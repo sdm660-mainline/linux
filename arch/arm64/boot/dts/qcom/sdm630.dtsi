@@ -1065,6 +1065,20 @@
 
 			gpu_sdm630_opp_table: opp-table {
 				compatible = "operating-points-v2";
+
+				opp-700000000 {
+					opp-hz = /bits/ 64 <700000000>;
+					opp-level = <RPM_SMD_LEVEL_TURBO>;
+					opp-peak-kBps = <5184000>;
+					opp-supported-hw = <0xFF>;
+				};
+
+				/*
+				* 775MHz is only available on default speed bin
+				* or 0xA2 (speed bin 1). Though it cannot be used
+				* for now due to interconnect framework not supporting
+				* multiple frequencies at the same opp-level
+
 				opp-775000000 {
 					opp-hz = /bits/ 64 <775000000>;
 					opp-level = <RPM_SMD_LEVEL_TURBO>;
@@ -1107,6 +1121,7 @@
 					opp-peak-kBps = <1200000>;
 					opp-supported-hw = <0xff>;
 				};
+				*/
 			};
 		};
 
