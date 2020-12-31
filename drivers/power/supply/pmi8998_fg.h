@@ -46,6 +46,12 @@
 #define PARAM_ADDR_BATT_VOLTAGE    0xa0
 #define PARAM_ADDR_BATT_CURRENT    0xa2
 
+#define MISC_BASE	0x1600
+
+#define BATTERY_CHARGER_STATUS_REG(chip)	(chip->chg_base + 0x06)
+#define BATTERY_CHARGER_STATUS_MASK GENMASK(2, 0)
+#define POWER_PATH_STATUS_REG	(MISC_BASE + 0x0B)
+
 enum wa_flags {
 	PMI8998_V1_REV_WA,
 	PMI8998_V2_REV_WA,
@@ -121,6 +127,7 @@ struct battery_info {
 struct pmi8998_fg_chip {
 	struct device *dev;
 	unsigned int base;
+	unsigned int chg_base;
 	struct regmap *regmap;
 	struct mutex lock;
 
