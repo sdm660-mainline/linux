@@ -11,6 +11,8 @@
 #include <linux/power_supply.h>
 #include <linux/module.h>
 #include <linux/math64.h>
+#include <linux/of_irq.h>
+#include <linux/interrupt.h>
 
 #include "pmi8998_fg.h"
 
@@ -318,6 +320,70 @@ static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
 	return rc;
 }
 
+int pmi8998_get_prop_usb_online(struct pmi8998_fg_chip *chip, int *val){
+	unsigned int stat;
+	int rc;
+
+	rc = regmap_read(chip->regmap, POWER_PATH_STATUS_REG, &stat);
+	if (rc < 0){
+		dev_err(chip->dev, "Couldn't read POWER_PATH_STATUS! ret=%d\n", rc);
+		return rc;
+	}
+
+	dev_dbg(chip->dev, "USB POWER_PATH_STATUS : 0x%02x\n", stat);
+	*val = (stat & BIT(4)) && (stat & BIT(0));
+	return rc;
+}
+
+int pmi8998_get_prop_batt_status(struct pmi8998_fg_chip *chip, int *val){
+	int usb_online_val;
+	unsigned int stat;
+	int rc;
+	bool usb_online;
+
+	rc = pmi8998_get_prop_usb_online(chip, &usb_online_val);
+	if (rc < 0) {
+		dev_err(chip->dev, "Couldn't get usb online property rc=%d\n", rc);
+		return rc;
+	}
+	dev_dbg(chip->dev, "USB ONLINE val : %d\n", usb_online_val);
+	usb_online = (bool)usb_online_val;
+
+	if (!usb_online) {
+		*val = POWER_SUPPLY_STATUS_DISCHARGING;
+		return rc;
+	}
+
+	rc = regmap_read(chip->regmap, BATTERY_CHARGER_STATUS_REG(chip), &stat);
+	if (rc < 0){
+		dev_err(chip->dev, "Charging status REGMAP read failed! ret=%d\n", rc);
+		return rc;
+	}
+		
+	stat = stat & BATTERY_CHARGER_STATUS_MASK;
+	dev_dbg(chip->dev, "Charging status : %d!\n", stat);
+
+	switch (stat) {
+		case TRICKLE_CHARGE:
+		case PRE_CHARGE:
+		case FAST_CHARGE:
+		case FULLON_CHARGE:
+		case TAPER_CHARGE:
+		case TERMINATE_CHARGE:
+		case INHIBIT_CHARGE:
+			*val = POWER_SUPPLY_STATUS_CHARGING;
+			break;
+		case DISABLE_CHARGE:
+			*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
+			break;
+		default:  
+			*val = POWER_SUPPLY_STATUS_UNKNOWN;
+			break;
+	}
+
+	return rc;
+}
+
 static int fg_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val)
@@ -325,7 +391,7 @@ static int fg_get_property(struct power_supply *psy,
 	struct pmi8998_fg_chip *chip = power_supply_get_drvdata(psy);
 	int error = 0;
 
-	dev_info(chip->dev, "Getting property: %d", psp);
+	dev_dbg(chip->dev, "Getting property: %d", psp);
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_MANUFACTURER:
@@ -360,8 +426,7 @@ static int fg_get_property(struct power_supply *psy,
 		val->intval = chip->batt_info.nom_cap_uah;
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
-		val->intval = POWER_SUPPLY_STATUS_CHARGING;
-		//error = smb2_chg_get_status(chip, &val->intval);
+		error = pmi8998_get_prop_batt_status(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = POWER_SUPPLY_HEALTH_GOOD;
@@ -402,12 +467,19 @@ static int pmi8998_fg_of_battery_init(struct pmi8998_fg_chip *chip){
 	return rc;
 }
 
+irqreturn_t pmi8998_handle_usb_plugin(int irq, void *data){
+	struct pmi8998_fg_chip *chip = data;
+	dev_dbg(chip->dev, "USB IRQ called!\n");
+	power_supply_changed(chip->bms_psy);
+	return IRQ_HANDLED;
+}
+
 static int pmi8998_fg_probe(struct platform_device *pdev)
 {
 	struct power_supply_config supply_config = {};
 	struct pmi8998_fg_chip *chip;
 	const __be32 *prop_addr;
-	int rc = 0;
+	int rc = 0, irq;
 	u8 dma_status;
 	bool error_present;
 
@@ -432,6 +504,13 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	chip->base = be32_to_cpu(*prop_addr);
+
+	prop_addr = of_get_address(pdev->dev.of_node, 1, NULL, NULL);
+	if (!prop_addr) {
+		dev_err(chip->dev, "Couldn't read CHG base address from dt\n");
+		return -EINVAL;
+	}
+	chip->chg_base = be32_to_cpu(*prop_addr);
 
 	// Init memif fn inlined here (chip hardware info)
 	rc = pmi8998_read(chip->regmap, chip->revision, REG_MEM(chip) + DIG_MINOR, 4);
@@ -479,10 +558,6 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		pr_err("failed to write dma_ctl, rc=%d\n", rc);
 		return rc;
 	}
-	
-	dev_dbg(chip->dev, "probed revision DIG:%d.%d ANA:%d.%d\n",
-		chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
-		chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
 
 	supply_config.drv_data = chip;
 	supply_config.of_node = pdev->dev.of_node;
@@ -495,6 +570,21 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, chip);
+
+	irq = of_irq_get_byname(pdev->dev.of_node, "usb-plugin");
+	if (irq < 0) {
+		dev_err(&pdev->dev, "Couldn't get irq usb-plugin byname\n");
+		return irq;
+	}
+
+	rc = devm_request_threaded_irq(chip->dev, irq, NULL,
+					pmi8998_handle_usb_plugin,
+					IRQF_ONESHOT, "usb-plugin", chip);
+	if (rc < 0) {
+		pr_err("Couldn't request irq %d\n", irq);
+		return rc;
+	}
+
 	return 0;
 }
 
