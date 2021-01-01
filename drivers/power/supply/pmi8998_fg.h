@@ -10,7 +10,10 @@
 #define MEM_INTF_RD_DATA0           0x67
 #define MEM_INTF_WR_DATA0           0x63
 
-#define SMB2_CABLE_CONNECTED        0x06
+#define PMIC_SUBTYPE		0x105
+
+#define PM8998_SUBTYPE		0x14
+#define PMI8998_SUBTYPE		0x15
 
 // pm8950 / pm89988 common
 #define MEM_INTF_IMA_CFG            0x52
@@ -33,9 +36,9 @@
 #define BATT_TEMP_LSB_MASK          GENMASK(7, 0)
 #define BATT_TEMP_MSB_MASK          GENMASK(2, 0)
 
-#define REG_BASE(chip)              (chip->base)
-#define REG_BATT(chip)              (chip->base + 0x100)
-#define REG_MEM(chip)               (chip->base + 0x400)
+#define REG_BASE              0x4000
+#define REG_BATT              0x4100
+#define REG_MEM               0x4400
 
 /* Interrupt offsets */
 #define INT_RT_STS                  0x10
@@ -46,9 +49,17 @@
 #define PARAM_ADDR_BATT_VOLTAGE    0xa0
 #define PARAM_ADDR_BATT_CURRENT    0xa2
 
+#define BATT_INFO_JEITA_COLD(chip)		(REG_BATT + 0x62)
+#define BATT_INFO_JEITA_COOL(chip)		(REG_BATT + 0x63)
+#define BATT_INFO_JEITA_WARM(chip)		(REG_BATT + 0x64)
+#define BATT_INFO_JEITA_HOT(chip)		(REG_BATT + 0x65)
+
 #define MISC_BASE	0x1600
+#define USBIN_BASE  0x1300
 
 #define BATTERY_CHARGER_STATUS_REG(chip)	(chip->chg_base + 0x06)
+#define BATTERY_HEALTH_STATUS_REG(chip)	(chip->chg_base + 0x07)
+
 #define BATTERY_CHARGER_STATUS_MASK GENMASK(2, 0)
 #define POWER_PATH_STATUS_REG	(MISC_BASE + 0x0B)
 
@@ -87,41 +98,18 @@ static enum power_supply_property fg_properties[] = {
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_MIN,
-	POWER_SUPPLY_PROP_TEMP,
-	// POWER_SUPPLY_PROP_CHARGE_NOW,
-	// POWER_SUPPLY_PROP_CHARGE_FULL,
-	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
-	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_STATUS,
-};
-
-struct fg_learning_data {
-	struct mutex    learning_lock;
-	bool            active;
-	int64_t         cc_uah;
-	int             learned_cc_uah;
-	int             init_cc_pc_val;
-	int             max_start_soc;
-	int             max_increment;
-	int             max_decrement;
-	int             vbat_est_thr_uv;
-	int             max_cap_limit;
-	int             min_cap_limit;
-	int             min_temp;
-	int             max_temp;
-};
-
-struct battery_info {
-	const char *manufacturer;
-	const char *model;
-	const char *serial_num;
-
-	int nom_cap_uah;
-
-	int batt_max_voltage_uv_design;
-	int batt_max_voltage_uv;
+	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_CHARGE_FULL,
+	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_TEMP_MIN,
+	POWER_SUPPLY_PROP_TEMP_MAX,
+	POWER_SUPPLY_PROP_TEMP_ALERT_MIN,
+	POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
 };
 
 struct pmi8998_fg_chip {
@@ -130,15 +118,16 @@ struct pmi8998_fg_chip {
 	unsigned int chg_base;
 	struct regmap *regmap;
 	struct mutex lock;
+	unsigned int subtype;
 
 	struct power_supply *bms_psy;
 
 	u8 revision[4];
 	bool ima_supported;
 
-	struct battery_info batt_info;
-
-	struct fg_learning_data learning_data;
+	int batt_cap_uah;
+	int batt_max_voltage_uv;
+	int batt_min_voltage_uv;
 
 	int health;
 	int status;
