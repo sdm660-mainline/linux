@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2020, Mark Hargreaves <clashclanacc2602@gmail.com>
+ */
+
+/dts-v1/;
+#include "sdm660-xiaomi-clover-common.dtsi"
+
+/ {
+	model = "Xiaomi Mi Pad 4";
+	compatible = "xiaomi,clover", "qcom,sda660";
+};
+
+&blsp_i2c3 {
+	status = "okay";
+
+	touchscreen@38 {
+		compatible = "edt,edt-ft5406";
+		reg = <0x38>;
+
+		vcc-supply = <&vreg_l11a_1p8>;
+
+		pinctrl-0 = <&ts_int_active &ts_rst>;
+		pinctrl-names = "default";
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+
+		touchscreen-size-x = <1200>;
+		touchscreen-size-y = <1920>;
+	};
+};
+
+&mdss_dsi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+
+	status = "okay";
+
+	panel: panel@0 {
+		compatible = "boe,nt51021";
+		reg = <0>;
+
+		backlight = <&pm660l_wled>;
+
+		avdd-supply = <&lcd_pwr>;
+		reset-gpios = <&tlmm 62 GPIO_ACTIVE_LOW>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mdss_dsi_reset &mdss_vsync_active>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+
+	status = "okay";
+};
+
+&pm660l_wled {
+	qcom,switching-freq = <800>;
+	qcom,current-limit-microamp = <20000>;
+	qcom,num-strings = <3>;
+
+	status = "okay";
+};
+
+&remoteproc_mss {
+	firmware-name = "mba.mbn", "modemnm.mdt";
+
+	status = "okay";
+};
+
+&simplefb {
+	/*
+	 * Prevent unused clocks and power domains from being disabled. It's
+	 * needed to keep bootloader-enabled display stack (and therefore
+	 * framebuffer) working.
+	 */
+	assigned-clocks = <&mmcc MDSS_MDP_CLK>,   /* from mdp */
+			  <&mmcc MDSS_VSYNC_CLK>;
+	assigned-clock-rates = <300000000>,
+				<19200000>;
+	clocks = <&mmcc MDSS_AHB_CLK>, /* from mdss & mdp */
+		<&mmcc MDSS_AXI_CLK>,
+		<&mmcc MDSS_VSYNC_CLK>,
+		<&mmcc MDSS_MDP_CLK>,
+		<&mmcc BYTE0_CLK_SRC>, /* from mdss_dsi0 */
+		<&mmcc PCLK0_CLK_SRC>,
+		<&mmcc MDSS_BYTE0_CLK>,
+		<&mmcc MDSS_BYTE0_INTF_CLK>,
+		<&mmcc MNOC_AHB_CLK>,
+		<&mmcc MISC_AHB_CLK>,
+		<&mmcc MDSS_PCLK0_CLK>,
+		<&mmcc MDSS_ESC0_CLK>;
+
+	power-domains = <&rpmpd SDM660_VDDCX>, <&mmcc MDSS_GDSC>;
+
+	/* Let simledrm framebuffer to know panel physical size to
+	   allow userspace to do proper DPI scaling */
+	panel = <&fb_panel>;
+
+	fb_panel: fb-panel {
+		width-mm = <107>;
+		height-mm = <172>;
+	};
+};
+
+&tlmm {
+	ts_int_active: ts-int-active-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	ts_rst: ts-rst-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+};
