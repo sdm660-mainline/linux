@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2026, Nickolay Goppen <setotau@mainlining.org>
+ */
+
+/dts-v1/;
+#include "sdm660-xiaomi-clover-regular-common.dtsi"
+/ {
+	model = "Xiaomi Mi Pad 4 Wi-Fi";
+	compatible = "xiaomi,clover-wifi", "qcom,sda660";
+};
+
+&remoteproc_mss {
+	firmware-name = "mba.mbn", "modemnm.mdt";
+
+	status = "okay";
+};
