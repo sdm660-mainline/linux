@@ -22,7 +22,7 @@
 
 /**
  * pmi8998_read() - Read multiple registers with regmap_bulk_read
- * 
+ *
  * @param map The regmap to read
  * @param val Pointer to read values into
  * @param addr Address to read from
@@ -43,7 +43,7 @@ static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
 
 /**
  * @brief pmi8998_write() - Write multiple registers with regmap_bulk_write
- * 
+ *
  * @param map The regmap to write
  * @param val Pointer to write values into
  * @param addr Address to write from
@@ -73,7 +73,7 @@ static int pmi8998_write(struct regmap *map, u8 *val, u16 addr, int len)
 /**
  * @brief pmi8998_masked_write() - like pmi8998_write but applies
  * a mask first.
- * 
+ *
  * @param map The regmap to write
  * @param val Pointer to write values into
  * @param addr Address to write from
@@ -321,7 +321,7 @@ int pmi8998_get_prop_batt_status(struct pmi8998_fg_chip *chip, int *val){
 		dev_err(chip->dev, "Charging status REGMAP read failed! ret=%d\n", rc);
 		return rc;
 	}
-		
+
 	stat = stat & BATTERY_CHARGER_STATUS_MASK;
 	dev_dbg(chip->dev, "Charging status : %d!\n", stat);
 
@@ -338,7 +338,7 @@ int pmi8998_get_prop_batt_status(struct pmi8998_fg_chip *chip, int *val){
 		case DISABLE_CHARGE:
 			*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
 			break;
-		default:  
+		default:
 			*val = POWER_SUPPLY_STATUS_UNKNOWN;
 			break;
 	}
@@ -366,7 +366,7 @@ int pmi8998_get_prop_health_status(struct pmi8998_fg_chip *chip, int *val){
 		*val = POWER_SUPPLY_HEALTH_WARM;
 	else
 		*val = POWER_SUPPLY_HEALTH_GOOD;
-	
+
 	return rc;
 }
 
@@ -520,7 +520,7 @@ irqreturn_t pmi8998_handle_usb_plugin(int irq, void *data){
 	} else {
 		val.intval = POWER_SUPPLY_STATUS_DISCHARGING;
 		power_supply_set_property(chip->bms_psy, POWER_SUPPLY_PROP_STATUS, &val);
-	}	
+	}
 
 	dev_dbg(chip->dev, "USB IRQ: %s\n", vbus_rising ? "attached" : "detached");
 	power_supply_changed(chip->bms_psy);
@@ -578,7 +578,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		dev_err(chip->dev, "Error in reading qcom,max-voltage-uv, rc=%d\n", rc);
 		return rc;
 	}
-	
+
 	rc = of_property_read_u32(pdev->dev.of_node, "qcom,battery-capacity-ua",
 					&chip->batt_cap_uah);
 	if (rc < 0) {
@@ -602,7 +602,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	dev_dbg(chip->dev, "pmi8998 revision DIG:%d.%d ANA:%d.%d\n",
 		chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
 		chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
-	
+
 	/*
 	 * Change the FG_MEM_INT interrupt to track IACS_READY
 	 * condition instead of end-of-transaction. This makes sure
