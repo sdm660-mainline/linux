@@ -594,6 +594,7 @@ int qcom_fg_get_prop_batt_status(struct qcom_fg_chip *chip, int *val){
 	}
 	dev_dbg(chip->dev, "USB ONLINE val : %d\n", usb_online_val);
 	usb_online = (bool)usb_online_val;
+	chip->online = usb_online;
 
 	if (!usb_online) {
 		*val = POWER_SUPPLY_STATUS_DISCHARGING;
@@ -827,6 +828,9 @@ static int fg_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		error = chip->ops->get_batt_status(chip, &val->intval);
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = chip->online;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		error = chip->ops->get_health_status(chip, &val->intval);
