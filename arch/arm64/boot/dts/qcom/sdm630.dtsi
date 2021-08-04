@@ -638,7 +638,9 @@
 			reg = <0x016c0000 0x40000>;
 			#global-interrupts = <2>;
 			#iommu-cells = <1>;
-			qcom,bypass-cbndx = /bits/ 8 <3>;
+			qcom,bypass-cbndx = /bits/ 8 <6>;
+			qcom,reset-nodisable-cbs = /bits/ 8 <7 8 9 10 11 12 13 14
+							     15 16 17 18 19 20>;
 
 			interrupts =
 				<GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
@@ -1181,6 +1183,7 @@
 				      "mem_iface";
 			#global-interrupts = <2>;
 			#iommu-cells = <1>;
+			qcom,reset-nodisable-cbs = /bits/ 8 <2 3 4>;
 
 			interrupts =
 				<GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
@@ -1219,6 +1222,7 @@
 			reg = <0x05100000 0x40000>;
 			#iommu-cells = <1>;
 			qcom,bypass-cbndx = /bits/ 8 <12>;
+			qcom,reset-nodisable-cbs = /bits/ 8 <13>;
 
 			#global-interrupts = <2>;
 			interrupts =
