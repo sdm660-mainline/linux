@@ -25,6 +25,7 @@
 		mmc2 = &sdhc_2;
 	};
 
+
 	chosen { };
 
 	clocks {
@@ -639,6 +640,7 @@
 			clock-names = "bus";
 			#global-interrupts = <2>;
 			#iommu-cells = <1>;
+			qcom,bypass-cbndx = /bits/ 8 <3>;
 
 			interrupts =
 				<GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
@@ -1162,6 +1164,7 @@
 			compatible = "qcom,sdm630-smmu-v2", "qcom,smmu-v2";
 			reg = <0x05100000 0x40000>;
 			#iommu-cells = <1>;
+			qcom,bypass-cbndx = /bits/ 8 <12>;
 
 			#global-interrupts = <2>;
 			interrupts =
