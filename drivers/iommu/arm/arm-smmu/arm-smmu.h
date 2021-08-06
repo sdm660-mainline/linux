@@ -430,6 +430,7 @@ struct arm_smmu_impl {
 			    u64 val);
 	int (*cfg_probe)(struct arm_smmu_device *smmu);
 	int (*reset)(struct arm_smmu_device *smmu);
+	bool (*reset_cb_nodisable)(struct arm_smmu_device *smmu, int cbndx);
 	int (*init_context)(struct arm_smmu_domain *smmu_domain,
 			struct io_pgtable_cfg *cfg, struct device *dev);
 	void (*tlb_sync)(struct arm_smmu_device *smmu, int page, int sync,
