@@ -6,6 +6,7 @@
 #include <linux/acpi.h>
 #include <linux/adreno-smmu-priv.h>
 #include <linux/delay.h>
+#include <linux/bitmap.h>
 #include <linux/of_device.h>
 #include <linux/qcom_scm.h>
 
@@ -387,11 +388,20 @@ static int qcom_smmu500_reset(struct arm_smmu_device *smmu)
 	return 0;
 }
 
+static bool qcom_smmu500_reset_cb_nodisable(struct arm_smmu_device *smmu,
+					    int cbndx)
+{
+	struct qcom_smmu *qsmmu = to_qcom_smmu(smmu);
+
+	return test_bit(cbndx, qsmmu->reset_cb_nodisable_mask);
+}
+
 static const struct arm_smmu_impl qcom_smmu_impl = {
 	.init_context = qcom_smmu_init_context,
 	.cfg_probe = qcom_smmu_cfg_probe,
 	.def_domain_type = qcom_smmu_def_domain_type,
 	.reset = qcom_smmu500_reset,
+	.reset_cb_nodisable = qcom_smmu500_reset_cb_nodisable,
 	.write_s2cr = qcom_smmu_write_s2cr,
 	.tlb_sync = qcom_smmu_tlb_sync,
 };
@@ -400,6 +410,7 @@ static const struct arm_smmu_impl qcom_adreno_smmu_impl = {
 	.init_context = qcom_adreno_smmu_init_context,
 	.def_domain_type = qcom_smmu_def_domain_type,
 	.reset = qcom_smmu500_reset,
+	.reset_cb_nodisable = qcom_smmu500_reset_cb_nodisable,
 	.alloc_context_bank = qcom_adreno_smmu_alloc_context_bank,
 	.write_sctlr = qcom_adreno_smmu_write_sctlr,
 	.tlb_sync = qcom_smmu_tlb_sync,
@@ -410,6 +421,8 @@ static struct arm_smmu_device *qcom_smmu_create(struct arm_smmu_device *smmu,
 {
 	const struct device_node *np = smmu->dev->of_node;
 	struct qcom_smmu *qsmmu;
+	u8 reset_nodisable_cbs[ARM_SMMU_MAX_CBS];
+	int i, sz;
 
 	/* Check to make sure qcom_scm has finished probing */
 	if (!qcom_scm_is_available())
@@ -422,6 +435,7 @@ static struct arm_smmu_device *qcom_smmu_create(struct arm_smmu_device *smmu,
 	qsmmu->smmu.impl = impl;
 	qsmmu->cfg = qcom_smmu_impl_data(smmu);
 	qsmmu->bypass_cbndx = 0xff;
+	bitmap_zero(qsmmu->reset_cb_nodisable_mask, ARM_SMMU_MAX_CBS);
 
 	if (np != NULL) {
 		/*
@@ -430,6 +444,23 @@ static struct arm_smmu_device *qcom_smmu_create(struct arm_smmu_device *smmu,
 		 * - We are booting on ACPI
 		 */
 		of_property_read_u8(np, "qcom,bypass-cbndx", &qsmmu->bypass_cbndx);
+
+		/*
+		 * Some context banks may not be disabled because they are
+		 * secured: read from DT a list of secured contexts that cannot
+		 * be disabled without crashing the system.
+		 * This list is optional, as not all firmware configurations do
+		 * require us skipping disablement of context banks.
+		 */
+		sz = of_property_read_variable_u8_array(np, "qcom,reset-nodisable-cbs",
+							reset_nodisable_cbs,
+							1, ARM_SMMU_MAX_CBS);
+		if (sz > 0) {
+			for (i = 0; i < sz; i++) {
+				__set_bit(reset_nodisable_cbs[i],
+					  qsmmu->reset_cb_nodisable_mask);
+			}
+		}
 	}
 
 	return &qsmmu->smmu;
