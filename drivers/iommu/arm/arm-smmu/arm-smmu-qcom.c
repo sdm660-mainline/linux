@@ -379,8 +379,15 @@ static int qcom_sdm845_smmu500_reset(struct arm_smmu_device *smmu)
 static int qcom_smmu500_reset(struct arm_smmu_device *smmu)
 {
 	const struct device_node *np = smmu->dev->of_node;
+	struct qcom_smmu *qsmmu = to_qcom_smmu(smmu);
 
-	arm_mmu500_reset(smmu);
+	/*
+	 * Execute the mmu-500 reset implementation detail only if there
+	 * are no secured untouchable contexts in this iommu, otherwise
+	 * the system will crash.
+	 */
+	if (bitmap_empty(qsmmu->reset_cb_nodisable_mask, ARM_SMMU_MAX_CBS))
+		arm_mmu500_reset(smmu);
 
 	if (of_device_is_compatible(np, "qcom,sdm845-smmu-500"))
 		return qcom_sdm845_smmu500_reset(smmu);
