@@ -9,6 +9,7 @@
 struct qcom_smmu {
 	struct arm_smmu_device smmu;
 	const struct qcom_smmu_config *cfg;
+	DECLARE_BITMAP(reset_cb_nodisable_mask, ARM_SMMU_MAX_CBS);
 	bool bypass_quirk;
 	u8 bypass_cbndx;
 	u32 stall_enabled;
