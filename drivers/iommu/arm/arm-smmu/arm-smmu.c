@@ -1600,6 +1600,16 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 
 	/* Make sure all context banks are disabled and clear CB_FSR  */
 	for (i = 0; i < smmu->num_context_banks; ++i) {
+		/*
+		 * Some context banks cannot be disabled due to hypervisor
+		 * configuration on some systems; if this is the case,
+		 * skip disabling and writing FAULT on the CB FSR in order
+		 * to avoid a system crash.
+		 */
+		if (smmu->impl && smmu->impl->reset_cb_nodisable &&
+		    smmu->impl->reset_cb_nodisable(smmu, i)) {
+			continue;
+		}
 		arm_smmu_write_context_bank(smmu, i);
 		arm_smmu_cb_write(smmu, i, ARM_SMMU_CB_FSR, ARM_SMMU_FSR_FAULT);
 	}
