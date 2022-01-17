@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2021, AngeloGioacchino Del Regno
  *                     <angelogioacchino.delregno@somainline.org>
+ * Copyright (c) 2022, Molly Sophia <mollysophia379@gmail.com>
  */
 
 /dts-v1/;
@@ -25,6 +26,19 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		framebuffer@9d400000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0x9d400000 0x0 (1080 * 2280 * 4)>;
+			width = <1080>;
+			height = <2280>;
+			stride = <(1080 * 4)>;
+			format = "a8r8g8b8";
+		};
 	};
 
 	reserved-memory {
@@ -55,6 +69,11 @@
 
 		removed_region@85800000 {
 			reg = <0x00 0x85800000 0x00 0x3700000>;
+			no-map;
+		};
+
+		framebuffer_memory@9d400000 {
+			reg = <0x0 0x9d400000 0x0 (1080 * 2280 * 4)>;
 			no-map;
 		};
 	};
@@ -173,17 +192,17 @@
 
 	gpio_keys {
 		status = "okay";
-		compatible = "gpio-keys";
-		input-name = "gpio-keys";
-		#address-cells = <1>;
-		#size-cells = <0>;
+		compatible = "gpio-keys-polled";
+		poll-interval = <100>;
+		label = "Volume up";
+		pinctrl-names = "default";
+		pinctrl-0 = <&vol_up_gpio_default>;
 
 		vol_up {
 			label = "Volume Up";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
+			linux,input-type = <EV_KEY>;
 			linux,code = <KEY_VOLUMEUP>;
-			wakeup-source;
 			debounce-interval = <15>;
 		};
 	};
@@ -224,6 +243,23 @@
 	 * one SMB1355 chip is present on board. What's the
 	 * right address?
 	 */
+};
+
+&blsp_i2c4 {
+	status = "okay";
+	/* Novatek device tree node */
+	novatek@62 {
+		compatible = "novatek,nt36525";
+		reg = <0x62>;
+		vcc-supply = <&vreg_l11a_1p8>;
+		pinctrl-0 = <&ts_int_active &ts_rst_n>;
+		pinctrl-names = "default";
+		interrupt-parent = <&tlmm>;
+		interrupts = <67 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2280>;
+	};
 };
 
 &blsp1_uart2 {
@@ -582,13 +618,22 @@
 		power-source = <0>;
 	};
 
-	vol_key_gpio_default: vol-key-gpio-default {
+	vol_up_gpio_default: vol-up-gpio-default {
 		pins = "gpio7";
 		function = "normal";
 		bias-pull-up;
 		input-enable;
 		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
 	};
+};
+
+&pon_resin {
+	linux,code = <KEY_VOLUMEDOWN>;
+	status = "okay";
+};
+
+&pon_pwrkey {
+	status = "okay";
 };
 
 &tlmm {
@@ -705,6 +750,26 @@
 		input-enable;
 	};
 
+};
+
+&adreno_gpu{
+	status = "disabled";
+};
+
+&gpucc{
+	status = "disabled";
+};
+
+&mmcc{
+	status = "disabled";
+};
+
+&qusb2phy0 {
+	status = "okay";
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
+	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
 &usb3 {
