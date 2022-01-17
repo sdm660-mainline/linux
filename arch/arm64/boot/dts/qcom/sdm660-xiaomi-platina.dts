@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2021, AngeloGioacchino Del Regno
  *                     <angelogioacchino.delregno@somainline.org>
+ * Copyright (c) 2022, Molly Sophia <mollysophia379@gmail.com>
  */
 
 /dts-v1/;
@@ -25,6 +26,19 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		framebuffer@9d400000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0x9d400000 0x0 (1080 * 2280 * 4)>;
+			width = <1080>;
+			height = <2280>;
+			stride = <(1080 * 4)>;
+			format = "a8r8g8b8";
+		};
 	};
 
 	reserved-memory {
@@ -55,6 +69,11 @@
 
 		removed_region@85800000 {
 			reg = <0x00 0x85800000 0x00 0x3700000>;
+			no-map;
+		};
+
+		framebuffer_memory@9d400000 {
+			reg = <0x0 0x9d400000 0x0 (1080 * 2280 * 4)>;
 			no-map;
 		};
 	};
