@@ -245,6 +245,23 @@
 	 */
 };
 
+&blsp_i2c4 {
+	status = "okay";
+	/* Novatek device tree node */
+	novatek@62 {
+		compatible = "novatek,nt36525";
+		reg = <0x62>;
+		vcc-supply = <&vreg_l11a_1p8>;
+		pinctrl-0 = <&ts_int_active &ts_rst_n>;
+		pinctrl-names = "default";
+		interrupt-parent = <&tlmm>;
+		interrupts = <67 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2280>;
+	};
+};
+
 &blsp1_uart2 {
 	status = "okay";
 };
