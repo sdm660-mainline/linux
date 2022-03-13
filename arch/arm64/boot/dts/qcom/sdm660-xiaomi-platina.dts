@@ -726,6 +726,18 @@
 
 };
 
+&adreno_gpu{
+	status = "disabled";
+};
+
+&gpucc{
+	status = "disabled";
+};
+
+&mmcc{
+	status = "disabled";
+};
+
 &qusb2phy0 {
 	status = "okay";
 
