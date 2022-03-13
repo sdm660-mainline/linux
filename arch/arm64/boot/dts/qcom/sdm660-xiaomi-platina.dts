@@ -192,17 +192,17 @@
 
 	gpio_keys {
 		status = "okay";
-		compatible = "gpio-keys";
-		input-name = "gpio-keys";
-		#address-cells = <1>;
-		#size-cells = <0>;
+		compatible = "gpio-keys-polled";
+		poll-interval = <100>;
+		label = "Volume up";
+		pinctrl-names = "default";
+		pinctrl-0 = <&vol_up_gpio_default>;
 
 		vol_up {
 			label = "Volume Up";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
+			linux,input-type = <EV_KEY>;
 			linux,code = <KEY_VOLUMEUP>;
-			wakeup-source;
 			debounce-interval = <15>;
 		};
 	};
@@ -618,13 +618,22 @@
 		power-source = <0>;
 	};
 
-	vol_key_gpio_default: vol-key-gpio-default {
+	vol_up_gpio_default: vol-up-gpio-default {
 		pins = "gpio7";
 		function = "normal";
 		bias-pull-up;
 		input-enable;
 		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
 	};
+};
+
+&pon_resin {
+	linux,code = <KEY_VOLUMEDOWN>;
+	status = "okay";
+};
+
+&pon_pwrkey {
+	status = "okay";
 };
 
 &tlmm {
