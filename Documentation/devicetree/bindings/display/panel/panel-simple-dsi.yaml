@@ -57,6 +57,8 @@ properties:
       - samsung,sofef00
         # Shangai Top Display Optoelectronics 7" TL070WSH30 1024x600 TFT LCD panel
       - tdo,tl070wsh30
+        # Asus Zenfone Max Pro M1 (x00td) nt36672_1080p_video_txd FHD+ IPS LCD Panel
+      - asus,nt36672-txd
 
   reg:
     maxItems: 1
