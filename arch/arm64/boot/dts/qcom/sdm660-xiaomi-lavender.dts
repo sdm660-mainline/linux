@@ -94,6 +94,25 @@
 	status = "okay";
 };
 
+&blsp_i2c1 {
+	status = "okay";
+
+	/* Novatek NT36672A touchscreen */
+	touchscreen@62 {
+		compatible = "novatek,nt36525";
+		reg = <0x62>;
+		vdd-supply = <&vreg_l11a_1p8>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <67 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&ts_pins_active>;
+		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2340>;
+	};
+};
+
 &blsp1_uart2 {
 	status = "okay";
 };
@@ -439,6 +458,27 @@
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
+
+	ts_pins_active: ts-pins-active-state {
+		pins = "gpio66", "gpio67";
+		function = "gpio";
+		drive-strength = <16>;
+		bias-pull-up;
+	};
+
+	ts_rst_sleep: ts-rst-sleep-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	ts_int_sleep: ts-int-sleep-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
 };
 
 &usb3 {
