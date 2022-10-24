@@ -759,3 +759,7 @@
 	qcom,min-voltage-uv= <3400000>;
 	qcom,max-voltage-uv= <4350000>;
 };
+
+&pm660_rradc {
+	status = "okay";
+};
