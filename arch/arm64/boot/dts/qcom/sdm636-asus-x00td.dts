@@ -746,3 +746,8 @@
 	status = "okay";
 	firmware-name = "qcom/venus-4.4/venus.mdt";
 };
+
+&pm660_charger {
+	status = "okay";
+	monitored-battery = <&battery>;
+};
