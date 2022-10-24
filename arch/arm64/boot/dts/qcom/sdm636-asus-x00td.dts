@@ -751,3 +751,11 @@
 	status = "okay";
 	monitored-battery = <&battery>;
 };
+
+&pm660_fg {
+	status = "okay";
+	monitored-battery = <&battery>;
+	qcom,battery-capacity-ua = <5000000>;
+	qcom,min-voltage-uv= <3400000>;
+	qcom,max-voltage-uv= <4350000>;
+};
