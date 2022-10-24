@@ -173,6 +173,14 @@
 		regulator-boot-on;
 	};
 
+	battery: battery {
+			compatible = "simple-battery";
+
+			charge-full-design-microamp-hours = <5000000>;
+			voltage-min-design-microvolt = <3400000>;
+			voltage-max-design-microvolt = <4350000>;
+	};
+
 	/* Add support of modem and Wi-Fi */
 	soc {
 		/*
