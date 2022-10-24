@@ -214,7 +214,7 @@
 			resets = <&gcc GCC_MSS_RESTART>;
 			reset-names = "mss_restart";
 
-			qcom,halt-regs = <&tcsr_mutex_regs 0x23000 0x25000 0x24000>;
+			qcom,halt-regs = <&tcsr_regs_1 0x23000 0x25000 0x24000>;
 
 			power-domains = <&rpmpd SDM660_VDDCX>,
 					<&rpmpd SDM660_VDDMX>;
