@@ -612,7 +612,7 @@ DMA_CTRL_REUSE
 
   - Interpretation of command data is DMA controller specific. It can be
     used for issuing immediate commands to other peripherals/register
-    reads/register writes for which the descriptor shoudl be in a
+    reads/register writes for which the descriptor should be in a
     different format from normal data descriptors.
 
 - DMA_PREP_REPEAT
