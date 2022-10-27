@@ -590,6 +590,16 @@ DMA_CTRL_REUSE
     writes for which the descriptor should be in different format from
     normal data descriptors.
 
+- DMA_PREP_IMM_CMD
+
+  - If set, the client driver tells DMA controller that passed data in DMA
+    API is immediate command data.
+
+  - Interpretation of command data is DMA controller specific. It can be
+    used for issuing immediate commands to other peripherals/register
+    reads/register writes for which the descriptor should be in a
+    different format from normal data descriptors.
+
 - DMA_PREP_REPEAT
 
   - If set, the transfer will be automatically repeated when it ends until a
