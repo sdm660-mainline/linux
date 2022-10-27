@@ -30,6 +30,7 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/dma-mapping.h>
+#include <linux/dma/qcom_bam_dma.h>
 #include <linux/scatterlist.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
@@ -70,6 +71,7 @@ struct bam_async_desc {
 	u16 flags;
 
 	struct bam_desc_hw *curr_desc;
+	struct bam_dma_metadata *metadata;
 
 	/* list node for the desc in the bam_chan list of descriptors */
 	struct list_head desc_node;
@@ -419,6 +421,52 @@ static inline void __iomem *bam_addr(struct bam_device *bdev, u32 pipe,
 }
 
 /**
+ * bam_update_metadata - update metadata buffer
+ * @bchan: BAM channel to read metadata from
+ * @async_desc: BAM async descriptior
+ *
+ * Updates metadata buffer (transfer size) based on values
+ * read from FIFO descriptors at bchan->head
+ */
+
+static inline void bam_update_metadata(struct bam_chan *bchan,
+				       struct bam_async_desc *async_desc)
+{
+	unsigned int i, e, len = 0;
+	struct bam_desc_hw *fifo;
+
+	if (!async_desc->metadata)
+		return;
+
+	fifo = PTR_ALIGN(bchan->fifo_virt, sizeof(struct bam_desc_hw));
+	for (i = bchan->head, e = i + async_desc->xfer_len; i < e; i++)
+		len += fifo[i % MAX_DESCRIPTORS].size;
+
+	async_desc->metadata->xfer_len_bytes += len;
+}
+
+/**
+ * bam_attach_metadata - attach metadata buffer to the async descriptor
+ * @desc: async descriptor
+ * @data: buffer pointer
+ * @len: length of passed buffer
+ */
+static int bam_attach_metadata(struct dma_async_tx_descriptor *desc, void *data,
+			       size_t len)
+{
+	struct bam_async_desc *async_desc;
+
+	if (!data || len != sizeof(struct bam_dma_metadata))
+		return -EINVAL;
+
+	async_desc = container_of(desc, struct bam_async_desc, vd.tx);
+	async_desc->metadata = data;
+	async_desc->metadata->xfer_len_bytes = 0;
+
+	return 0;
+}
+
+/**
  * bam_reset() - reset and initialize BAM registers
  * @bdev: bam device
  */
@@ -455,6 +503,10 @@ static void bam_reset(struct bam_device *bdev)
 	/* unmask global bam interrupt */
 	writel_relaxed(BAM_IRQ_MSK, bam_addr(bdev, 0, BAM_IRQ_SRCS_MSK_EE));
 }
+
+static struct dma_descriptor_metadata_ops metadata_ops = {
+	.attach = bam_attach_metadata,
+};
 
 /**
  * bam_reset_channel - Reset individual BAM DMA channel
@@ -714,6 +766,8 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
 		} while (remainder > 0);
 	}
 
+	async_desc->vd.tx.metadata_ops = &metadata_ops;
+
 	return vchan_tx_prep(&bchan->vc, &async_desc->vd, flags);
 }
 
@@ -866,6 +920,8 @@ static u32 process_channel_irqs(struct bam_device *bdev)
 			/* Not enough data to read */
 			if (avail < async_desc->xfer_len)
 				break;
+
+			bam_update_metadata(bchan, async_desc);
 
 			/* manage FIFO */
 			bchan->head += async_desc->xfer_len;
@@ -1347,6 +1403,7 @@ static int bam_dma_probe(struct platform_device *pdev)
 	bdev->common.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
 	bdev->common.src_addr_widths = DMA_SLAVE_BUSWIDTH_4_BYTES;
 	bdev->common.dst_addr_widths = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	bdev->common.desc_metadata_modes = DESC_METADATA_CLIENT;
 	bdev->common.device_alloc_chan_resources = bam_alloc_chan;
 	bdev->common.device_free_chan_resources = bam_free_chan;
 	bdev->common.device_prep_slave_sg = bam_prep_slave_sg;
