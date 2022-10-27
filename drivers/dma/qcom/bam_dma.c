@@ -58,6 +58,7 @@ struct bam_desc_hw {
 #define DESC_FLAG_EOB BIT(13)
 #define DESC_FLAG_NWD BIT(12)
 #define DESC_FLAG_CMD BIT(11)
+#define DESC_FLAG_IMM BIT(8)
 
 struct bam_async_desc {
 	struct virt_dma_desc vd;
@@ -693,6 +694,8 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
 		do {
 			if (flags & DMA_PREP_CMD)
 				desc->flags |= cpu_to_le16(DESC_FLAG_CMD);
+			else if (flags & DMA_PREP_IMM_CMD)
+				desc->flags |= cpu_to_le16(DESC_FLAG_IMM);
 
 			desc->addr = cpu_to_le32(sg_dma_address(sg) +
 						 curr_offset);
