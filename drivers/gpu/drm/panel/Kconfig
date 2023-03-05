@@ -108,6 +108,15 @@ config DRM_PANEL_ELIDA_KD35T133
 	  KD35T133 controller for 320x480 LCD panels with MIPI-DSI
 	  system interfaces.
 
+config DRM_PANEL_FT8716U
+	tristate "FT8716U panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	 Say Y here if you want to enable support for the FT8716U controller
+	 for 1080x1920 LCD panels. Found on some (most?) Nokia PL2 (6.1) phones.
+
 config DRM_PANEL_FEIXIN_K101_IM2BA02
 	tristate "Feixin K101 IM2BA02 panel"
 	depends on OF
