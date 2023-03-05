@@ -1,0 +1,721 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2022, Alexander Richards
+ */
+
+/dts-v1/;
+
+#include "sdm630.dtsi"
+#include "pm660.dtsi"
+#include "pm660l.dtsi"
+
+/ {
+	chassis-type = "handset";
+	
+	model = "HMD Global Nokia 6.1";
+
+	// Some versions of the bootloader on this phone do weird things when
+	// this is not identical to downstream. However, the bootloader that
+	// Android 10 uses seems to accept these without any problems.
+	compatible = "nokia,6.1", "qcom,sdm630";
+	
+	
+	qcom,msm-id = <0x13e 0x00>;
+	qcom,board-id = <0x08 0x00>;
+	qcom,pmic-id = <0x1001b 0x101011a 0x00 0x00 0x1001b 0x201011a 0x00 0x00>;
+	
+	battery: battery {
+		compatible = "simple-battery";
+
+		charge-full-design-microamp-hours = <4000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
+	};
+	
+	aliases {
+	};
+	
+	chosen {
+		bootargs = "";
+		
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		framebuffer0: framebuffer@9D400000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0x9D400000 0x0 (1080 * 1920 * 4)>;
+			width = <1080>;
+			height = <1920>;
+			stride = <(1080 * 4)>;
+			format = "a8r8g8b8";
+			status = "okay";
+		};
+	};
+	
+	vph_pwr: vph-pwr-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vph_pwr";
+
+		regulator-always-on;
+		regulator-boot-on;
+	};
+	
+	reserved-memory {
+		ranges;
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+
+		removed_region0@85800000 {
+			reg = <0x00 0x85800000 0x00 0x3700000>;
+			no-map;
+		};
+
+		adsp_region {
+			size = <0x00 0x800000>;
+			reusable;
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			alignment = <0x00 0x400000>;
+			phandle = <0x10d>;
+			linux,phandle = <0x10d>;
+		};
+
+		dfps_data_mem@9f7ff000 {
+			reg = <0x00 0x9f7ff000 0x00 0x1000>;
+			label = "dfps_data_mem";
+		};
+
+		pstore_region@ACB00000 {
+			reg = <0x00 0xacb00000 0x00 0x200000>;
+			compatible = "ramoops";
+			record-size = <4096>;
+			console-size = <262144>;
+			ftrace-size = <4096>;
+			pmsg-size = <4096>;
+			ecc-size = <0>;
+			status = "okay";
+		};
+
+		fih_mem@AC800000 {
+			reg = <0x00 0xac800000 0x00 0x300000>;
+			no-map;
+		};
+
+		fih_nv@AC000000 {
+			reg = <0x00 0xac000000 0x00 0x800000>;
+			no-map;
+		};
+
+		venus_fw_region {
+			size = <0x00 0x800000>;
+			reusable;
+			alloc-ranges = <0x00 0x80000000 0x00 0x20000000>;
+			alignment = <0x00 0x400000>;
+			phandle = <0x11f>;
+			linux,phandle = <0x11f>;
+		};
+
+		secure_region {
+			size = <0x00 0x5c00000>;
+			reusable;
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			alignment = <0x00 0x400000>;
+			phandle = <0x135>;
+			linux,phandle = <0x135>;
+		};
+
+		splash_region@9d400000 {
+			reg = <0x00 0x9d400000 0x00 0x2300000>;
+			label = "cont_splash_mem";
+			no-map;
+		};
+
+		linux,cma {
+			size = <0x00 0x2000000>;
+			reusable;
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			alignment = <0x00 0x400000>;
+			linux,cma-default;
+		};
+
+		qseecom_region {
+			size = <0x00 0x1400000>;
+			reusable;
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			alignment = <0x00 0x400000>;
+			phandle = <0x134>;
+			linux,phandle = <0x134>;
+		};
+	};
+	
+	/*
+	 * Until we hook up type-c detection, we
+	 * have to stick with this. But it works.
+	 */
+	extcon_usb: extcon-usb {
+		compatible = "linux,extcon-usb-gpio";
+		id-gpio = <&tlmm 58 GPIO_ACTIVE_HIGH>;
+	};
+	
+	gpio-keys {
+		compatible = "gpio-keys";
+		
+		vol_down: vol-down {
+			label = "Volume Down";
+			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
+			linux,input-type = <1>;
+			linux,code = <KEY_VOLUMEDOWN>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+	};
+};
+
+&blsp2_uart1 {
+	status = "okay";
+	/* HCI Bluetooth */
+	bluetooth {
+		compatible = "qcom,wcn3990-bt"; // common for all QCOM
+		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
+		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
+		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
+		max-speed = <3200000>;
+	};
+};
+
+&blsp1_uart2 {
+	status = "okay";
+};
+
+&blsp_i2c2 {
+	status = "okay";
+};
+
+&blsp_i2c4 {
+	status = "okay";
+	touchscreen@38 {
+		compatible = "edt,edt-ft5406", "edt,edt-ft5x06";
+		reg = <0x38>;
+		vcc-supply = <&vreg_l11a_1p8>;
+		pinctrl-0 = <&ts_int_active &ts_rst>;
+		pinctrl-names = "default";
+		interrupt-parent = <&tlmm>;
+		interrupts = <67 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <1920>;
+	};
+};
+
+&blsp_i2c7 { /* for P/L Sensor */
+	status = "okay";
+};
+
+&adsp_pil {
+	status = "okay";
+	firmware-name = "adsp.mdt";
+};
+
+&pon_pwrkey {
+	status = "okay";
+};
+
+&pon_resin {
+	status = "okay";
+
+	linux,code = <KEY_VOLUMEUP>;
+};
+
+&qusb2phy0 {
+	status = "okay";
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
+	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+};
+
+&mdss_dsi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+	status = "okay";
+
+	panel@0 {
+		compatible = "focaltech,ft8716u";
+		reg = <0>;
+
+		backlight = <&pm660l_wled>;
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_HIGH>;
+		disp-te-gpios = <&tlmm 59 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+	status = "okay";
+};
+
+&adsp_pil {
+	status = "okay";
+	firmware-name = "adsp.mdt";
+};
+
+&lpass_smmu {
+	status = "okay";
+};
+
+&gcc {
+	status = "okay";
+};
+
+&gpucc {
+	status = "okay";
+};
+
+&mmcc {
+	status = "okay";
+};
+
+&mmss_smmu {
+	status = "okay";
+};
+
+&kgsl_smmu {
+	status = "okay";
+};
+
+&anoc2_smmu {
+	status = "okay";
+};
+
+&mdss {
+	status = "okay";
+};
+
+&cci {
+	status = "okay";
+};
+
+&camss {
+	status = "okay";
+};
+
+&adreno_gpu {
+	status = "okay";
+	zap-shader {
+		memory-region = <&zap_shader_region>;
+		firmware-name = "qcom/a508_zap.mdt";
+	};
+};
+
+&pm660l_wled {
+	status = "okay";
+	default-brightness = <512>;
+};
+
+&pm660_charger {
+	status = "okay";
+	monitored-battery = <&battery>;
+};
+
+&pm660_fg {
+	status = "okay";
+	monitored-battery = <&battery>;
+	qcom,battery-capacity-ua = <4000000>;
+	qcom,min-voltage-uv= <3400000>;
+	qcom,max-voltage-uv= <4408000>;
+};
+
+&pm660_rradc {
+	status = "okay";
+};
+
+&qusb2phy0 {
+	status = "okay";
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
+	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+};
+
+&rpm_requests {
+	regulators-0 {
+		compatible = "qcom,rpm-pm660l-regulators";
+
+		vdd_s1-supply = <&vph_pwr>;
+		vdd_s2-supply = <&vph_pwr>;
+		vdd_s3_s4-supply = <&vph_pwr>;
+		vdd_s5-supply = <&vph_pwr>;
+		vdd_s6-supply = <&vph_pwr>;
+
+		vdd_l1_l9_l10-supply = <&vreg_s2b_1p05>;
+		vdd_l2-supply = <&vreg_bob>;
+		vdd_l3_l5_l7_l8-supply = <&vreg_bob>;
+		vdd_l4_l6-supply = <&vreg_bob>;
+		vdd_bob-supply = <&vph_pwr>;
+
+		vreg_s1b_1p125: s1 {
+			regulator-min-microvolt = <1125000>;
+			regulator-max-microvolt = <1125000>;
+			regulator-enable-ramp-delay = <200>;
+		};
+
+		vreg_s2b_1p05: s2 {
+			regulator-min-microvolt = <1050000>;
+			regulator-max-microvolt = <1050000>;
+			regulator-enable-ramp-delay = <200>;
+		};
+
+		/* LDOs */
+		vreg_l1b_0p925: l1 {
+			regulator-min-microvolt = <800000>; // TODO
+			regulator-max-microvolt = <925000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		/* SDHCI 3.3V signal doesn't seem to be supported. */
+		vreg_l2b_2p95: l2 {
+			regulator-min-microvolt = <350000>;
+			regulator-max-microvolt = <2696000>; // should be <3100000>, but we set it for lower for sdhci reasons
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l3b_3p3: l3 {
+			regulator-min-microvolt = <1710000>;
+			regulator-max-microvolt = <3600000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l4b_2p95: l4 {
+			regulator-min-microvolt = <1700000>;
+			regulator-max-microvolt = <2950000>;
+			regulator-enable-ramp-delay = <250>;
+
+			regulator-min-microamp = <200>;
+			regulator-max-microamp = <600000>;
+			regulator-system-load = <570000>;
+			regulator-allow-set-load;
+		};
+
+		/*
+		 * Downstream specifies a range of 1721-3600mV,
+		 * but the only assigned consumers are SDHCI2 VMMC
+		 * and Coresight QPDI that both request pinned 2.95V.
+		 * Tighten the range to 1.8-3.328 (closest to 3.3) to
+		 * make the mmc driver happy.
+		 */
+		vreg_l5b_2p95: l5 {
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <3328000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+			regulator-system-load = <800000>;
+		};
+
+		vreg_l6b_3p3: l6 {
+			regulator-min-microvolt = <1700000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-ramp-delay = <0>;
+		};
+
+		vreg_l7b_3p125: l7 {
+			regulator-min-microvolt = <2700000>;
+			regulator-max-microvolt = <3125000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l8b_3p3: l8 {
+			regulator-min-microvolt = <2800000>;
+			regulator-max-microvolt = <3400000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_bob: bob {
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3600000>;
+			regulator-enable-ramp-delay = <500>;
+		};
+	};
+
+	regulators-1 {
+		compatible = "qcom,rpm-pm660-regulators";
+
+		vdd_s1-supply = <&vph_pwr>;
+		vdd_s2-supply = <&vph_pwr>;
+		vdd_s3-supply = <&vph_pwr>;
+		vdd_s4-supply = <&vph_pwr>;
+		vdd_s5-supply = <&vph_pwr>;
+		vdd_s6-supply = <&vph_pwr>;
+
+		vdd_l1_l6_l7-supply = <&vreg_s5a_1p35>;
+		vdd_l2_l3-supply = <&vreg_s2b_1p05>;
+		vdd_l5-supply = <&vreg_s2b_1p05>;
+		vdd_l8_l9_l10_l11_l12_l13_l14-supply = <&vreg_s4a_2p04>;
+		vdd_l15_l16_l17_l18_l19-supply = <&vreg_bob>;
+
+		/*
+		 * S1A (FTAPC0), S2A (FTAPC1), S3A (HFAPC1) are managed
+		 * by the Core Power Reduction hardened (CPRh) and the
+		 * Operating State Manager (OSM) HW automatically.
+		 */
+
+		vreg_s4a_2p04: s4 {
+			regulator-min-microvolt = <1805000>;
+			regulator-max-microvolt = <2040000>;
+			regulator-enable-ramp-delay = <200>;
+			regulator-always-on;
+		};
+
+		vreg_s5a_1p35: s5 {
+			regulator-min-microvolt = <1224000>;
+			regulator-max-microvolt = <1350000>;
+			regulator-enable-ramp-delay = <200>;
+		};
+
+		vreg_s6a_0p87: s6 {
+			regulator-min-microvolt = <504000>;
+			regulator-max-microvolt = <992000>;
+			regulator-enable-ramp-delay = <150>;
+		};
+
+		/* LDOs */
+		vreg_l1a_1p225: l1 {
+			regulator-min-microvolt = <1150000>;
+			regulator-max-microvolt = <1250000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l2a_1p0: l2 {
+			regulator-min-microvolt = <950000>;
+			regulator-max-microvolt = <1010000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l3a_1p0: l3 {
+			regulator-min-microvolt = <950000>;
+			regulator-max-microvolt = <1010000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l5a_0p848: l5 {
+			regulator-min-microvolt = <525000>;
+			regulator-max-microvolt = <950000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l6a_1p3: l6 {
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1370000>;
+			regulator-allow-set-load;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l7a_1p2: l7 {
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1200000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l8a_1p8: l8 {
+			regulator-min-microvolt = <1750000>;
+			regulator-max-microvolt = <1900000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-system-load = <325000>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l9a_1p8: l9 {
+			regulator-min-microvolt = <1750000>;
+			regulator-max-microvolt = <1900000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l10a_1p8: l10 {
+			regulator-min-microvolt = <1780000>;
+			regulator-max-microvolt = <1950000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l11a_1p8: l11 {
+			regulator-min-microvolt = <1780000>;
+			regulator-max-microvolt = <1950000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l12a_1p8: l12 {
+			regulator-min-microvolt = <1780000>;
+			regulator-max-microvolt = <1950000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		/* This gives power to the LPDDR4: never turn it off! */
+		vreg_l13a_1p8: l13 {
+			regulator-min-microvolt = <1780000>;
+			regulator-max-microvolt = <1950000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-boot-on;
+			regulator-always-on;
+		};
+
+		vreg_l14a_1p8: l14 {
+			regulator-min-microvolt = <1710000>;
+			regulator-max-microvolt = <1900000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l15a_1p8: l15 {
+			regulator-min-microvolt = <1650000>;
+			regulator-max-microvolt = <2950000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+/*		// Not present in downstream DTS, but seems to be present in many other sdm630 devices
+		vreg_l16a_2p7: l16 {
+			regulator-min-microvolt = <2800000>;
+			regulator-max-microvolt = <2800000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-always-on;
+		};
+*/
+
+		vreg_l17a_1p8: l17 {
+			regulator-min-microvolt = <1650000>;
+			regulator-max-microvolt = <2950000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l18a_1v8: l18 {
+			regulator-min-microvolt = <1780000>;
+			regulator-max-microvolt = <1950000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-ramp-delay = <10>;
+			regulator-min-microamp = <200>;
+			regulator-max-microamp = <50000>;
+			regulator-system-load = <10000>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l19a_3p3: l19 {
+			regulator-min-microvolt = <3200000>;
+			regulator-max-microvolt = <3400000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+	};
+};
+
+&remoteproc_mss {
+	firmware-name = "mba.mbn", "modem.mdt";
+	status = "okay";
+};
+
+&sdhc_1 {
+	status = "okay";
+	bus-width = <8>;
+	non-removable;
+	mmc-ddr-1_8v;
+	mmc-hs200-1_8v;
+	mmc-hs400-1_8v;
+	vmmc-supply = <&vreg_l4b_2p95>;
+	vqmmc-supply = <&vreg_l8a_1p8>;  
+};
+
+&sdhc_2 {
+	status = "okay";
+
+	vmmc-supply = <&vreg_l5b_2p95>;
+	vqmmc-supply = <&vreg_l2b_2p95>;
+};
+
+&tlmm {
+	gpio-reserved-ranges = <8 4>;
+
+	panel_reset_gpio: panel-reset-gpio {
+		pins = "gpio53";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-disable = <0>;
+	};
+
+	mdss_dsi_suspend: mdss-dsi-suspend {
+		pins = "gpio53";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	panel_te_gpio: panel-te-gpio {
+		pins = "gpio59";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	ts_int_active: ts-int-active {
+		pins = "gpio67";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	ts_rst: ts-rst {
+		pins = "gpio66";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+};
+
+&usb3 {
+	qcom,select-utmi-as-pipe-clk;
+
+	status = "okay";
+};
+
+&usb3_dwc3 {
+	maximum-speed = "high-speed";
+	phys = <&qusb2phy0>;
+	phy-names = "usb2-phy";
+
+	dr_mode = "peripheral";
+	extcon = <&extcon_usb>;
+};
+
+&sound {
+	status = "disabled";
+	model = "sdm660";
+};
+
+&venus {
+	status = "disabled";
+	firmware-name = "qcom/venus-4.4/venus.mdt";
+};
+
+&wifi {
+	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p848>;
+	vdd-1.8-xo-supply = <&vreg_l9a_1p8>;
+	vdd-1.3-rfa-supply = <&vreg_l6a_1p3>;
+	vdd-3.3-ch0-supply = <&vreg_l19a_3p3>;
+
+	status = "okay";
+};
