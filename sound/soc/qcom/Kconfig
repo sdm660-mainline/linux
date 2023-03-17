@@ -151,6 +151,16 @@ config SND_SOC_MSM8996
 	  APQ8096 SoC-based systems.
 	  Say Y if you want to use audio device on this SoCs
 
+config SND_SOC_SDM660_INT
+	tristate "SoC Machine driver for SDM660 and SDM670 boards"
+	depends on QCOM_APR
+	depends on OF
+	depends on PM
+	help
+	  This adds support for audio on Qualcomm Technologies Inc. SDM660
+	  and SDM670 SoC-based systems.
+	  Say Y if you want to use audio devices on these SoCs.
+
 config SND_SOC_SDM845
 	tristate "SoC Machine driver for SDM845 boards"
 	depends on QCOM_APR && I2C && SOUNDWIRE
