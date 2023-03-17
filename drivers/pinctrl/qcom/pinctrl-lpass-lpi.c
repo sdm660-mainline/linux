@@ -193,7 +193,8 @@ static int lpi_config_set_slew_rate(struct lpi_pinctrl *pctrl,
 	unsigned long sval;
 	void __iomem *reg;
 	int slew_offset;
-
+	if (IS_ERR(pctrl->slew_base))
+		return -EINVAL;
 	if (slew > LPI_SLEW_RATE_MAX) {
 		dev_err(pctrl->dev, "invalid slew rate %u for pin: %d\n",
 			slew, group);
@@ -459,9 +460,11 @@ int lpi_pinctrl_probe(struct platform_device *pdev)
 
 	if (!(data->flags & LPI_FLAG_SLEW_RATE_SAME_REG)) {
 		pctrl->slew_base = devm_platform_ioremap_resource(pdev, 1);
-		if (IS_ERR(pctrl->slew_base))
-			return dev_err_probe(dev, PTR_ERR(pctrl->slew_base),
-					     "Slew resource not provided\n");
+		if (IS_ERR(pctrl->slew_base)) {
+			return dev_warn(dev, "Slew resource not provided: %ld\n",
+					PTR_ERR(pctrl->slew_base));
+			pctrl->slew_base = NULL;
+		}
 	}
 
 	ret = devm_clk_bulk_get_optional(dev, MAX_LPI_NUM_CLKS, pctrl->clks);
