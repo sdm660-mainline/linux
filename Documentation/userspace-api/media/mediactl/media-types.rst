@@ -388,8 +388,7 @@ Types and flags used to represent the media graph elements
 	  be connected with links.
 
 	  The internal flag may currently be present only in a sink pad where it
-	  indicates that the :ref:``stream <media-glossary-stream>`` originates
-	  from within the entity.
+	  indicates that the :term:`Stream` originates from within the entity.
 
 One and only one of ``MEDIA_PAD_FL_SINK`` and ``MEDIA_PAD_FL_SOURCE``
 must be set for every pad.
