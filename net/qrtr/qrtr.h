@@ -33,4 +33,9 @@ int qrtr_ns_init(void);
 
 void qrtr_ns_remove(void);
 
+int qcom_smd_qrtr_add_device(struct qrtr_endpoint *parent, unsigned int node, unsigned int port,
+			     u16 service, u16 instance);
+
+int qcom_smd_qrtr_del_device(struct qrtr_endpoint *parent, unsigned int port);
+
 #endif
