@@ -17827,7 +17827,7 @@ F:	tools/testing/selftests/rtc/
 Real-time Linux Analysis (RTLA) tools
 M:	Daniel Bristot de Oliveira <bristot@kernel.org>
 M:	Steven Rostedt <rostedt@goodmis.org>
-L:	linux-trace-devel@vger.kernel.org
+L:	linux-trace-kernel@vger.kernel.org
 S:	Maintained
 F:	Documentation/tools/rtla/
 F:	tools/tracing/rtla/
@@ -18397,7 +18397,7 @@ F:	drivers/infiniband/ulp/rtrs/
 RUNTIME VERIFICATION (RV)
 M:	Daniel Bristot de Oliveira <bristot@kernel.org>
 M:	Steven Rostedt <rostedt@goodmis.org>
-L:	linux-trace-devel@vger.kernel.org
+L:	linux-trace-kernel@vger.kernel.org
 S:	Maintained
 F:	Documentation/trace/rv/
 F:	include/linux/rv.h
@@ -19140,6 +19140,9 @@ SHARED MEMORY COMMUNICATIONS (SMC) SOCKETS
 M:	Karsten Graul <kgraul@linux.ibm.com>
 M:	Wenjia Zhang <wenjia@linux.ibm.com>
 M:	Jan Karcher <jaka@linux.ibm.com>
+R:	D. Wythe <alibuda@linux.alibaba.com>
+R:	Tony Lu <tonylu@linux.alibaba.com>
+R:	Wen Gu <guwen@linux.alibaba.com>
 L:	linux-s390@vger.kernel.org
 S:	Supported
 F:	net/smc/
