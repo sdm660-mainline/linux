@@ -32,7 +32,6 @@
 #include <linux/uaccess.h>
 #include <linux/crc8.h>
 #include <linux/fs.h>
-#include <asm/segment.h>
 
 #include "tas2557.h"
 #include "tas2557-core.h"
@@ -2214,15 +2213,12 @@ static int tas2557_load_calibration(struct tas2557_priv *pTAS2557, char *pFileNa
 	int nResult = 0;
 
 	struct file *nFile=NULL;
-	mm_segment_t fs;
 	unsigned char pBuffer[1000];
 	int nSize = 0;
 	loff_t pos = 0;
 
 	dev_dbg(pTAS2557->dev, "%s:\n", __func__);
 
-	fs = get_fs();
-	set_fs(KERNEL_DS);
 	nFile = filp_open(pFileName, O_RDONLY, 0);
 
 	dev_info(pTAS2557->dev, "TAS2557 calibration file = %s\n", pFileName);
@@ -2233,11 +2229,9 @@ static int tas2557_load_calibration(struct tas2557_priv *pTAS2557, char *pFileNa
 			dev_err(pTAS2557->dev, "TAS2557 cannot open calibration file: %s errno:%d\n", pFileName, (int)PTR_ERR(nFile));
 	} else {
 		pos = nFile->f_pos;
-		nSize = vfs_read(nFile, pBuffer, 1000, &pos);
+		nSize = kernel_read(nFile, pBuffer, 1000, &pos);
 		filp_close(nFile,NULL);
 	}
-
-	set_fs(fs);
 
 	if (!nSize)
 		goto end;

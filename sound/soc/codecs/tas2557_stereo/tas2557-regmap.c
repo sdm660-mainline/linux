@@ -1113,8 +1113,7 @@ static const struct regmap_config tas2557_i2c_regmap = {
  * should implement hardware reset functionality
  */
 atomic_t tas2557_ref_count;
-static int tas2557_i2c_probe(struct i2c_client *pClient,
-	const struct i2c_device_id *pID)
+static int tas2557_i2c_probe(struct i2c_client *pClient)
 {
 	struct tas2557_priv *pTAS2557;
 	int nResult = 0;
@@ -1306,7 +1305,7 @@ err:
 	return nResult;
 }
 
-static int tas2557_i2c_remove(struct i2c_client *pClient)
+static void tas2557_i2c_remove(struct i2c_client *pClient)
 {
 	struct tas2557_priv *pTAS2557 = i2c_get_clientdata(pClient);
 
@@ -1323,7 +1322,6 @@ static int tas2557_i2c_remove(struct i2c_client *pClient)
 #endif
 
 	mutex_destroy(&pTAS2557->dev_lock);
-	return 0;
 }
 
 static const struct i2c_device_id tas2557_i2c_id[] = {
