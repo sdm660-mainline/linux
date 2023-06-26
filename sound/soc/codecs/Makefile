@@ -255,6 +255,11 @@ snd-soc-sta350-objs := sta350.o
 snd-soc-sta529-objs := sta529.o
 snd-soc-stac9766-objs := stac9766.o
 snd-soc-sti-sas-objs := sti-sas.o
+snd-soc-tas2557s-objs := tas2557_stereo/tas2557-core.o \
+			tas2557_stereo/tas2557-regmap.o \
+			tas2557_stereo/tas2557-codec.o \
+			tas2557_stereo/tas2557-misc.o \
+			tas2557_stereo/tiload.o
 snd-soc-tas5086-objs := tas5086.o
 snd-soc-tas571x-objs := tas571x.o
 snd-soc-tas5720-objs := tas5720.o
@@ -616,6 +621,7 @@ obj-$(CONFIG_SND_SOC_STA529)   += snd-soc-sta529.o
 obj-$(CONFIG_SND_SOC_STAC9766)	+= snd-soc-stac9766.o
 obj-$(CONFIG_SND_SOC_STI_SAS)	+= snd-soc-sti-sas.o
 obj-$(CONFIG_SND_SOC_TAS2552)	+= snd-soc-tas2552.o
+obj-$(CONFIG_SND_SOC_TAS2557_STEREO) += snd-soc-tas2557s.o
 obj-$(CONFIG_SND_SOC_TAS2562)	+= snd-soc-tas2562.o
 obj-$(CONFIG_SND_SOC_TAS2764)	+= snd-soc-tas2764.o
 obj-$(CONFIG_SND_SOC_TAS2780)	+= snd-soc-tas2780.o
