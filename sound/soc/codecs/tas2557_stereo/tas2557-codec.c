@@ -153,7 +153,7 @@ static void tas2557_shutdown(struct snd_pcm_substream *substream,
 	dev_dbg(pTAS2557->dev, "%s\n", __func__);
 }
 
-static int tas2557_mute(struct snd_soc_dai *dai, int mute)
+static int tas2557_mute(struct snd_soc_dai *dai, int mute, int direction)
 {
 	struct snd_soc_component *component = dai->component;
 	struct tas2557_priv *pTAS2557 = snd_soc_component_get_drvdata(component);
@@ -873,7 +873,7 @@ static struct snd_soc_component_driver soc_component_driver_tas2557 = {
 static struct snd_soc_dai_ops tas2557_dai_ops = {
 	.startup = tas2557_startup,
 	.shutdown = tas2557_shutdown,
-	.digital_mute = tas2557_mute,
+	.mute_stream = tas2557_mute,
 	.hw_params = tas2557_hw_params,
 	.prepare = tas2557_prepare,
 	.set_sysclk = tas2557_set_dai_sysclk,
@@ -901,7 +901,7 @@ static struct snd_soc_dai_driver tas2557_dai_driver[] = {
 			.formats = TAS2557_FORMATS,
 		},
 		.ops = &tas2557_dai_ops,
-		.symmetric_rates = 1,
+		.symmetric_rate = 1,
 	},
 	{
 		.name = "tas2557 Stereo ASI2",
@@ -914,7 +914,7 @@ static struct snd_soc_dai_driver tas2557_dai_driver[] = {
 				.formats = TAS2557_FORMATS,
 			},
 		.ops = &tas2557_dai_ops,
-		.symmetric_rates = 1,
+		.symmetric_rate = 1,
 	},
 	{
 		.name = "tas2557 Stereo ASIM",
@@ -927,7 +927,7 @@ static struct snd_soc_dai_driver tas2557_dai_driver[] = {
 				.formats = TAS2557_FORMATS,
 			},
 		.ops = &tas2557_dai_ops,
-		.symmetric_rates = 1,
+		.symmetric_rate = 1,
 	},
 };
 

@@ -373,7 +373,7 @@ int tiload_driver_init(struct tas2557_priv *pTAS2557)
 		dev_err(pTAS2557->dev, "cannot allocate major number %d\n", tiload_major);
 		return result;
 	}
-	tiload_class = class_create(THIS_MODULE, DEVICE_NAME);
+	tiload_class = class_create(DEVICE_NAME);
 	tiload_major = MAJOR(dev);
 	dev_info(pTAS2557->dev, "allocated Major Number: %d\n", tiload_major);
 
