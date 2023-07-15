@@ -564,6 +564,43 @@ static const struct nt36672a_panel_cmd tianma_fhd_video_off_cmds[] = {
 	{ .data = {0xFF, 0x10} },
 };
 
+static const struct nt36672a_panel_cmd tianma_xiaomi_tulip_fhd_video_on_cmds_1[] = {
+	{ .data = {0xFF, 0x25} },
+	{ .data = {0xFB, 0x01} },
+	{ .data = {0x18, 0x96} },
+	{ .data = {0x05, 0x04} },
+	{ .data = {0xFF, 0x20} },
+	{ .data = {0xFB, 0x01} },
+	{ .data = {0x78, 0x01} },
+	{ .data = {0xFF, 0x24} },
+	{ .data = {0xFB, 0x01} },
+	{ .data = {0x82, 0x13} },
+	{ .data = {0x84, 0x31} },
+	{ .data = {0x88, 0x13} },
+	{ .data = {0x8A, 0x31} },
+	{ .data = {0x8E, 0xE4} },
+	{ .data = {0x8F, 0x01} },
+	{ .data = {0x90, 0x80} },
+	{ .data = {0xFF, 0x26} },
+	{ .data = {0xFB, 0x01} },
+	{ .data = {0xA9, 0x12} },
+	{ .data = {0xAA, 0x10} },
+	{ .data = {0xAE, 0x8A} },
+	{ .data = {0xFF, 0x10} },
+	{ .data = {0x11, 0x00} },
+	{ .data = {0xB0, 0x01} },
+	{ .data = {0x35, 0x00} },
+	{ .data = {0x51, 0xFF} },
+	{ .data = {0x53, 0x2C} },
+	{ .data = {0x55, 0x00} },
+	{ .data = {0x29, 0x00} },
+};
+
+static const struct nt36672a_panel_cmd tianma_xiaomi_tulip_fhd_video_off_cmds[] = {
+	{ .data = {0x28, 0x24} },
+	{ .data = {0x10, 0x00} },
+};
+
 static const struct drm_display_mode tianma_fhd_video_panel_default_mode = {
 	.clock		= 161331,
 
@@ -598,6 +635,40 @@ static const struct nt36672a_panel_desc tianma_fhd_video_panel_desc = {
 	.num_on_cmds_2 = ARRAY_SIZE(tianma_fhd_video_on_cmds_2),
 	.off_cmds = tianma_fhd_video_off_cmds,
 	.num_off_cmds = ARRAY_SIZE(tianma_fhd_video_off_cmds),
+};
+
+static const struct drm_display_mode tianma_xiaomi_tulip_fhd_video_panel_default_mode = {
+	.clock		= (1080 + 100 + 28 + 120) * (2280 + 10 + 3 + 8) * 60 / 1000,
+
+	.hdisplay	= 1080,
+	.hsync_start	= 1080 + 100,
+	.hsync_end	= 1080 + 100 + 28,
+	.htotal		= 1080 + 100 + 28 + 120,
+
+	.vdisplay	= 2280,
+	.vsync_start	= 2280 + 10,
+	.vsync_end	= 2280 + 10 + 3,
+	.vtotal		= 2280 + 10 + 3 + 8,
+
+	.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+};
+
+static const struct nt36672a_panel_desc tianma_xiaomi_tulip_fhd_video_panel_desc = {
+	.display_mode = &tianma_xiaomi_tulip_fhd_video_panel_default_mode,
+
+	.width_mm = 68,
+	.height_mm = 143,
+
+	.mode_flags = MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_VIDEO
+			| MIPI_DSI_MODE_VIDEO_HSE
+			| MIPI_DSI_CLOCK_NON_CONTINUOUS
+			| MIPI_DSI_MODE_VIDEO_BURST,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+	.on_cmds_1 = tianma_xiaomi_tulip_fhd_video_on_cmds_1,
+	.num_on_cmds_1 = ARRAY_SIZE(tianma_xiaomi_tulip_fhd_video_on_cmds_1),
+	.off_cmds = tianma_xiaomi_tulip_fhd_video_off_cmds,
+	.num_off_cmds = ARRAY_SIZE(tianma_xiaomi_tulip_fhd_video_off_cmds),
 };
 
 static int nt36672a_panel_add(struct nt36672a_panel *pinfo)
@@ -698,6 +769,7 @@ static void nt36672a_panel_shutdown(struct mipi_dsi_device *dsi)
 
 static const struct of_device_id tianma_fhd_video_of_match[] = {
 	{ .compatible = "tianma,fhd-video", .data = &tianma_fhd_video_panel_desc },
+	{ .compatible = "tianma,xiaomi-tulip-fhd-video", .data = &tianma_xiaomi_tulip_fhd_video_panel_desc },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tianma_fhd_video_of_match);
