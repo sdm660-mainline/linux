@@ -1322,6 +1322,14 @@ config SND_SOC_MSM8916_WCD_DIGITAL
 	tristate "Qualcomm MSM8916 WCD DIGITAL Codec"
 	select REGMAP_MMIO
 
+config SND_SOC_SDM660_WCD_ANALOG
+	tristate "Qualcomm SDM660 WCD Analog Codec"
+	depends on SPMI || COMPILE_TEST
+
+config SND_SOC_SDM660_WCD_DIGITAL
+	tristate "Qualcomm SDM660 WCD DIGITAL Codec"
+	select REGMAP_MMIO
+
 config SND_SOC_PCM1681
 	tristate "Texas Instruments PCM1681 CODEC"
 	depends on I2C
