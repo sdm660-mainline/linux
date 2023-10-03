@@ -31,6 +31,13 @@
 	chosen { };
 
 	clocks {
+		int_cdc_bclk: int-cdc-bclk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <1536000>;
+			clock-output-names = "int_cdc_bclk";
+		};
+
 		xo_board: xo-board {
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
@@ -2350,6 +2357,11 @@
 					q6afe: service@4 {
 						compatible = "qcom,q6afe";
 						reg = <APR_SVC_AFE>;
+
+						q6afecc: clock-controller {
+							compatible = "qcom,q6afe-clocks";
+						};
+
 						q6afedai: dais {
 							compatible = "qcom,q6afe-dais";
 							#address-cells = <1>;
