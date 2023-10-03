@@ -15,6 +15,7 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/thermal/thermal.h>
 #include <dt-bindings/soc/qcom,apr.h>
+#include <dt-bindings/sound/qcom,q6dsp-lpass-ports.h>
 
 / {
 	interrupt-parent = <&intc>;
@@ -2370,6 +2371,21 @@
 					input-enable;
 				};
 			};
+		};
+
+		lpass_codec: audio-codec@152c0000 {
+			compatible = "qcom,sdm660-wcd-digital-codec",
+				     "qcom,msm8916-wcd-digital-codec";
+			reg = <0x152c0000 0x400>;
+
+			clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+			clock-names = "mclk";
+
+			// Resolve naming conflicts with digital and analog PDM_RX*
+			sound-name-prefix = "Digital";
+			#sound-dai-cells = <1>;
+
+			status = "disabled";
 		};
 
 		adsp_pil: remoteproc@15700000 {
