@@ -156,6 +156,8 @@ config SND_SOC_SDM660_INT
 	depends on QCOM_APR
 	depends on OF
 	depends on PM
+	select SND_SOC_QDSP6
+	select SND_SOC_QCOM_COMMON
 	help
 	  This adds support for audio on Qualcomm Technologies Inc. SDM660
 	  and SDM670 SoC-based systems.
