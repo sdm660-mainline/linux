@@ -2436,6 +2436,7 @@
 
 						q6afecc: clock-controller {
 							compatible = "qcom,q6afe-clocks";
+							#clock-cells = <2>;
 						};
 
 						q6afedai: dais {
