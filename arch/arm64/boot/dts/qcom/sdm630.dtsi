@@ -636,6 +636,7 @@
 		anoc2_smmu: iommu@16c0000 {
 			compatible = "qcom,sdm630-smmu-v2", "qcom,smmu-v2";
 			reg = <0x016c0000 0x40000>;
+
 			#global-interrupts = <2>;
 			#iommu-cells = <1>;
 			qcom,bypass-cbndx = /bits/ 8 <6>;
