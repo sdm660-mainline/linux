@@ -174,6 +174,12 @@
 		vdd_l4_l6-supply = <&vreg_bob>;
 		vdd_bob-supply = <&vph_pwr>;
 
+		vreg_bob: bob {
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3600000>;
+			regulator-enable-ramp-delay = <500>;
+		};
+
 		vreg_s1b_1p125: s1 {
 			regulator-min-microvolt = <1125000>;
 			regulator-max-microvolt = <1125000>;
@@ -207,6 +213,7 @@
 			regulator-max-microvolt = <3300000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
+			regulator-always-on;
 		};
 
 		vreg_l4b_2p95: l4 {
@@ -245,12 +252,6 @@
 			regulator-min-microvolt = <3200000>;
 			regulator-max-microvolt = <3400000>;
 			regulator-enable-ramp-delay = <250>;
-		};
-
-		vreg_bob: bob {
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3600000>;
-			regulator-enable-ramp-delay = <500>;
 		};
 	};
 
