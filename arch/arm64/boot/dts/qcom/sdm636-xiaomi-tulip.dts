@@ -10,11 +10,11 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
 
+/delete-node/ &adsp_mem;
 /delete-node/ &qhee_code;
-/delete-node/ &smem_region;
+/delete-node/ &qseecom_mem;
+/delete-node/ &rmtfs_mem;
 /delete-node/ &tz_mem;
-/delete-node/ &adsp_region;
-/delete-node/ &buffer_mem;
 /delete-node/ &zap_shader_region;
 
 / {
@@ -22,9 +22,9 @@
 	compatible = "xiaomi,tulip", "qcom,sdm660", "qcom,sdm636";
 	chassis-type = "handset";
 
-	qcom,msm-id = <0x159 0>;
-	qcom,board-id = <0x40008 0x00>;
-	qcom,pmic-id = <0x1001b 0x101011a 0x0 0x0 0x1001b 0x201011a 0x0 0x0>;
+	aliases {
+		serial0 = &blsp1_uart2;
+	};
 
 	battery: battery {
 		compatible = "simple-battery";
@@ -51,18 +51,14 @@
 	};
 
 	gpio-keys {
-		status = "okay";
 		compatible = "gpio-keys";
 
-		key-volup {
-			label = "Volume Up";
-			gpios = <&tlmm 7 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
-			linux,code = <KEY_VOLUMEUP>;
-			gpio-key,wakeup;
+		key-volume-up {
 			debounce-interval = <15>;
+			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
+			label = "volume_up";
+			linux,code = <KEY_VOLUMEUP>;
 		};
-
 	};
 
 	reserved-memory {
@@ -70,49 +66,8 @@
 		#size-cells = <2>;
 		ranges;
 
-		/* removed_regions in downstream / qhee_code */
-		removed_region: removed_region@85800000 {
-			reg = <0x0 0x85800000 0x0 0x600000>;
-			no-map;
-		};
-
-		smem_region: smem_memory@86000000 {
-			reg = <0x0 0x86000000 0x0 0x200000>;
-			no-map;
-		};
-
-		tz_mem: tz_memory@86200000 {
-			reg = <0x0 0x86200000 0x0 0x2D00000>;
-			no-map;
-		};
-
-		modem_fw_mem: modem_fw_region@8ac00000 {
-			reg = <0x0 0x8ac00000 0x0 0x7e00000>;
-			no-map;
-		};
-
-		adsp_region: adsp@92a00000 {
-			reg = <0x0 0x92a00000 0x0 0x1e00000>;
-			no-map;
-		};
-
-		buffer_mem: buffer_region@94a00000 {
-			reg = <0x0 0x94a00000 0x0 0x100000>;
-			no-map;
-		};
-
 		framebuffer_memory@9d400000 {
 			reg = <0x0 0x9d400000 0x0 (1080 * 2280 * 4)>;
-			no-map;
-		};
-
-		dfps_data_mem: dfps@9f7ff000 {
-			reg = <0x00 0x9f7ff000 0x00 0x1000>;
-			label = "dfps_data_mem";
-		};
-
-		pil_mba_mem: mba@94800000 {
-			reg = <0x0 0x94800000 0x0 0x200000>;
 			no-map;
 		};
 
@@ -124,24 +79,11 @@
 			ftrace-size = <0x0>;
 			pmsg-size = <0x20000>;
 		};
-	};
 
-	lcdb_ldo_vreg: ldo-regulator {
-		compatible = "regulator-fixed";
-		label = "ldo";
-		regulator-name = "lcdb_ldo";
-		regulator-max-microamp = <260000>;
-		regulator-min-microvolt = <4000000>;
-		regulator-max-microvolt = <4000000>;
-	};
-
-	lcdb_ncp_vreg: ncp-regulator {
-		compatible = "regulator-fixed";
-		label = "ncp";
-		regulator-name = "lcdb_ncp";
-		regulator-max-microamp = <260000>;
-		regulator-min-microvolt = <4000000>;
-		regulator-max-microvolt = <4000000>;
+		qseecom_mem: qseecom-region@f5800000 {
+			reg = <0x0 0xf5800000 0x0 0x1400000>;
+			no-map;
+		};
 	};
 
 	vph_pwr: vph-pwr-regulator {
@@ -149,22 +91,16 @@
 		regulator-name = "vph_pwr";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
+
 		regulator-always-on;
 		regulator-boot-on;
 	};
 };
 
-// &adreno_gpu {
-// 	status = "okay";
-
-// 	zap-shader {
-// 		firmware-name = "qcom/a512_zap.mdt";
-// 	};
-// };
-
 &adsp_pil {
-	status = "okay";
 	firmware-name = "adsp.mdt";
+
+	status = "okay";
 };
 
 &anoc2_smmu {
@@ -203,7 +139,7 @@
 	status = "okay";
 
 	bluetooth {
-		compatible = "qcom,wcn3990-bt"; // common for all QCOM
+		compatible = "qcom,wcn3990-bt";
 		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
 		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
 		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
@@ -231,57 +167,6 @@
 	status = "okay";
 };
 
-&mdss {
-	status = "okay";
-};
-
-&mdss_dsi0 {
-	status = "okay";
-
-	#address-cells = <1>;
-	#size-cells = <0>;
-	vdd-supply = <&vreg_l6b_3p3>;
-	vdda-supply = <&vreg_l11a_1p8>;
-
-	panel@0 {
-		compatible = "tianma,xiaomi-tulip-fhd-video", "novatek,nt36672a";
-		reg = <0>;
-
-		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
-		disp-te-gpios = <&tlmm 59 GPIO_ACTIVE_HIGH>;
-
-		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&panel_reset_n &mdp_vsync_n>;
-		pinctrl-1 = <&panel_suspend_n &mdp_vsync_n>;
-
-		backlight = <&pm660l_wled>;
-
-		vddio-supply = <&vreg_l11a_1p8>;
-		vddpos-supply = <&lcdb_ldo_vreg>;
-		vddneg-supply = <&lcdb_ncp_vreg>;
-
-		panel-width-mm = <68>;
-		panel-height-mm = <143>;
-
-		port {
-			panel_in: endpoint {
-				remote-endpoint = <&mdss_dsi0_out>;
-			};
-		};
-	};
-};
-
-&mdss_dsi0_out {
-	data-lanes = <0 1 2 3>;
-	remote-endpoint = <&panel_in>;
-};
-
-&mdss_dsi0_phy {
-	status = "okay";
-
-	vcca-supply = <&vreg_l1b_0p925>;
-};
-
 &mdss_dsi1 {
 	status = "disabled";
 };
@@ -299,17 +184,18 @@
 };
 
 &pm660_charger {
-	status = "okay";
-
 	monitored-battery = <&battery>;
+
+	status = "okay";
 };
 
 &pm660_fg {
-	status = "okay";
 	monitored-battery = <&battery>;
 	qcom,battery-capacity-ua = <4000000>;
 	qcom,min-voltage-uv= <3400000>;
 	qcom,max-voltage-uv= <4408000>;
+
+	status = "okay";
 };
 
 &pm660_rradc {
@@ -317,26 +203,33 @@
 };
 
 &pm660l_wled {
-	status = "okay";
-
 	default-brightness = <512>;
+
+	status = "okay";
 };
 
 &pon_pwrkey {
 	status = "okay";
 };
 
-&qusb2phy0 {
-	status = "okay";
+&pon_resin {
+	linux,code = <KEY_VOLUMEDOWN>;
 
+	status = "okay";
+};
+
+&qusb2phy0 {
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-pll-supply = <&vreg_l10a_1p8>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
 };
 
 &remoteproc_mss {
-	status = "okay";
 	firmware-name = "mba.mbn", "modem.mdt";
+
+	status = "okay";
 };
 
 &rpm_requests {
@@ -591,27 +484,6 @@
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 
-	panel_reset_n: panel-rst-n-state {
-		pins = "gpio53";
-		function = "gpio";
-		drive-strength = <8>;
-		bias-disable;
-	};
-
-	panel_suspend_n: panel-suspend-n-state {
-		pins = "gpio53";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-pull-down;
-	};
-
-	mdp_vsync_n: mdp-vsync-n-state {
-		pins = "gpio59";
-		function = "mdp_vsync";
-		drive-strength = <2>;
-		bias-pull-down;
-	};
-
 	ts_rst_n: ts-rst-n-state {
 		pins = "gpio66";
 		function = "gpio";
@@ -631,24 +503,22 @@
 };
 
 &usb3_dwc3 {
-	status = "okay";
-
 	dr_mode = "peripheral";
+
+	status = "okay";
 };
 
 &venus {
-	status = "okay";
-
 	firmware-name = "qcom/venus-4.4/venus.mdt";
+
+	status = "okay";
 };
 
 &wifi {
-	status = "okay";
-
-	//qcom,msa-fixed-perm;
-
 	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p848>;
 	vdd-1.8-xo-supply = <&vreg_l9a_1p8>;
 	vdd-1.3-rfa-supply = <&vreg_l6a_1p3>;
 	vdd-3.3-ch0-supply = <&vreg_l19a_3p3>;
+
+	status = "okay";
 };
