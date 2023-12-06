@@ -1541,7 +1541,7 @@
 		};
 
 		mdss: display-subsystem@c900000 {
-			compatible = "qcom,mdss";
+			compatible = "qcom,sdm630-mdss", "qcom,mdss";
 			reg = <0x0c900000 0x1000>,
 			      <0x0c9b0000 0x1040>;
 			reg-names = "mdss_phys", "vbif_phys";
