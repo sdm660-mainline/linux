@@ -1684,6 +1684,33 @@ static const struct panel_desc boe_tv101wum_n53_desc = {
 	.init_cmds = boe_init_cmd,
 };
 
+static const struct drm_display_mode boe_tv101wum_nx0_default_mode = {
+	.clock = 165581,
+	.hdisplay = 1200,
+	.hsync_start = 1200 + 172,
+	.hsync_end = 1200 + 172 + 4,
+	.htotal = 1200 + 172 + 4 + 32,
+	.vdisplay = 1920,
+	.vsync_start = 1920 + 25,
+	.vsync_end = 1920 + 25 + 1,
+	.vtotal = 1920 + 25 + 1 + 14,
+	.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+};
+
+static const struct panel_desc boe_tv101wum_nx0_desc = {
+	.modes = &boe_tv101wum_nx0_default_mode,
+    	.bpc = 8,
+    	.size = {
+        	.width_mm = 135,
+        	.height_mm = 216,
+    	},
+    	.lanes = 4,
+    	.format = MIPI_DSI_FMT_RGB888,
+    	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
+    	            MIPI_DSI_MODE_LPM,
+    	.init_cmds = boe_init_cmd,
+};
+
 static const struct drm_display_mode auo_b101uan08_3_default_mode = {
 	.clock = 159667,
 	.hdisplay = 1200,
@@ -1955,6 +1982,9 @@ static const struct of_device_id boe_of_match[] = {
 	{ .compatible = "boe,tv101wum-n53",
 	  .data = &boe_tv101wum_n53_desc
 	},
+	{ .compatible = "boe,tv101wum-nx0",
+	  .data = &boe_tv101wum_nx0_desc
+    	},
 	{ .compatible = "auo,b101uan08.3",
 	  .data = &auo_b101uan08_3_desc
 	},
