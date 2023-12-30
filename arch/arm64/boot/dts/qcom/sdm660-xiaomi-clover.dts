@@ -95,6 +95,13 @@
 		vdd_l4_l6-supply = <&vreg_bob>;
 		vdd_bob-supply = <&vph_pwr>;
 
+		vreg_bob: bob {
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3600000>;
+			regulator-enable-ramp-delay = <500>;
+			regulator-ramp-delay = <0>;
+		};
+
 		vreg_s1b_1p125: s1 {
 			regulator-min-microvolt = <1125000>;
 			regulator-max-microvolt = <1125000>;
@@ -202,37 +209,6 @@
 		vreg_l10b_0p915: l10 {
 			/* Unused */
 			status = "disabled";
-		};
-
-		vreg_bob: bob {
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3600000>;
-			regulator-enable-ramp-delay = <500>;
-			regulator-ramp-delay = <0>;
-		};
-
-		vreg_bob_pin1: bob_pin1 {
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3600000>;
-			regulator-enable-ramp-delay = <500>;
-			regulator-ramp-delay = <0>;
-			qcom,bob-pin-id = <1>;
-		};
-
-		vreg_bob_pin2: bob_pin2 {
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3600000>;
-			regulator-enable-ramp-delay = <500>;
-			regulator-ramp-delay = <0>;
-			qcom,bob-pin-id = <2>;
-		};
-
-		vreg_bob_pin3: bob_pin3 {
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3600000>;
-			regulator-enable-ramp-delay = <500>;
-			regulator-ramp-delay = <0>;
-			qcom,bob-pin-id = <3>;
 		};
 	};
 
