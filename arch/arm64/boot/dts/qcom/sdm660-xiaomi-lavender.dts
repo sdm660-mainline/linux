@@ -39,6 +39,14 @@
 		};
 	};
 
+	battery: battery {
+		compatible = "simple-battery";
+
+		charge-full-design-microamp-hours = <4000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
+	};
+
 	vph_pwr: vph-pwr-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vph_pwr";
@@ -134,6 +142,33 @@
 
 &lpass_smmu {
 	status = "okay";
+};
+
+&pm660_charger {
+	monitored-battery = <&battery>;
+
+	status = "okay";
+};
+
+&pm660_fg {
+	monitored-battery = <&battery>;
+	qcom,battery-capacity-ua = <4000000>;
+	qcom,min-voltage-uv= <3400000>;
+	qcom,max-voltage-uv= <4408000>;
+
+	status = "okay";
+};
+
+&pm660_rradc {
+	status = "okay";
+};
+
+&pm660l_wled {
+	status = "okay";
+
+	qcom,switching-freq = <800>;
+	qcom,current-limit-microamp = <20000>;
+	qcom,num-strings = <2>;
 };
 
 &pon_pwrkey {
@@ -410,14 +445,6 @@
 			regulator-allow-set-load;
 		};
 	};
-};
-
-&pm660l_wled {
-	status = "okay";
-
-	qcom,switching-freq = <800>;
-	qcom,current-limit-microamp = <20000>;
-	qcom,num-strings = <2>;
 };
 
 &sdc2_state_on {
