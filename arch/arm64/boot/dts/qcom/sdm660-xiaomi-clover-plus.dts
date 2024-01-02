@@ -1,0 +1,212 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2023, Nickolay Goppen <killubuntoid@yandex.ru>
+ */
+
+/dts-v1/;
+#include "sdm660-xiaomi-clover-common.dtsi"
+
+/ {
+	model = "Xiaomi Mi Pad 4 Plus";
+	compatible = "xiaomi,clover-plus", "qcom,sdm660";
+	qcom,board-id = <11 0>;
+	qcom,msm-id = <324 0>;
+	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>, <0x0001001b 0x0201011a 0x0 0x0>,<0x0001001b 0x0102001a 0x0 0x0>;
+
+	vreg_bl_vddio: lcd-backlight-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_bl_vddio";
+		regulator-min-microvolt = <3150000>;
+		regulator-max-microvolt = <3150000>;
+
+		gpio = <&tlmm 72 0>;
+		enable-active-high;
+
+		startup-delay-us = <70000>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_bl_en_default>;
+	};
+};
+
+&blsp_i2c3 {
+	status = "okay";
+
+	touchscreen@5d {
+		compatible = "goodix,gt9110";
+		reg = <0x5d>;
+		AVDD28-supply = <&vreg_l3b_3p0>;
+		VDDIO-supply = <&vreg_l11a_1p8>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <67 IRQ_TYPE_LEVEL_LOW>;
+		pinctrl-names = "default", "int-output-low", "int-output-high", "int-input";
+		pinctrl-0 = <&ts_int_default>;
+		pinctrl-1 = <&ts_int_output_low>;
+		pinctrl-2 = <&ts_int_output_high>;
+		pinctrl-3 = <&ts_int_input>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+		touchscreen-max-id = <10>;
+		touchscreen-size-x = <1200>;
+		touchscreen-size-y = <1920>;
+		touchscreen-max-w = <512>;
+		touchscreen-max-p = <512>;
+	};
+};
+
+&blsp_i2c8 {
+	status = "okay";
+
+	i2c_backlight: backlight@2c {
+		compatible = "ti,lp8556";
+		reg = <0x2c>;
+		enable-supply = <&vreg_bl_vddio>;
+
+		bl-name = "lcd-backlight";
+		dev-ctrl = /bits/ 8 <0x05>;
+		init-brt = /bits/ 8 <0x7f>; /* 50% brightness */
+
+		/* TODO: Stange thing, according to datasheet for LP8556 valid
+		 * EEPROM addresses range from 0x98h to 0xAF, but driver
+		 * thinks A0 is lowest valid address. So write to 9E will be
+		 * silently discarded. Bug in driver? */
+		rom-9eh {
+			rom-addr = /bits/ 8 <0x9E>;
+			rom-val = /bits/ 8 <0x20>;
+		};
+		rom-a0h {
+			rom-addr = /bits/ 8 <0xa0>;
+			rom-val = /bits/ 8 <0x09>;
+		};
+		rom-a1h {
+			rom-addr = /bits/ 8 <0xa1>;
+			rom-val = /bits/ 8 <0x5f>;
+		};
+		rom-a3h {
+			rom-addr = /bits/ 8 <0xa3>;
+			rom-val = /bits/ 8 <0x0e>;
+		};
+		rom-a5h {
+			rom-addr = /bits/ 8 <0xa5>;
+			rom-val = /bits/ 8 <0x24>;
+		};
+		rom-a9h {
+			rom-addr = /bits/ 8 <0xa9>;
+			rom-val = /bits/ 8 <0xa0>;
+		};
+		rom-aeh {
+			rom-addr = /bits/ 8 <0xae>;
+			rom-val = /bits/ 8 <0x0e>;
+		};
+	};
+};
+
+&mdss_dsi0 {
+	status = "disabled";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+	//vdda-1p2-supply = <0x109>; // pm660_ldoa1
+	//vdda-0p9-supply = <0x105>; // pm660l_ldob1
+	//vdda-3p3-supply = <0x197>; // pm660l_ldob6
+	//wqhd-vddio-supply = <0x17e>; // pm660_ldoa11
+
+	panel: panel@0 {
+		compatible = "boe,nt51021-10wu";
+		reg = <0>;
+
+		backlight = <&i2c_backlight>;
+
+		reset-gpios = <&tlmm 62 GPIO_ACTIVE_HIGH>; // not used by panel-simple
+		//disp-te-gpios = <&pm660l_gpios GPIO_ACTIVE_HIGH>; // used by msm dsi host
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+
+		//pp1800-supply = <&vreg_l11a_1p8>; // wqhd-vddio-supply
+		// supply is the same for touchscreen
+
+		width-mm = <135>;
+		height-mm = <216>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+	status = "okay";
+};
+
+&simplefb {
+	/* In order to allow simledrm framebuffer to know panel
+	 * physical size to allow userspace to do proper DPI scaling */
+	panel = <&panel>;
+};
+
+&tlmm {
+	lcd_bl_en_default: lcd-bl-en-default-state {
+		pins = "gpio72";
+		function = "gpio";
+		drive-strength = <10>;
+		output-low;
+		bias-disable;
+	};
+
+	ts_int_default: ts_int_default {
+		mux {
+			pins = "gpio67";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio67";
+			drive-strength = <16>;
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	ts_int_output_high: ts_int_output_high {
+		mux {
+			pins = "gpio67";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio67";
+			output-high;
+		};
+	};
+
+	ts_int_output_low: ts_int_output_low {
+		mux {
+			pins = "gpio67";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio67";
+			output-low;
+		};
+	};
+
+	ts_int_input: ts_int_input {
+		mux {
+			pins = "gpio67";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio67";
+			input-enable;
+			bias-disable;
+		};
+	};
+};
