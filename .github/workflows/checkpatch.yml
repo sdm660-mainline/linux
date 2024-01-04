@@ -1,0 +1,32 @@
+name: checkpatch review
+on:
+  # Run only on pull requests, not on any pushes
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  checkpatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 'Calculate number of commits in PR (+1)'
+        run: |
+          echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> $GITHUB_ENV
+          cat $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: ${{ env.PR_FETCH_DEPTH }}
+          fetch-tags: false
+      - name: Symlink checkpatch config temporarily
+        # This checkpatch action does not support overriding checkpatch config
+        # file/directory using env var. It requires .checkpatch.conf in repo root
+        run: |
+          ln -s .github/workflows/.checkpatch.conf .checkpatch.conf
+          ls -la .checkpatch.conf
+      - name: Run checkpatch
+        uses: webispy/checkpatch-action@v9
+        continue-on-error: true  # Allow this step to fail
+      - name: Cleanup temporary confing symlink
+        run: |
+          rm -f .checkpatch.conf
+
