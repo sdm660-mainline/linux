@@ -524,6 +524,11 @@
 	extcon = <&extcon_usb>;
 };
 
+&venus {
+	firmware-name = "qcom/venus-4.4/venus.mdt";
+	status = "okay";
+};
+
 &wifi {
 	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p848>;
 	vdd-1.8-xo-supply = <&vreg_l9a_1p8>;
