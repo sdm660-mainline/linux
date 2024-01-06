@@ -98,8 +98,8 @@
 	};
 };
 
-&adreno_gpu{
-	status = "okay";
+&adreno_gpu {
+	status = "disabled"; // TODO: set to okay when display stack works
 
 	zap-shader {
 		memory-region = <&zap_shader_region>;
@@ -130,7 +130,7 @@
 	status = "disabled";
 };
 
-&gpucc{
+&gpucc {
 	status = "okay";
 };
 
@@ -143,7 +143,7 @@
 };
 
 &mdss {
-	status = "okay";
+	//status = "okay"; // TODO: remove when panel works, but now do not probe mdss
 };
 
 &mdss_dsi1 {

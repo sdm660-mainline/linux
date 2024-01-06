@@ -16,6 +16,7 @@
 
 &blsp_i2c3 {
 	status = "okay";
+
 	touchscreen@38 {
 		compatible = "edt,edt-ft5406", "edt,edt-ft5x06";
 		reg = <0x38>;
