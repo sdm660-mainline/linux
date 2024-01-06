@@ -55,6 +55,7 @@
 
 &blsp_i2c8 {
 	status = "disabled";
+
 	i2c_backlight: backlight@2c {
 		compatible = "ti,lp8556";
 		reg = <0x2c>;
