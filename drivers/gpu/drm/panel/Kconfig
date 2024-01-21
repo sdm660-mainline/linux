@@ -87,6 +87,15 @@ config DRM_PANEL_BOE_TD4320
 	  Say Y here if you want to enable support for BOE TD4320 panel
 	  used in Xiaomi Redmi Note 7 phone.
 
+config DRM_PANEL_BOE_NT51021_10WU
+	tristate "Boe NT51021 10-inch panel for Xiaomi Mi Pad 4 Plus"
+
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	  Say Y here to enable support for BOE NT51021 10-inch panel found on Xiaomi
+	  Mi Pad 4 Plus.
+
 config DRM_PANEL_BOE_TV101WUM_NL6
 	tristate "BOE TV101WUM and AUO KD101N80 45NA 1200x1920 panel"
 	depends on OF

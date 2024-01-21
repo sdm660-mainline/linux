@@ -12,17 +12,20 @@
 	qcom,board-id = <11 0>;
 	qcom,msm-id = <324 0>;
 	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>, <0x0001001b 0x0201011a 0x0 0x0>,<0x0001001b 0x0102001a 0x0 0x0>;
-
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <8620000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
+	};	
 	vreg_bl_vddio: lcd-backlight-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vreg_bl_vddio";
 		regulator-min-microvolt = <3150000>;
 		regulator-max-microvolt = <3150000>;
 
-		gpio = <&tlmm 72 0>;
+		gpio = <&tlmm 72 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-
-		startup-delay-us = <70000>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_bl_en_default>;
@@ -100,8 +103,27 @@
 	};
 };
 
+&pm660_charger {
+	monitored-battery = <&battery>;
+
+	status = "okay";
+};
+
+&pm660_fg {
+	monitored-battery = <&battery>;
+	qcom,battery-capacity-ua = <8620000>;
+	qcom,min-voltage-uv = <3400000>;
+	qcom,max-voltage-uv = <4400000>;
+
+	status = "okay";
+};
+
+&pm660_rradc {
+	status = "okay";
+};
+
 &mdss_dsi0 {
-	status = "disabled";
+	status = "okay";
 
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -117,12 +139,12 @@
 		reg = <0>;
 
 		backlight = <&i2c_backlight>;
-
-		reset-gpios = <&tlmm 62 GPIO_ACTIVE_HIGH>; // not used by panel-simple
+		avdd-supply = <&lcd_pwr>;
+		reset-gpios = <&tlmm 62 GPIO_ACTIVE_LOW>; // not used by panel-simple
 		//disp-te-gpios = <&pm660l_gpios GPIO_ACTIVE_HIGH>; // used by msm dsi host
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+		pinctrl-0 = <&mdss_dsi_reset>;
 
 		//pp1800-supply = <&vreg_l11a_1p8>; // wqhd-vddio-supply
 		// supply is the same for touchscreen
