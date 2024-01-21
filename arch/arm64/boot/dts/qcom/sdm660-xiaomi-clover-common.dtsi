@@ -54,6 +54,19 @@
 		regulator-boot-on;
 	};
 
+	lcd_pwr: lcd-power-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "lcd_pwr";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+
+		gpio = <&pm660l_gpios 5 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_pwr_en_default>;
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 
@@ -104,10 +117,15 @@
 			no-map;
 		};
 	};
+
+	extcon_usb: extcon-usb {
+		compatible = "linux,extcon-usb-gpio";
+		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &adreno_gpu {
-	status = "disabled"; // TODO: set to okay when display stack works
+	status = "okay"; // TODO: set to okay when display stack works
 
 	zap-shader {
 		memory-region = <&zap_shader_region>;
@@ -132,7 +150,7 @@
 };
 
 &blsp1_uart2 {
-	status = "disabled";
+	status = "okay";
 };
 
 &gpucc {
@@ -148,7 +166,15 @@
 };
 
 &mdss {
-	// status = "okay"; // TODO: enable this when panel works
+	status = "okay"; // TODO: remove when panel works, but now do not probe mdss
+};
+
+&mdss_dsi1 {
+	status = "disabled";
+};
+
+&mdss_dsi1_phy {
+	status = "disabled";
 };
 
 &mmcc {
@@ -157,6 +183,14 @@
 
 &mmss_smmu {
 	status = "okay";
+};
+
+&pm660l_gpios {
+	lcd_pwr_en_default: lcd-pwr-en-default-state {
+		pins = "gpio5";
+		function = "gpio";
+		bias-disable;
+	};
 };
 
 &pm660_charger {
@@ -193,6 +227,11 @@
 
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+};
+
+&cdsp_pil {
+	firmware-name = "cdsp.mdt";
+	status = "okay";
 };
 
 &remoteproc_mss {
@@ -248,8 +287,15 @@
 
 		/* SDHCI 3.3V signal doesn't seem to be supported. */
 		vreg_l2b_2p95: l2 {
-			regulator-min-microvolt = <1648000>;
-			regulator-max-microvolt = <2696000>;
+			/*
+			 * This regulator supports 1.648 - 3.104V on this board
+			 * but we set a max voltage of anything less than 2.7V
+			 * to satisfy a condition in sdhci.c that will disable
+			 * 3.3V SDHCI signaling, which happens to be not really
+			 * supported on the Xperia Nile/Ganges platform.
+			 */
+			regulator-min-microvolt = <1650000>;
+			regulator-max-microvolt = <3100000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
@@ -553,18 +599,11 @@
 &tlmm {
 	gpio-reserved-ranges = <0 4>;
 
-	mdss_dsi_active: mdss-dsi-active-state {
+	mdss_dsi_reset: mdss-dsi-reset {
 		pins = "gpio62";
 		function = "gpio";
 		drive-strength = <8>;
 		bias-disable;
-	};
-
-	mdss_te_active: mdss-te-active-state {
-		pins = "gpio59";
-		function = "mdp_vsync";
-		drive-strength = <2>;
-		bias-pull-down;
 	};
 };
 
@@ -579,8 +618,8 @@
 	phys = <&qusb2phy0>;
 	phy-names = "usb2-phy";
 	dr_mode = "peripheral";
-
 	status = "okay";
+	extcon = <&extcon_usb>;
 };
 
 &venus {
