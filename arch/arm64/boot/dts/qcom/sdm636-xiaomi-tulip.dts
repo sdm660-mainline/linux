@@ -24,6 +24,7 @@
 
 	aliases {
 		serial0 = &blsp1_uart2;
+		serial1 = &blsp2_uart1;
 	};
 
 	battery: battery {
@@ -203,8 +204,6 @@
 };
 
 &pm660l_wled {
-	default-brightness = <512>;
-
 	status = "okay";
 };
 
