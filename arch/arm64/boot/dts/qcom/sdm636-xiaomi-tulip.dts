@@ -10,10 +10,6 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
 
-/delete-node/ &adsp_mem;
-/delete-node/ &qhee_code;
-/delete-node/ &qseecom_mem;
-/delete-node/ &rmtfs_mem;
 /delete-node/ &tz_mem;
 /delete-node/ &zap_shader_region;
 
@@ -51,6 +47,23 @@
 		};
 	};
 
+	gpio-hall-sensor {
+		compatible = "gpio-keys";
+		label = "Hall effect sensor";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&hall_sensor_default>;
+
+		hall-sensor {
+			label = "Hall Effect Sensor";
+			gpios = <&tlmm 75 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_LID>;
+			linux,can-disable;
+			wakeup-source;
+		};
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 
@@ -72,6 +85,11 @@
 			no-map;
 		};
 
+		dfps_data_mem@9f7ff000 {
+			reg = <0x0 0x9f7ff000 0x0 0x1000>;
+			no-map;
+		};
+
 		ramoops@a0000000 {
 			compatible = "ramoops";
 			reg = <0x0 0xa0000000 0x0 0x400000>;
@@ -79,11 +97,6 @@
 			record-size = <0x20000>;
 			ftrace-size = <0x0>;
 			pmsg-size = <0x20000>;
-		};
-
-		qseecom_mem: qseecom-region@f5800000 {
-			reg = <0x0 0xf5800000 0x0 0x1400000>;
-			no-map;
 		};
 	};
 
@@ -196,6 +209,10 @@
 	qcom,min-voltage-uv= <3400000>;
 	qcom,max-voltage-uv= <4408000>;
 
+	status = "okay";
+};
+
+&pm660_haptics {
 	status = "okay";
 };
 
@@ -472,6 +489,14 @@
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
+
+	hall_sensor_default: hall-sensor-state {
+		pins = "gpio75";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		input-enable;
+	};
 
 	ts_rst_n: ts-rst-n-state {
 		pins = "gpio66";
