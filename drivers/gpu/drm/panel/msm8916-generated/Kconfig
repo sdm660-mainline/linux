@@ -1,0 +1,12 @@
+menu "MSM8916 panel drivers generated with linux-mdss-dsi-panel-driver-generator"
+	depends on GPIOLIB && OF && REGULATOR
+	depends on DRM_MIPI_DSI
+
+config DRM_PANEL_MSM8916_GENERATED
+	tristate "Select all generated MSM8916 panel drivers by default"
+
+config DRM_PANEL_XIAOMI_LAVENDER_TD4320
+	tristate "Xiaomi LAVENDER TD4320"
+	default DRM_PANEL_MSM8916_GENERATED
+
+endmenu
