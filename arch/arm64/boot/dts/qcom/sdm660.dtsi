@@ -83,6 +83,10 @@
 			opp-supported-hw = <0xff>;
 		};
 	};
+
+	zap-shader {
+		firmware-name = "a512_zap.mbn";
+	};
 };
 
 &CPU0 {
