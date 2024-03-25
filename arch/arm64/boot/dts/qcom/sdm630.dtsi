@@ -1175,6 +1175,11 @@
 				};
 				*/
 			};
+
+			zap-shader {
+				memory-region = <&zap_shader_region>;
+				firmware-name = "a508_zap.mbn";
+			};
 		};
 
 		kgsl_smmu: iommu@5040000 {
