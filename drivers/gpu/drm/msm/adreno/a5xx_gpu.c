@@ -1768,7 +1768,8 @@ struct msm_gpu *a5xx_gpu_init(struct drm_device *dev)
 
 	check_speed_bin(&pdev->dev);
 
-	nr_rings = 4;
+	/* NOTE: Disable preemption until it is fixed */
+	nr_rings = 1;
 
 	if (config->info->revn == 510)
 		nr_rings = 1;
