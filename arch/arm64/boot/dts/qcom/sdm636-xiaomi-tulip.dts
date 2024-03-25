@@ -15,7 +15,6 @@
 /delete-node/ &qseecom_mem;
 /delete-node/ &rmtfs_mem;
 /delete-node/ &tz_mem;
-/delete-node/ &zap_shader_region;
 
 / {
 	model = "Xiaomi Redmi Note 6 Pro";
