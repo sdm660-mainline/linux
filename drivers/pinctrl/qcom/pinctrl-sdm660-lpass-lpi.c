@@ -178,7 +178,7 @@ static struct platform_driver sdm660_lpi_pinctrl_driver = {
 		.of_match_table = sdm660_lpi_pinctrl_of_match,
 	},
 	.probe = lpi_pinctrl_probe,
-	.remove = lpi_pinctrl_remove,
+	.remove_new = lpi_pinctrl_remove,
 };
 module_platform_driver(sdm660_lpi_pinctrl_driver);
 

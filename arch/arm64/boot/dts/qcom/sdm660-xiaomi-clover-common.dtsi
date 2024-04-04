@@ -9,6 +9,8 @@
 #include "pm660l.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
+#include <dt-bindings/sound/qcom,q6afe.h>
+#include <dt-bindings/sound/qcom,q6asm.h>
 
 /delete-node/ &adsp_region;
 /delete-node/ &buffer_mem;
@@ -117,7 +119,69 @@
 			no-map;
 		};
 	};
+	sound {
+		compatible = "qcom,sdm660-internal-sndcard";
+		model = "Xiaomi Mi Pad 4";
 
+		pinctrl-0 = <&cdc_pdm_default>,
+			    <&cdc_comp_default>,
+			    <&cdc_dmic_default>;
+		pinctrl-names = "default";
+
+		audio-routing = "Analog PDM_RX1", "Digital PDM_RX1",
+				"Analog PDM_RX2", "Digital PDM_RX2",
+				"Analog PDM_RX3", "Digital PDM_RX3",
+				"Digital LPASS_PDM_TX", "Analog PDM_TX",
+				"Analog AMIC2", "Analog MIC BIAS Internal2";
+		mm1-dai-link {
+			link-name = "MultiMedia1";
+
+			cpu {
+				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+			};
+		};
+		mm2-dai-link {
+			link-name = "MultiMedia2";
+
+			cpu {
+				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
+			};
+		};
+
+		int0-mi2s-rx-link {
+			link-name = "Internal MI2S Playback";
+
+			cpu {
+				sound-dai = <&q6afedai INT0_MI2S_RX>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&pm660l_codec 0>,
+					    <&lpass_codec 0>;
+			};
+		};
+
+		int3-mi2s-tx-link {
+			link-name = "Internal MI2S Capture";
+
+			cpu {
+				sound-dai = <&q6afedai INT3_MI2S_TX>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&pm660l_codec 1>,
+					    <&lpass_codec 1>;
+			};
+		};
+	};
 	extcon_usb: extcon-usb {
 		compatible = "linux,extcon-usb-gpio";
 		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
@@ -212,6 +276,29 @@
 	status = "okay";
 };
 
+&lpass_codec {
+	clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+		 <&int_cdc_bclk>;
+	clock-names = "mclk", "ahbix-clk";
+
+	assigned-clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+	assigned-clock-rates = <9600000>;
+
+	status = "okay";
+};
+
+&pm660l_codec {
+	clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+	clock-names = "mclk";
+
+	assigned-clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+	assigned-clock-rates = <9600000>;
+
+	vdd-micbias-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
+};
+
 &pon_pwrkey {
 	status = "okay";
 };
@@ -220,6 +307,28 @@
 	status = "okay";
 
 	linux,code = <KEY_VOLUMEDOWN>;
+};
+
+&q6afedai {
+	dai@81 {
+		reg = <INT0_MI2S_RX>;
+		qcom,sd-lines = <0 1>;
+	};
+
+	dai@88 {
+		reg = <INT3_MI2S_TX>;
+		qcom,sd-lines = <0 1>;
+	};
+};
+
+&q6asmdai {
+	dai@0 {
+		reg = <0>;
+	};
+
+	dai@1 {
+		reg = <1>;
+	};
 };
 
 &qusb2phy0 {
