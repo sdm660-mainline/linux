@@ -461,7 +461,7 @@ int lpi_pinctrl_probe(struct platform_device *pdev)
 	if (!(data->flags & LPI_FLAG_SLEW_RATE_SAME_REG)) {
 		pctrl->slew_base = devm_platform_ioremap_resource(pdev, 1);
 		if (IS_ERR(pctrl->slew_base)) {
-			return dev_warn(dev, "Slew resource not provided: %ld\n",
+			dev_warn(dev, "Slew resource not provided: %ld\n",
 					PTR_ERR(pctrl->slew_base));
 			pctrl->slew_base = NULL;
 		}
