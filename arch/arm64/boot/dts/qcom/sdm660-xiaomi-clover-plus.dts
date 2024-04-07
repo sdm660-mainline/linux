@@ -53,6 +53,7 @@
 		touchscreen-size-y = <1920>;
 		touchscreen-max-w = <512>;
 		touchscreen-max-p = <512>;
+		goodix,config-name = "goodix_9110_cfg.bin";
 	};
 };
 
@@ -65,7 +66,7 @@
 		enable-supply = <&vreg_bl_vddio>;
 
 		bl-name = "lcd-backlight";
-		dev-ctrl = /bits/ 8 <0x05>;
+		dev-ctrl = /bits/ 8 <0x87>; /* pwm + i2c combined mode after shaper block, 12-bit */
 		init-brt = /bits/ 8 <0x7f>; /* 50% brightness */
 
 		/* TODO: Stange thing, according to datasheet for LP8556 valid
@@ -78,15 +79,15 @@
 		};
 		rom-a0h {
 			rom-addr = /bits/ 8 <0xa0>;
-			rom-val = /bits/ 8 <0x09>;
+			rom-val = /bits/ 8 <0x09>; /* max current 23.5mA */
 		};
 		rom-a1h {
 			rom-addr = /bits/ 8 <0xa1>;
-			rom-val = /bits/ 8 <0x5f>;
+			rom-val = /bits/ 8 <0x5f>; /* max current 23.5mA */
 		};
 		rom-a3h {
 			rom-addr = /bits/ 8 <0xa3>;
-			rom-val = /bits/ 8 <0x0e>;
+			rom-val = /bits/ 8 <0x0e>; /* Select brightness change transition duration 000 = 0 ms (immediate change)*/
 		};
 		rom-a5h {
 			rom-addr = /bits/ 8 <0xa5>;

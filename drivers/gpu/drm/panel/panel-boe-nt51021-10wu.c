@@ -39,32 +39,32 @@ static int nt51021_boe_10wu_on(struct nt51021_boe_10wu *ctx)
 	struct device *dev = &dsi->dev;
 	int ret;
 
-	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5);
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5); //command interface selection (force sending)?
 	usleep_range(1000, 2000);
-	mipi_dsi_generic_write_seq(dsi, 0x01, 0x00);
+	mipi_dsi_generic_write_seq(dsi, 0x01, 0x00); //global reset
 	msleep(20);
-	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5);
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5);//command interface selection (force sending)?
 	usleep_range(1000, 2000);
-	mipi_dsi_generic_write_seq(dsi, 0x83, 0x00);
-	mipi_dsi_generic_write_seq(dsi, 0x84, 0x00);
-	mipi_dsi_generic_write_seq(dsi, 0x8c, 0x8e);
-	mipi_dsi_generic_write_seq(dsi, 0xfa, 0x12);
-	mipi_dsi_generic_write_seq(dsi, 0xfd, 0x1b);
-	mipi_dsi_generic_write_seq(dsi, 0xcd, 0x6c);
-	mipi_dsi_generic_write_seq(dsi, 0xc8, 0xfc);
-	mipi_dsi_generic_write_seq(dsi, 0x97, 0x00);
-	mipi_dsi_generic_write_seq(dsi, 0x8b, 0x10);
-	mipi_dsi_generic_write_seq(dsi, 0xa9, 0x20);
-	mipi_dsi_generic_write_seq(dsi, 0x83, 0xaa);
-	mipi_dsi_generic_write_seq(dsi, 0x84, 0x11);
-	mipi_dsi_generic_write_seq(dsi, 0xa9, 0x4b);
-	mipi_dsi_generic_write_seq(dsi, 0x85, 0x04);
-	mipi_dsi_generic_write_seq(dsi, 0x86, 0x08);
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0x00); //page_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x00); //page_step1
+	mipi_dsi_generic_write_seq(dsi, 0x8c, 0x8e); //GOP setting?
+	mipi_dsi_generic_write_seq(dsi, 0xfa, 0x12); //voltages?
+	mipi_dsi_generic_write_seq(dsi, 0xfd, 0x1b); //voltages?
+	mipi_dsi_generic_write_seq(dsi, 0xcd, 0x6c); //3Dummy?
+	mipi_dsi_generic_write_seq(dsi, 0xc8, 0xfc); //GCH?
+	mipi_dsi_generic_write_seq(dsi, 0x97, 0x00); //resistor setting 100ohm?
+	mipi_dsi_generic_write_seq(dsi, 0x8b, 0x10); //??
+	mipi_dsi_generic_write_seq(dsi, 0xa9, 0x20); //tp_sync?
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0xaa); //page1_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x11); //page1_step1
+	mipi_dsi_generic_write_seq(dsi, 0xa9, 0x4b); //IC MIP Rx drivering setting 85%
+	mipi_dsi_generic_write_seq(dsi, 0x85, 0x04); //test mode1?
+	mipi_dsi_generic_write_seq(dsi, 0x86, 0x08); //test mode2?
 	mipi_dsi_generic_write_seq(dsi, 0x98, 0xc1);
-	mipi_dsi_generic_write_seq(dsi, 0x9c, 0x10);
-	mipi_dsi_generic_write_seq(dsi, 0x83, 0xaa);
-	mipi_dsi_generic_write_seq(dsi, 0x84, 0x11);
-	mipi_dsi_generic_write_seq(dsi, 0xc0, 0x0e);
+	mipi_dsi_generic_write_seq(dsi, 0x9c, 0x10); //test mode3?
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0xaa); //page1_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x11); //page1_step1
+	mipi_dsi_generic_write_seq(dsi, 0xc0, 0x0e); //gamma settings?
 	mipi_dsi_generic_write_seq(dsi, 0xc1, 0x11);
 	mipi_dsi_generic_write_seq(dsi, 0xc2, 0x1f);
 	mipi_dsi_generic_write_seq(dsi, 0xc3, 0x30);
@@ -127,32 +127,32 @@ static int nt51021_boe_10wu_on(struct nt51021_boe_10wu *ctx)
 	mipi_dsi_generic_write_seq(dsi, 0xfc, 0xf8);
 	mipi_dsi_generic_write_seq(dsi, 0xfd, 0xff);
 	mipi_dsi_generic_write_seq(dsi, 0xfe, 0xfc);
-	mipi_dsi_generic_write_seq(dsi, 0xff, 0x0f);
-	mipi_dsi_generic_write_seq(dsi, 0x83, 0xbb);
-	mipi_dsi_generic_write_seq(dsi, 0x84, 0x22);
-	mipi_dsi_generic_write_seq(dsi, 0xa1, 0xff);
-	mipi_dsi_generic_write_seq(dsi, 0xa2, 0xfe);
-	mipi_dsi_generic_write_seq(dsi, 0xa3, 0xfa);
-	mipi_dsi_generic_write_seq(dsi, 0xa4, 0xf7);
-	mipi_dsi_generic_write_seq(dsi, 0xa5, 0xf3);
-	mipi_dsi_generic_write_seq(dsi, 0xa6, 0xf1);
-	mipi_dsi_generic_write_seq(dsi, 0xa7, 0xed);
-	mipi_dsi_generic_write_seq(dsi, 0xa8, 0xeb);
-	mipi_dsi_generic_write_seq(dsi, 0xa9, 0xe9);
-	mipi_dsi_generic_write_seq(dsi, 0xaa, 0xe6);
-	mipi_dsi_generic_write_seq(dsi, 0xaf, 0x00);
+	mipi_dsi_generic_write_seq(dsi, 0xff, 0x0f); //gamma settings end?
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0xbb); //page2_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x22); //page2_step1
+	mipi_dsi_generic_write_seq(dsi, 0xa1, 0xff); //pwm0?
+	mipi_dsi_generic_write_seq(dsi, 0xa2, 0xfe); //pwm1?
+	mipi_dsi_generic_write_seq(dsi, 0xa3, 0xfa); //pwm2?
+	mipi_dsi_generic_write_seq(dsi, 0xa4, 0xf7); //pwm3?
+	mipi_dsi_generic_write_seq(dsi, 0xa5, 0xf3); //pwm4?
+	mipi_dsi_generic_write_seq(dsi, 0xa6, 0xf1); //pwm5?
+	mipi_dsi_generic_write_seq(dsi, 0xa7, 0xed); //pwm6?
+	mipi_dsi_generic_write_seq(dsi, 0xa8, 0xeb); //pwm7?
+	mipi_dsi_generic_write_seq(dsi, 0xa9, 0xe9); //pwm8?
+	mipi_dsi_generic_write_seq(dsi, 0xaa, 0xe6); //pwm9?
+	mipi_dsi_generic_write_seq(dsi, 0xaf, 0x00); //tckv_oe 0x12ui?
 	mipi_dsi_generic_write_seq(dsi, 0xb0, 0x12);
 	mipi_dsi_generic_write_seq(dsi, 0xb1, 0x23);
 	mipi_dsi_generic_write_seq(dsi, 0xb2, 0x34);
 	mipi_dsi_generic_write_seq(dsi, 0xb3, 0x77);
-	mipi_dsi_generic_write_seq(dsi, 0xb4, 0x0d);
-	mipi_dsi_generic_write_seq(dsi, 0xb5, 0x1a);
-	mipi_dsi_generic_write_seq(dsi, 0xb6, 0x16);
+	mipi_dsi_generic_write_seq(dsi, 0xb4, 0x0d); //cabc_delta_gray64?
+	mipi_dsi_generic_write_seq(dsi, 0xb5, 0x1a); //cabc_delta_gray128?
+	mipi_dsi_generic_write_seq(dsi, 0xb6, 0x16); //cabc_delta_gray192?
 	mipi_dsi_generic_write_seq(dsi, 0x9a, 0x10);
 	mipi_dsi_generic_write_seq(dsi, 0x9b, 0x00);
 	mipi_dsi_generic_write_seq(dsi, 0x96, 0xe6);
 	mipi_dsi_generic_write_seq(dsi, 0x99, 0x06);
-	mipi_dsi_generic_write_seq(dsi, 0xc0, 0x0e);
+	mipi_dsi_generic_write_seq(dsi, 0xc0, 0x0e); //gamma settings?
 	mipi_dsi_generic_write_seq(dsi, 0xc1, 0x11);
 	mipi_dsi_generic_write_seq(dsi, 0xc2, 0x1f);
 	mipi_dsi_generic_write_seq(dsi, 0xc3, 0x30);
@@ -215,10 +215,10 @@ static int nt51021_boe_10wu_on(struct nt51021_boe_10wu *ctx)
 	mipi_dsi_generic_write_seq(dsi, 0xfc, 0xf8);
 	mipi_dsi_generic_write_seq(dsi, 0xfd, 0xff);
 	mipi_dsi_generic_write_seq(dsi, 0xfe, 0xfc);
-	mipi_dsi_generic_write_seq(dsi, 0xff, 0x0f);
-	mipi_dsi_generic_write_seq(dsi, 0x83, 0xcc);
-	mipi_dsi_generic_write_seq(dsi, 0x84, 0x33);
-	mipi_dsi_generic_write_seq(dsi, 0xc0, 0x0e);
+	mipi_dsi_generic_write_seq(dsi, 0xff, 0x0f); //gamma settings end?
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0xcc); //page3_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x33); //page3_step1
+	mipi_dsi_generic_write_seq(dsi, 0xc0, 0x0e); //gamma settings?
 	mipi_dsi_generic_write_seq(dsi, 0xc1, 0x11);
 	mipi_dsi_generic_write_seq(dsi, 0xc2, 0x1f);
 	mipi_dsi_generic_write_seq(dsi, 0xc3, 0x30);
@@ -281,10 +281,10 @@ static int nt51021_boe_10wu_on(struct nt51021_boe_10wu *ctx)
 	mipi_dsi_generic_write_seq(dsi, 0xfc, 0xf8);
 	mipi_dsi_generic_write_seq(dsi, 0xfd, 0xff);
 	mipi_dsi_generic_write_seq(dsi, 0xfe, 0xfc);
-	mipi_dsi_generic_write_seq(dsi, 0xff, 0x0f);
-	mipi_dsi_generic_write_seq(dsi, 0x83, 0x00);
-	mipi_dsi_generic_write_seq(dsi, 0x84, 0x00);
-	mipi_dsi_generic_write_seq(dsi, 0x9f, 0xff);
+	mipi_dsi_generic_write_seq(dsi, 0xff, 0x0f); //gamma settings end?
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0x00); //page_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x00); //page_step1
+	mipi_dsi_generic_write_seq(dsi, 0x9f, 0xff); //bl_level max?
 
 	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
 	if (ret < 0) {
@@ -293,7 +293,14 @@ static int nt51021_boe_10wu_on(struct nt51021_boe_10wu *ctx)
 	}
 	usleep_range(5000, 6000);
 
-	mipi_dsi_generic_write_seq(dsi, 0x8f, 0x00);
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0x00); //command interface selection (exit force sending)?
+	usleep_range(1000, 2000);
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5);//command interface selection? (force sending)?
+	usleep_range(1000, 2000);
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0xbb); //page2_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x22); //page2_step1
+	mipi_dsi_generic_write_seq(dsi, 0x90, 0x40); //CABC still
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0x00); //command interface selection (exit force sending)?
 	usleep_range(1000, 2000);
 
 	return 0;
@@ -305,7 +312,14 @@ static int nt51021_boe_10wu_off(struct nt51021_boe_10wu *ctx)
 	struct device *dev = &dsi->dev;
 	int ret;
 
-	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5);
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5);//command interface selection (force sending)?
+	usleep_range(1000, 2000);
+	mipi_dsi_generic_write_seq(dsi, 0x83, 0xbb); //page2_step0
+	mipi_dsi_generic_write_seq(dsi, 0x84, 0x22); //page2_step1
+	mipi_dsi_generic_write_seq(dsi, 0x90, 0xc0); //CABC off
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0x00); //command interface selection (exit force sending)?
+	usleep_range(1000, 2000);
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0xa5);//command interface selection (force sending)?
 	msleep(20);
 
 	ret = mipi_dsi_dcs_set_display_off(dsi);
@@ -322,7 +336,7 @@ static int nt51021_boe_10wu_off(struct nt51021_boe_10wu *ctx)
 	}
 	msleep(70);
 
-	mipi_dsi_generic_write_seq(dsi, 0x8f, 0x00);
+	mipi_dsi_generic_write_seq(dsi, 0x8f, 0x00); //exit force sending?
 	usleep_range(4000, 5000);
 
 	return 0;
