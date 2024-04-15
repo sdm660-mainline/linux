@@ -12,6 +12,8 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
 
+/delete-node/ &zap_shader_region;
+
 / {
 	model = "Xiaomi Redmi Note 7";
 	compatible = "xiaomi,lavender", "qcom,sdm660";
@@ -36,6 +38,10 @@
 			height = <2340>;
 			stride = <(1080 * 4)>;
 			format = "a8r8g8b8";
+
+			/* In order to allow simledrm framebuffer to know
+			 * physical dimensions */
+			panel = <&panel>;
 		};
 	};
 
@@ -86,6 +92,15 @@
 			reg = <0x0 0x9d400000 0x0 0x23ff000>;
 			no-map;
 		};
+
+		/* from downstream dmesg:
+		 * subsys-pil-tz soc:qcom,kgsl-hyp: a512_zap: loading from
+		 *     0x00000000fc400000 to 0x00000000fc402000 */
+		zap_shader_region: gpu@fc400000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xfc400000 0x0 0x2000>;
+			no-map;
+		};
 	};
 
 	/*
@@ -95,6 +110,14 @@
 	extcon_usb: extcon-usb {
 		compatible = "linux,extcon-usb-gpio";
 		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&adreno_gpu {
+	status = "okay";
+
+	zap-shader {
+		memory-region = <&zap_shader_region>;
 	};
 };
 
@@ -140,7 +163,69 @@
 	};
 };
 
+&gpucc {
+	status = "okay";
+};
+
+&kgsl_smmu {
+	status = "okay";
+};
+
 &lpass_smmu {
+	status = "okay";
+};
+
+&mdp {
+	status = "okay";
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+
+	panel: panel@0 {
+		//compatible = "tianma,nt36672a-xiaomi-lavender"; // full driver
+		compatible = "tianma,nt36672a-xiaomi-lavender-simple";
+		reg = <0>;
+
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>; // originally was GPIO_ACTIVE_HIGH?
+
+		backlight = <&pm660l_wled>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+
+		width-mm = <67>;
+		height-mm = <145>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+	status = "okay";
+};
+
+&mmss_smmu {
 	status = "okay";
 };
 
@@ -490,6 +575,20 @@
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
+
+	mdss_dsi_active: mdss_dsi_active {
+		function = "gpio";
+		pins = "gpio53";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	mdss_te_active: mdss_te_active {
+		pins = "gpio59";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
 
 	ts_pins_active: ts-pins-active-state {
 		pins = "gpio66", "gpio67";
