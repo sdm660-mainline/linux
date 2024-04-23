@@ -88,6 +88,15 @@ config DRM_PANEL_BOE_NT51021
 	  8-inch and 10-inch DSI video mode panels used in Xiaomi Mi Pad 4
 	  and Xiaomi Mi Pad 4 PLUS.
 
+config DRM_PANEL_BOE_TD4320
+	tristate "BOE TD4320 DSI panel (for xiaomi-lavender)"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for BOE TD4320 panel
+	  used in Xiaomi Redmi Note 7 phone.
+
 config DRM_PANEL_BOE_TV101WUM_NL6
 	tristate "BOE TV101WUM and AUO KD101N80 45NA 1200x1920 panel"
 	depends on OF
