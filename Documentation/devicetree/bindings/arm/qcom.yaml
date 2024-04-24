@@ -831,6 +831,8 @@ properties:
       - items:
           - enum:
               - xiaomi,lavender
+              - xiaomi,lavender-boe
+              - xiaomi,lavender-tianma
           - const: qcom,sdm660
 
       - items:
