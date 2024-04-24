@@ -904,6 +904,8 @@ properties:
               - xiaomi,clover-plus
               - xiaomi,jasmine
               - xiaomi,lavender
+              - xiaomi,lavender-boe
+              - xiaomi,lavender-tianma
               - xiaomi,platina
           - const: qcom,sdm660
 
