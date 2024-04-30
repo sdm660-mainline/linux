@@ -93,6 +93,7 @@ config DRM_PANEL_BOE_NT51021_10WU
 	depends on OF
 	depends on DRM_MIPI_DSI
 	depends on BACKLIGHT_CLASS_DEVICE
+	help
 	  Say Y here to enable support for BOE NT51021 10-inch panel found on Xiaomi
 	  Mi Pad 4 Plus.
 
