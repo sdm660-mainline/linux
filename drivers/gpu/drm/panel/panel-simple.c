@@ -5072,6 +5072,37 @@ static const struct panel_desc_dsi nt36672a_tianma_lavender = {
 	.lanes = 4,
 };
 
+static const struct drm_display_mode nt36672a_tianma_tulip_mode = {
+	.clock = (1080 + 100 + 28 + 120) * (2280 + 10 + 3 + 8) * 60 / 1000,
+	.hdisplay = 1080,
+	.hsync_start = 1080 + 100,
+	.hsync_end = 1080 + 100 + 28,
+	.htotal = 1080 + 100 + 28 + 120,
+	.vdisplay = 2280,
+	.vsync_start = 2280 + 10,
+	.vsync_end = 2280 + 10 + 3,
+	.vtotal = 2280 + 10 + 3 + 8,
+	.width_mm = 68,
+	.height_mm = 143,
+};
+
+static const struct panel_desc_dsi nt36672a_tianma_tulip = {
+	.desc = {
+		.modes = &nt36672a_tianma_tulip_mode,
+		.num_modes = 1,
+		.bpc = 8,
+		.size = {
+			.width = 68,
+			.height = 143,
+		},
+		.connector_type = DRM_MODE_CONNECTOR_DSI,
+	},
+	.flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+		 MIPI_DSI_CLOCK_NON_CONTINUOUS,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+};
+
 static const struct of_device_id dsi_of_match[] = {
 	{
 		.compatible = "auo,b080uan01",
@@ -5101,6 +5132,9 @@ static const struct of_device_id dsi_of_match[] = {
 		.compatible = "tianma,nt36672a-xiaomi-lavender-simple",
 		.data = &nt36672a_tianma_lavender
 	}, {
+		.compatible = "tianma,nt36672a-xiaomi-tulip-simple",
+		.data = &nt36672a_tianma_tulip
+	}, {		
 		/* sentinel */
 	}
 };
