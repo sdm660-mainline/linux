@@ -375,15 +375,16 @@ static int pdr_get_domain_list(struct servreg_get_domain_list_req *req,
 	mutex_unlock(&pdr->lock);
 	if (ret < 0) {
 		qmi_txn_cancel(&txn);
-		return ret;
+		goto err_unlock;
 	}
 
 	ret = qmi_txn_wait(&txn, 5 * HZ);
 	if (ret < 0) {
 		pr_err("PDR: %s get domain list txn wait failed: %d\n",
 		       req->service_name, ret);
-		return ret;
+		goto err_unlock;
 	}
+	mutex_unlock(&pdr->lock);
 
 	if (resp->resp.result != QMI_RESULT_SUCCESS_V01) {
 		pr_err("PDR: %s get domain list failed: 0x%x\n",
@@ -392,6 +393,11 @@ static int pdr_get_domain_list(struct servreg_get_domain_list_req *req,
 	}
 
 	return 0;
+
+err_unlock:
+	mutex_unlock(&pdr->lock);
+
+	return ret;
 }
 
 static int pdr_locate_service(struct pdr_handle *pdr, struct pdr_service *pds)
