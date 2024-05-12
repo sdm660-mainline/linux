@@ -8,8 +8,82 @@
 #include "sdm630.dtsi"
 #include "sdm630-sony-xperia-nile.dtsi"
 
+/delete-node/ &zap_shader_region;
+
 / {
 	model = "Sony Xperia XA2";
 	compatible = "sony,pioneer-row", "qcom,sdm630";
 	chassis-type = "handset";
+
+	reserved-memory {
+		zap_shader_region: gpu@fe49c000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xfe49c000 0x0 0xe000>;
+			no-map;
+		};
+	};
+};
+
+&adreno_gpu {
+	status = "okay";
+};
+
+&gpucc {
+	status = "okay";
+};
+
+&kgsl_smmu {
+	status = "okay";
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+
+	status = "okay";
+
+	panel@0 {
+		compatible = "truly,td4322";
+		reg = <0>;
+
+		backlight = <&pm660l_wled>;
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+
+		pinctrl-0 = <&panel_reset_gpio>;
+		pinctrl-names = "default";
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+	status = "okay";
+};
+
+&mmss_smmu {
+	status = "okay";
+};
+
+&pm660l_wled {
+	status = "okay";
+
+	qcom,num-strings = <2>;
+	qcom,current-limit-microamp = <17500>;
 };
