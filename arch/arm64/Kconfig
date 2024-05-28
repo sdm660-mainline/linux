@@ -2323,6 +2323,32 @@ config CMDLINE_FORCE
 
 endchoice
 
+config CMDLINE_DROP_DANGEROUS_ANDROID_OPTIONS
+	bool "Drop certain dangerous options from cmdline"
+	default n
+	help
+	  Android >=9 primary bootloader with system-as-root feature [1]
+	  enabled passes some arguments in kernel command line, that make
+	  booting Linux harder:
+
+	    * skip_initramfs
+	    * root=/dev/dm-0
+	    * init=/init
+	    * dm=...
+
+	  Those parameters override default boot partition to hardcoded,
+	  set init binary to /init, disable booting from initramfs.
+
+	  Most importantly, Linux processes root= parameter and at boot time
+	  skips initramfs and tries to mount device that does not exist and
+	  fails.
+
+	  If this option is enabled, those cmdline parameters will be erased
+	  from bootloader's command line, and custom OS can boot the way it
+	  likes.
+
+	  [1] https://source.android.com/docs/core/architecture/partitions/system-as-root
+
 config EFI_STUB
 	bool
 
