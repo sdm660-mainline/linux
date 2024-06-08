@@ -28,7 +28,7 @@
 
 		stdout-path = "serial0:115200n8";
 
-		framebuffer@9d400000 {
+		simplefb: framebuffer@9d400000 {
 			compatible = "simple-framebuffer";
 			reg = <0x0 0x9d400000 0x0 (1200 * 1920 * 4)>;
 			width = <1200>;
@@ -127,10 +127,7 @@
 		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
 		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
 		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
-		//vddio-supply = <&vreg_l13a_1p8>; // chip-pwd-supply ?
 		max-speed = <3200000>;
-		/* This path is relative to the qca/ subdir under lib/firmware. */
-		//firmware-name = "crnv21.bin";
 	};
 };
 
@@ -151,19 +148,11 @@
 };
 
 &mdss {
-	//status = "okay"; // TODO: remove when panel works, but now do not probe mdss
-};
-
-&mdss_dsi1 {
-	status = "disabled";
-};
-
-&mdss_dsi1_phy {
-	status = "disabled";
+	// status = "okay"; // TODO: enable this when panel works
 };
 
 &mmcc {
-	status = "okay";
+	// status = "okay"; // TODO: enable this when panel works
 };
 
 &mmss_smmu {
@@ -201,6 +190,9 @@
 
 &qusb2phy0 {
 	status = "okay";
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
 &remoteproc_mss {
@@ -577,12 +569,18 @@
 };
 
 &usb3 {
+	qcom,select-utmi-as-pipe-clk; /* Required if only USB 2.0 is available */
+
 	status = "okay";
 };
 
 &usb3_dwc3 {
-	status = "okay";
+	maximum-speed = "high-speed";
+	phys = <&qusb2phy0>;
+	phy-names = "usb2-phy";
 	dr_mode = "peripheral";
+
+	status = "okay";
 };
 
 &venus {
