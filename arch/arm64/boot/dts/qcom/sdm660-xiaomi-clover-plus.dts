@@ -112,7 +112,7 @@
 	//vdda-3p3-supply = <0x197>; // pm660l_ldob6
 	//wqhd-vddio-supply = <0x17e>; // pm660_ldoa11
 
-	panel@0 {
+	panel: panel@0 {
 		compatible = "boe,nt51021-10wu";
 		reg = <0>;
 
@@ -126,6 +126,9 @@
 
 		//pp1800-supply = <&vreg_l11a_1p8>; // wqhd-vddio-supply
 		// supply is the same for touchscreen
+
+		width-mm = <135>;
+		height-mm = <216>;
 
 		port {
 			panel_in: endpoint {
@@ -143,6 +146,12 @@
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
 	status = "okay";
+};
+
+&simplefb {
+	/* In order to allow simledrm framebuffer to know panel
+	 * physical size to allow userspace to do proper DPI scaling */
+	panel = <&panel>;
 };
 
 &tlmm {
