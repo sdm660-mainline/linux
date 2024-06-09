@@ -603,8 +603,8 @@
 };
 
 &pm660l_wled {
-        status = "okay";
-        default-brightness = <512>;
+	status = "okay";
+	default-brightness = <512>;
 };
 
 &gcc {
@@ -620,19 +620,19 @@
 };
 
 &mmss_smmu {
-        status = "okay";
+	status = "okay";
 };
 
 &anoc2_smmu {
-        status = "okay";
+	status = "okay";
 };
 
 &kgsl_smmu {
-        status = "okay";
+	status = "okay";
 };
 
 &lpass_smmu {
-        status = "okay";
+	status = "okay";
 };
 
 &adreno_gpu {
