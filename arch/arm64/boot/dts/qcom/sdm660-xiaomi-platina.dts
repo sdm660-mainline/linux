@@ -192,8 +192,7 @@
 
 	gpio_keys {
 		status = "okay";
-		compatible = "gpio-keys-polled";
-		poll-interval = <100>;
+		compatible = "gpio-keys";
 		label = "Volume up";
 		pinctrl-names = "default";
 		pinctrl-0 = <&vol_up_gpio_default>;
@@ -752,15 +751,15 @@
 
 };
 
-&adreno_gpu{
+&adreno_gpu {
 	status = "disabled";
 };
 
-&gpucc{
+&gpucc {
 	status = "disabled";
 };
 
-&mmcc{
+&mmcc {
 	status = "disabled";
 };
 
