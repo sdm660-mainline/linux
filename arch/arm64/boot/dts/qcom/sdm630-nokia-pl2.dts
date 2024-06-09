@@ -252,17 +252,17 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
 
-                port {
-                        panel_in: endpoint {
-                                remote-endpoint = <&mdss_dsi0_out>;
-                        };
-                };
-        };
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
 };
 
 &mdss_dsi0_out {
-        data-lanes = <0 1 2 3>;
-        remote-endpoint = <&panel_in>;
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
 };
 
 &mdss_dsi0_phy {
@@ -324,8 +324,8 @@
 };
 
 &pm660l_wled {
-        status = "okay";
-        default-brightness = <512>;
+	status = "okay";
+	default-brightness = <512>;
 };
 
 &pm660_charger {
@@ -343,6 +343,14 @@
 
 &pm660_rradc {
 	status = "okay";
+};
+
+&qusb2phy0 {
+	status = "okay";
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
+	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
 &rpm_requests {
@@ -679,10 +687,16 @@
 };
 
 &usb3 {
+	qcom,select-utmi-as-pipe-clk;
+
 	status = "okay";
 };
 
 &usb3_dwc3 {
+	maximum-speed = "high-speed";
+	phys = <&qusb2phy0>;
+	phy-names = "usb2-phy";
+
 	dr_mode = "peripheral";
 	extcon = <&extcon_usb>;
 };
