@@ -296,6 +296,10 @@
 	status = "okay";
 };
 
+&cdsp_smmu {
+	status = "okay";
+};
+
 &mdss {
 	status = "okay"; // TODO: remove when panel works, but now do not probe mdss
 };
