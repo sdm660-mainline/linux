@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <dt-bindings/sound/qcom,q6dsp-lpass-ports.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/jack.h>
@@ -34,9 +35,9 @@ struct sdm660_int_snd_data {
 
 static int snd_sdm660_int_startup(struct snd_pcm_substream *stream)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(stream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(stream);
 	struct sdm660_int_snd_data *data = snd_soc_card_get_drvdata(rtd->card);
-	struct snd_soc_dai *cpu = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu = snd_soc_rtd_to_cpu(rtd, 0);
 	struct snd_soc_dai *codec;
 	int i;
 
@@ -101,9 +102,9 @@ static int snd_sdm660_int_startup(struct snd_pcm_substream *stream)
 
 static void snd_sdm660_int_shutdown(struct snd_pcm_substream *stream)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(stream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(stream);
 	struct sdm660_int_snd_data *data = snd_soc_card_get_drvdata(rtd->card);
-	struct snd_soc_dai *cpu = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu = snd_soc_rtd_to_cpu(rtd, 0);
 
 	switch (cpu->id) {
 	case SECONDARY_TDM_RX_0:
@@ -143,8 +144,8 @@ static unsigned int tdm_slot_off[] = {
 static int snd_sdm660_int_hw_params(struct snd_pcm_substream *stream,
 				    struct snd_pcm_hw_params *params)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(stream);
-	struct snd_soc_dai *cpu = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(stream);
+	struct snd_soc_dai *cpu = snd_soc_rtd_to_cpu(rtd, 0);
 	unsigned int channels;
 	int ret;
 
@@ -219,9 +220,9 @@ static int sdm660_int_dai_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_card *card = rtd->card;
 	struct sdm660_int_snd_data *data = snd_soc_card_get_drvdata(card);
-	struct snd_soc_dai *cpu = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu = snd_soc_rtd_to_cpu(rtd, 0);
 	/* first codec on INT0_MI2S_RX must be the analog codec */
-	struct snd_soc_dai *codec = asoc_rtd_to_codec(rtd, 0);
+	struct snd_soc_dai *codec = snd_soc_rtd_to_codec(rtd, 0);
 	struct snd_jack *jack;
 	int ret;
 
