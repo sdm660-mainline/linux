@@ -38,6 +38,23 @@
 			height = <2340>;
 			stride = <(1080 * 4)>;
 			format = "a8r8g8b8";
+
+			/* HACK:
+			 * Fake panel node for simple-framebuffer to calculate DPI from. Only
+			 * needs width & height specified. This allows us to break device link
+			 * from simplefb to mdss (implicitly via panel->mdp->mdss) to fix drm
+			 * device probe ordering. Without this, simpledrm would probe second
+			 * after msm-drm, and confuse userspace with 2 GPUs in /dev/dri.
+			 * Alternative workaround is to boot with kernel parameter
+			 * `fw_devlink=permissive`, which is worse, because it can hide other
+			 * issues with device dependencies.
+			 */
+			panel = <&fb_panel>;
+
+			fb_panel: fb-panel {
+				width-mm = <67>;
+				height-mm = <145>;
+			};
 		};
 	};
 
