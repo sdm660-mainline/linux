@@ -1,0 +1,84 @@
+name: Build Linux kernel image and package
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - qcom-sdm660-6.*.y
+    tags:
+      - v*-sdm660
+jobs:
+  build-linux:
+    runs-on: [self-hosted, Linux, aarch64]
+    steps:
+      - name: Pring debug info and do some pre-run checks
+        run: |
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
+          echo "GITHUB_HEAD_REF: $GITHUB_HEAD_REF"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo -n "whoami: " ; whoami
+          echo -n "groups: " ; groups
+          echo "doas permissions check:"
+          doas -C /etc/doas.conf apt update
+      - name: Update ubuntu packages
+        run: |
+          doas -n apt update
+          doas -n apt -y upgrade
+      - name: Checkout linux source from git
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Prepare build directory (.output)
+        run: |
+          mkdir -p .output
+      - name: Prepare linux kernel .config using sdm660_defconfig
+        run: |
+          make O=.output LOCALVERSION= defconfig sdm660_defconfig
+      - name: Build linux kernel (Image.gz)
+        run: |
+          make O=.output LOCALVERSION= -j$(nproc)
+      - name: Install modules into fake install prefix
+        run: |
+          make O=.output LOCALVERSION= INSTALL_MOD_PATH=PREFIX INSTALL_MOD_STRIP=1 modules_install
+      - name: Update pmbootstrap
+        run: git -C /opt/pmbootstrap pull
+      - name: Prepare pmbootstrap config
+        run: |
+          echo -n "pmbootstrap version: "
+          pmbootstrap --version
+          pmbootstrap config work /home/runner/_pmbwork
+          pmbootstrap config aports /home/runner/_pmbwork/cache_git/pmaports
+          pmbootstrap config ccache_size 20G
+          pmbootstrap config extra_space 256
+          pmbootstrap config jobs 4
+          pmbootstrap config ui console
+      - name: Dump pmbootstrap config
+        run: pmbootstrap config
+      - name: Update pmaports
+        run: |
+          git -C $(pmbootstrap config aports) fetch origin
+          git -C $(pmbootstrap config aports) reset --hard origin/master
+          pmbootstrap status
+      - name: Clean pmbootstrap chroots (pmbootstrap zap)
+        run: |
+          pmbootstrap -y zap || tail -n200 /home/runner/_pmbwork/log.txt
+      - name: Clean previously built kernel packages
+        run: |
+          doas rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+      - name: package linux-postmarketos-qcom-sdm660 using build --envkernel
+        run: |
+          cd $GITHUB_WORKSPACE
+          pmbootstrap --details-to-stdout build --arch aarch64 --envkernel linux-postmarketos-qcom-sdm660
+      - name: Make small rootfs image with console ui (pmbootstrap install)
+        run: |
+          pmbootstrap install --zap --no-firewall --password=147147 || tail -n200 /home/runner/_pmbwork/log.txt
+      - name: Cleanup pmbootstrap chroots
+        run: |
+          pmbootstrap shutdown
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Artifacts
+          compression-level: 1
+          path: |
+            /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
