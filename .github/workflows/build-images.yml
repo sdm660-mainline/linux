@@ -65,7 +65,7 @@ jobs:
           pmbootstrap -y zap || tail -n200 /home/runner/_pmbwork/log.txt
       - name: Clean previously built kernel packages
         run: |
-          rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+          doas rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
       - name: package linux-postmarketos-qcom-sdm660 using build --envkernel
         run: |
           cd $GITHUB_WORKSPACE
