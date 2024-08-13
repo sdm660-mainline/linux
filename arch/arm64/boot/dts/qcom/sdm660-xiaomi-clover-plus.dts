@@ -17,7 +17,7 @@
 		charge-full-design-microamp-hours = <8620000>;
 		voltage-min-design-microvolt = <3400000>;
 		voltage-max-design-microvolt = <4400000>;
-	};	
+	};
 	vreg_bl_vddio: lcd-backlight-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vreg_bl_vddio";

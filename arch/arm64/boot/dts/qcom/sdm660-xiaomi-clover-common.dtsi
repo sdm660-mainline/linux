@@ -297,7 +297,7 @@
 };
 
 &cdsp_smmu {
-	//status = "okay";
+	status = "okay";
 };
 
 &mdss {

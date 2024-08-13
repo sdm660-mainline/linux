@@ -1301,7 +1301,7 @@
 
 		cdsp_smmu: iommu@5180000 {
 			compatible = "qcom,sdm630-smmu-v2", "qcom,smmu-v2";
-			reg = <0x51800000 0x40000>;
+			reg = <0x5180000 0x40000>;
 			#iommu-cells = <1>;
 			qcom,bypass-cbndx = /bits/ 8 <12>;
 			qcom,reset-nodisable-cbs = /bits/ 8 <13>;
@@ -2534,7 +2534,7 @@
 				fastrpc {
 					compatible = "qcom,fastrpc";
 					qcom,glink-channels = "fastrpcglink-apps-dsp";
-					label = "cdsp";
+					label = "turing";
 					qcom,non-secure-domain;
 					#address-cells = <1>;
 					#size-cells = <0>;
