@@ -475,7 +475,7 @@
 			 * supported on the Xperia Nile/Ganges platform.
 			 */
 			regulator-min-microvolt = <1650000>;
-			regulator-max-microvolt = <3100000>;
+			regulator-max-microvolt = <2690000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
