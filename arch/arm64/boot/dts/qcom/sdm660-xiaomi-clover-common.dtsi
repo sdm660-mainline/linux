@@ -148,11 +148,11 @@
 };
 
 &mdss {
-	// status = "okay"; // TODO: enable this when panel works
+	status = "disabled"; // TODO: enable this when panel works
 };
 
 &mmcc {
-	// status = "okay"; // TODO: enable this when panel works
+	status = "disabled"; // TODO: enable this when panel works
 };
 
 &mmss_smmu {
