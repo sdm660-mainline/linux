@@ -50,7 +50,7 @@
 			fb_panel: fb-panel {
 				width-mm = <68>;
 				height-mm = <136>;
-			}
+			};
 		};
 	};
 
