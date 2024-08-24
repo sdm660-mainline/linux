@@ -118,17 +118,10 @@
 
 		backlight = <&i2c_backlight>;
 
-		reset-gpios = <&tlmm 62 GPIO_ACTIVE_HIGH>; // not used by panel-simple
-		//disp-te-gpios = <&pm660l_gpios GPIO_ACTIVE_HIGH>; // used by msm dsi host
+		reset-gpios = <&tlmm 62 GPIO_ACTIVE_HIGH>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
-
-		//pp1800-supply = <&vreg_l11a_1p8>; // wqhd-vddio-supply
-		// supply is the same for touchscreen
-
-		width-mm = <135>;
-		height-mm = <216>;
 
 		port {
 			panel_in: endpoint {
@@ -149,9 +142,14 @@
 };
 
 &simplefb {
-	/* In order to allow simledrm framebuffer to know panel
-	 * physical size to allow userspace to do proper DPI scaling */
-	panel = <&panel>;
+	/* Let simledrm framebuffer to know panel physical size to
+	   allow userspace to do proper DPI scaling */
+	panel = <&fb_panel>;
+
+	fb_panel: fb-panel {
+		width-mm = <135>;
+		height-mm = <216>;
+	};
 };
 
 &tlmm {
