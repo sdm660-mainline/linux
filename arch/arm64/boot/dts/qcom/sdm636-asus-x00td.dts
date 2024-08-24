@@ -45,7 +45,12 @@
 
 			/* In order to allow simpledrm framebuffer to know
 			 * physical dimensions */
-			panel = <&panel>;
+			panel = <&fb_panel>;
+
+			fb_panel: fb-panel {
+				width-mm = <68>;
+				height-mm = <136>;
+			}
 		};
 	};
 
@@ -578,9 +583,6 @@
 
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_HIGH>;
 		disp-te-gpios = <&tlmm 59 GPIO_ACTIVE_HIGH>;
-
-		width-mm = <68>;
-		height-mm = <136>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
