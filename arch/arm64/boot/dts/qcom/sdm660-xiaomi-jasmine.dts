@@ -10,17 +10,15 @@
 #include "pm660l.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
-#include <dt-bindings/interrupt-controller/irq.h>
-#include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
 / {
-	model = "Xiaomi A2";
+	model = "Xiaomi Mi A2";
 	compatible = "xiaomi,jasmine", "qcom,sdm660";
 	chassis-type = "handset";
 
 	aliases {
-		serial0 = &blsp1_uart2;
+		serial0 = &blsp1_uart2; /* Debug UART */
+		serial1 = &blsp2_uart1; /* Bluetooth UART */
 	};
 
 	chosen {
@@ -30,6 +28,39 @@
 
 		stdout-path = "serial0:115200n8";
 
+		framebuffer0: framebuffer@9d400000 {
+			compatible = "simple-framebuffer";
+			reg = <0 0x9d400000 0 (1080 * 2340 * 4)>;
+			width = <1080>;
+			height = <2340>;
+			stride = <(1080 * 4)>;
+			format = "a8r8g8b8";
+
+			/* HACK:
+			 * Fake panel node for simple-framebuffer to calculate DPI from. Only
+			 * needs width & height specified. This allows us to break device link
+			 * from simplefb to mdss (implicitly via panel->mdp->mdss) to fix drm
+			 * device probe ordering. Without this, simpledrm would probe second
+			 * after msm-drm, and confuse userspace with 2 GPUs in /dev/dri.
+			 * Alternative workaround is to boot with kernel parameter
+			 * `fw_devlink=permissive`, which is worse, because it can hide other
+			 * issues with device dependencies.
+			 */
+			panel = <&fb_panel>;
+
+			fb_panel: fb-panel {
+				width-mm = <68>;
+				height-mm = <136>;
+			};
+		};
+	};
+
+	battery: battery {
+		compatible = "simple-battery";
+
+		charge-full-design-microamp-hours = <3000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
 	};
 
 	vph_pwr: vph-pwr-regulator {
@@ -42,18 +73,12 @@
 		regulator-boot-on;
 	};
 
-	gpio_keys {
-		status = "okay";
-		compatible = "gpio-keys-polled";
-		poll-interval = <100>;
-		label = "Volume up";
-		pinctrl-names = "default";
-		pinctrl-0 = <&vol_up_gpio_default>;
+	gpio-keys {
+		compatible = "gpio-keys";
 
-		vol_up {
+		key-volup {
 			label = "Volume Up";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
-			linux,input-type = <EV_KEY>;
 			linux,code = <KEY_VOLUMEUP>;
 			debounce-interval = <15>;
 		};
@@ -85,30 +110,70 @@
 	 */
 	extcon_usb: extcon-usb {
 		compatible = "linux,extcon-usb-gpio";
-		id-gpio = <&tlmm 58 GPIO_ACTIVE_HIGH>;
+		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
 	};
+};
+
+&adreno_gpu {
+	status = "okay";
+
+	zap-shader {
+		memory-region = <&zap_shader_region>;
+	};
+};
+
+&anoc2_smmu {
+	status = "okay";
 };
 
 &blsp1_uart2 {
 	status = "okay";
 };
 
+&blsp2_uart1 {
+	status = "okay";
+
+	bluetooth {
+		compatible = "qcom,wcn3990-bt";
+		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
+		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
+		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
+		vddio-supply = <&vreg_l13a_1p8>; // chip-pwd-supply ? // TODO: check
+		max-speed = <3200000>;
+		/* Path is relative to the qca/ subdir in lib/firmware. */
+		/* firmware-name = "crnv21.bin"; */ // default
+	};
+};
+
 &blsp_i2c1 {
 	status = "okay";
-	/* Novatek touchscreen device tree node */
+
+	/* Novatek NT36672A touchscreen */
 	touchscreen@62 {
 		compatible = "novatek,nt36525";
 		reg = <0x62>;
-		vcc-supply = <&vreg_l11a_1p8>;
-		pinctrl-0 = <&ts_int_active &ts_rst_n>;
-		pinctrl-names = "default";
+		vdd-supply = <&vreg_l11a_1p8>;
 		interrupt-parent = <&tlmm>;
-		interrupts = <67 IRQ_TYPE_EDGE_FALLING>;
+		interrupts = <67 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&ts_pins_active>;
+		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
 		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <2160>;
-		status = "okay";
 	};
+};
+
+&gpucc {
+	status = "okay";
+};
+
+&kgsl_smmu {
+	status = "okay";
+};
+
+&lpass_smmu {
+	status = "okay";
 };
 
 &mdss {
@@ -120,6 +185,8 @@
 
 	#address-cells = <1>;
 	#size-cells = <0>;
+
+	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-supply = <&vreg_l1a_1p225>;
 
 	panel@0 {
@@ -133,6 +200,7 @@
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&panel_reset_n &mdp_vsync_n>;
+
 		port {
 			panel_in: endpoint {
 				remote-endpoint = <&mdss_dsi0_out>;
@@ -151,63 +219,39 @@
 	status = "okay";
 };
 
-&pm660l_wled {
-	status = "okay";
-};
-
-&gcc {
-	status = "okay";
-};
-
-&gpucc {
-	status = "okay";
-};
-
-&mmcc {
-	status = "okay";
-};
-
 &mmss_smmu {
 	status = "okay";
 };
 
-&anoc2_smmu {
+&pm660_charger {
+	monitored-battery = <&battery>;
+
 	status = "okay";
 };
 
-&kgsl_smmu {
+&pm660_fg {
+	monitored-battery = <&battery>;
+	qcom,battery-capacity-ua = <4000000>;
+	qcom,min-voltage-uv= <3400000>;
+	qcom,max-voltage-uv= <4400000>;
+
 	status = "okay";
 };
 
-&lpass_smmu {
+&pm660_haptics {
 	status = "okay";
 };
 
-&adreno_gpu {
+&pm660_rradc {
 	status = "okay";
-	zap-shader {
-		memory-region = <&zap_shader_region>;
-		firmware-name = "qcom/a512_zap.mdt";
-	};
 };
 
-&adsp_pil {
-	firmware-name = "qcom/adsp.mdt";
-};
-
-&venus {
+&pm660l_wled {
 	status = "okay";
-	firmware-name = "qcom/venus-4.4/venus.mdt";
-};
 
-&pm660l_gpios {
-	vol_up_gpio_default: vol-up-gpio-default {
-		pins = "gpio7";
-		function = "normal";
-		bias-pull-up;
-		input-enable;
-		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
-	};
+	qcom,switching-freq = <800>;
+	qcom,current-limit-microamp = <20000>;
+	qcom,num-strings = <2>;
 };
 
 &pon_pwrkey {
@@ -227,38 +271,9 @@
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
-&sdhc_1 {
+&remoteproc_mss {
+	firmware-name = "mba.mbn", "modem.mdt";
 	status = "okay";
-	supports-cqe;
-
-	mmc-hs200-1_8v;
-	mmc-hs400-1_8v;
-	mmc-hs400-enhanced-strobe;
-
-	vmmc-supply = <&vreg_l4b_2p95>;
-	vqmmc-supply = <&vreg_l8a_1p8>;
-};
-
-&sdhc_2 {
-	status = "okay";
-
-	vmmc-supply = <&vreg_l5b_2p95>;
-	vqmmc-supply = <&vreg_l2b_2p95>;
-};
-
-&usb3 {
-	qcom,select-utmi-as-pipe-clk;
-
-	status = "okay";
-};
-
-&usb3_dwc3 {
-	maximum-speed = "high-speed";
-	phys = <&qusb2phy0>;
-	phy-names = "usb2-phy";
-
-	dr_mode = "peripheral";
-	extcon = <&extcon_usb>;
 };
 
 &rpm_requests {
@@ -276,6 +291,12 @@
 		vdd_l3_l5_l7_l8-supply = <&vreg_bob>;
 		vdd_l4_l6-supply = <&vreg_bob>;
 		vdd_bob-supply = <&vph_pwr>;
+
+		vreg_bob: bob {
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3600000>;
+			regulator-enable-ramp-delay = <500>;
+		};
 
 		vreg_s1b_1p125: s1 {
 			regulator-min-microvolt = <1125000>;
@@ -310,6 +331,7 @@
 			regulator-max-microvolt = <3300000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
+			regulator-always-on;
 		};
 
 		vreg_l4b_2p95: l4 {
@@ -348,12 +370,6 @@
 			regulator-min-microvolt = <3200000>;
 			regulator-max-microvolt = <3400000>;
 			regulator-enable-ramp-delay = <250>;
-		};
-
-		vreg_bob: bob {
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3600000>;
-			regulator-enable-ramp-delay = <500>;
 		};
 	};
 
@@ -514,20 +530,65 @@
 	};
 };
 
+&sdc2_state_on {
+	sd-cd-pins {
+		pins = "gpio54";
+		function = "gpio";
+		bias-pull-up;
+		drive-strength = <2>;
+	};
+};
+
+&sdc2_state_off {
+	sd-cd-pins {
+		pins = "gpio54";
+		function = "gpio";
+		bias-disable;
+		drive-strength = <2>;
+	};
+};
+
+&sdhc_1 {
+	status = "okay";
+	supports-cqe;
+
+	mmc-hs200-1_8v;
+	mmc-hs400-1_8v;
+	mmc-hs400-enhanced-strobe;
+
+	vmmc-supply = <&vreg_l4b_2p95>;
+	vqmmc-supply = <&vreg_l8a_1p8>;
+};
+
+&sdhc_2 {
+	status = "okay";
+
+	vmmc-supply = <&vreg_l5b_2p95>;
+	vqmmc-supply = <&vreg_l2b_2p95>;
+};
+
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 
-	ts_rst_n: ts-rst-n {
-		pins = "gpio66";
+	ts_pins_active: ts-pins-active-state {
+		pins = "gpio66", "gpio67";
 		function = "gpio";
-		bias-disable;
-		drive-strength = <8>;
-	};
-
-	ts_int_active: ts-int-active {
-		pins = "gpio67";
 		drive-strength = <16>;
 		bias-pull-up;
+	};
+
+	ts_rst_sleep: ts-rst-sleep-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	ts_int_sleep: ts-int-sleep-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
 	};
 
 	panel_reset_n: panel-rst-n {
@@ -543,4 +604,32 @@
 		drive-strength = <2>;
 		bias-pull-down;
 	};
+};
+
+&usb3 {
+	qcom,select-utmi-as-pipe-clk;
+
+	status = "okay";
+};
+
+&usb3_dwc3 {
+	maximum-speed = "high-speed";
+	phys = <&qusb2phy0>;
+	phy-names = "usb2-phy";
+
+	dr_mode = "peripheral";
+	extcon = <&extcon_usb>;
+};
+
+&venus {
+	status = "okay";
+};
+
+&wifi {
+	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p848>;
+	vdd-1.8-xo-supply = <&vreg_l9a_1p8>;
+	vdd-1.3-rfa-supply = <&vreg_l6a_1p3>;
+	vdd-3.3-ch0-supply = <&vreg_l19a_3p3>;
+
+	status = "okay";
 };
