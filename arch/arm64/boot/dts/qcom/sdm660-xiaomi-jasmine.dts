@@ -30,9 +30,9 @@
 
 		framebuffer0: framebuffer@9d400000 {
 			compatible = "simple-framebuffer";
-			reg = <0 0x9d400000 0 (1080 * 2340 * 4)>;
+			reg = <0 0x9d400000 0 (1080 * 2160 * 4)>;
 			width = <1080>;
-			height = <2340>;
+			height = <2160>;
 			stride = <(1080 * 4)>;
 			format = "a8r8g8b8";
 
