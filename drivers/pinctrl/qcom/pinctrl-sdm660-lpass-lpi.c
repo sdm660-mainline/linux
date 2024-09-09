@@ -28,39 +28,6 @@ enum lpass_lpi_functions {
 	LPI_MUX__,
 };
 
-static int gpio0_pins[] = { 0 };
-static int gpio1_pins[] = { 1 };
-static int gpio2_pins[] = { 2 };
-static int gpio3_pins[] = { 3 };
-static int gpio4_pins[] = { 4 };
-static int gpio5_pins[] = { 5 };
-static int gpio6_pins[] = { 6 };
-static int gpio7_pins[] = { 7 };
-static int gpio8_pins[] = { 8 };
-static int gpio9_pins[] = { 9 };
-static int gpio10_pins[] = { 10 };
-static int gpio11_pins[] = { 11 };
-static int gpio12_pins[] = { 12 };
-static int gpio13_pins[] = { 13 };
-static int gpio14_pins[] = { 14 };
-static int gpio15_pins[] = { 15 };
-static int gpio16_pins[] = { 16 };
-static int gpio17_pins[] = { 17 };
-static int gpio18_pins[] = { 18 };
-static int gpio19_pins[] = { 19 };
-static int gpio20_pins[] = { 20 };
-static int gpio21_pins[] = { 21 };
-static int gpio22_pins[] = { 22 };
-static int gpio23_pins[] = { 23 };
-static int gpio24_pins[] = { 24 };
-static int gpio25_pins[] = { 25 };
-static int gpio26_pins[] = { 26 };
-static int gpio27_pins[] = { 27 };
-static int gpio28_pins[] = { 28 };
-static int gpio29_pins[] = { 29 };
-static int gpio30_pins[] = { 30 };
-static int gpio31_pins[] = { 31 };
-
 static const struct pinctrl_pin_desc sdm660_lpi_pinctrl_pins[] = {
 	PINCTRL_PIN(0, "gpio0"),
 	PINCTRL_PIN(1, "gpio1"),
@@ -161,6 +128,7 @@ static const struct lpi_pinctrl_variant_data sdm660_lpi_pinctrl_data = {
 	.ngroups = ARRAY_SIZE(sdm660_lpi_pinctrl_groups),
 	.functions = sdm660_lpi_pinctrl_functions,
 	.nfunctions = ARRAY_SIZE(sdm660_lpi_pinctrl_functions),
+	.flags = LPI_FLAG_SLEW_RATE_SAME_REG,
 };
 
 static const struct of_device_id sdm660_lpi_pinctrl_of_match[] = {
@@ -178,7 +146,7 @@ static struct platform_driver sdm660_lpi_pinctrl_driver = {
 		.of_match_table = sdm660_lpi_pinctrl_of_match,
 	},
 	.probe = lpi_pinctrl_probe,
-	.remove = lpi_pinctrl_remove,
+	.remove_new = lpi_pinctrl_remove,
 };
 module_platform_driver(sdm660_lpi_pinctrl_driver);
 
