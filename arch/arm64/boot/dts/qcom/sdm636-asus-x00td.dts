@@ -477,26 +477,40 @@
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
-	
-	panel_reset_gpio: panel-reset-gpio {
-		pins = "gpio53";
+
+	mdss_dsi_active: mdss_dsi_active {
 		function = "gpio";
-		drive-strength = <8>;
-		bias-disable = <0>;
-	};
-	
-	mdss_dsi_suspend: mdss-dsi-suspend {
 		pins = "gpio53";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	mdss_te_active: mdss_te_active {
+		pins = "gpio59";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-down;
 	};
 
-	panel_te_gpio: panel-te-gpio {
-		pins = "gpio59";
+	ts_pins_active: ts-pins-active-state {
+		pins = "gpio66", "gpio67";
+		function = "gpio";
+		drive-strength = <16>;
+		bias-pull-up;
+	};
+
+	ts_rst_sleep: ts-rst-sleep-state {
+		pins = "gpio66";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-down;
+	};
+
+	ts_int_sleep: ts-int-sleep-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
 	};
 };
 
@@ -543,9 +557,15 @@
 	touchscreen@62 {
 		compatible = "novatek,nt36525";
 		reg = <0x62>;
+		vdd-supply = <&vreg_l11a_1p8>;
 		interrupt-parent = <&tlmm>;
 		interrupts = <67 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&ts_pins_active>;
+		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
 		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2160>;
 	};
 };
 
@@ -577,15 +597,14 @@
 
 	panel: panel@0 {
 		reg = <0>;
-		compatible = "asus,nt36672-txd";
+		compatible = "mdss,novatek-nt36672-txd"; //panel-simple "asus,nt36672-txd"
 
 		backlight = <&pm660l_wled>;
 
-		reset-gpios = <&tlmm 53 GPIO_ACTIVE_HIGH>;
-		disp-te-gpios = <&tlmm 59 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
+		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 		port {
 			panel_in: endpoint {
 				remote-endpoint = <&mdss_dsi0_out>;
@@ -639,6 +658,7 @@
 
 &adreno_gpu {
 	status = "okay";
+
 	zap-shader {
 		memory-region = <&zap_shader_region>;
 		firmware-name = "qcom/a512_zap.mdt";
