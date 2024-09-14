@@ -1647,7 +1647,7 @@ static const struct panel_desc boe_tv101wum_nx0_desc = {
     	.format = MIPI_DSI_FMT_RGB888,
     	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
     	            MIPI_DSI_MODE_LPM,
-    	.init_cmds = boe_init_cmd,
+	.init = boe_init,
 };
 
 static const struct drm_display_mode auo_b101uan08_3_default_mode = {
