@@ -1283,7 +1283,7 @@ static int qcom_fg_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int qcom_fg_remove(struct platform_device *pdev)
+static void qcom_fg_remove(struct platform_device *pdev)
 {
 	struct qcom_fg_chip *chip = platform_get_drvdata(pdev);
 
@@ -1291,8 +1291,6 @@ static int qcom_fg_remove(struct platform_device *pdev)
 
 	if(chip->sram_wq)
 		destroy_workqueue(chip->sram_wq);
-
-	return 0;
 }
 
 static const struct of_device_id fg_match_id_table[] = {
