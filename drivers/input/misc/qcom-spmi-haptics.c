@@ -934,15 +934,13 @@ static int __maybe_unused spmi_haptics_suspend(struct device *dev)
 
 static SIMPLE_DEV_PM_OPS(spmi_haptics_pm_ops, spmi_haptics_suspend, NULL);
 
-static int spmi_haptics_remove(struct platform_device *pdev)
+static void spmi_haptics_remove(struct platform_device *pdev)
 {
 	struct spmi_haptics *haptics = dev_get_drvdata(&pdev->dev);
 
 	cancel_work_sync(&haptics->work);
 	mutex_destroy(&haptics->play_lock);
 	input_unregister_device(haptics->haptics_input_dev);
-
-	return 0;
 }
 
 static void spmi_haptics_shutdown(struct platform_device *pdev)
