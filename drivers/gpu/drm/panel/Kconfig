@@ -78,6 +78,16 @@ config DRM_PANEL_BOE_TH101MB31UIG002_28A
 	  resolution and uses 24 bit RGB per pixel. It provides a MIPI DSI
 	  interface to the host and has a built-in LED backlight.
 
+config DRM_PANEL_BOE_NT51021
+	tristate "BOE NT51021-based panels for Xiaomi Mi Pad 4"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for BOE NT51021
+	  8-inch and 10-inch DSI video mode panels used in Xiaomi Mi Pad 4
+	  and Xiaomi Mi Pad 4 PLUS.
+
 config DRM_PANEL_BOE_TV101WUM_NL6
 	tristate "BOE TV101WUM and AUO KD101N80 45NA 1200x1920 panel"
 	depends on OF
