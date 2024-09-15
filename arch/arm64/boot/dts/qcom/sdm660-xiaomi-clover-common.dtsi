@@ -152,7 +152,7 @@
 };
 
 &mmcc {
-	status = "disabled"; // TODO: enable this when panel works
+	status = "okay";
 };
 
 &mmss_smmu {
