@@ -46,6 +46,17 @@
 		voltage-max-design-microvolt = <4408000>;
 	};
 
+	lcd_pwr: lcd-power-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "lcd_pwr";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&pm660l_gpios 5 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_pwr_en_default>;
+	};
+
 	vph_pwr: vph-pwr-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vph_pwr";
@@ -107,7 +118,7 @@
 };
 
 &adreno_gpu {
-	status = "disabled"; // TODO: set to okay when display stack works
+	status = "okay";
 
 	zap-shader {
 		memory-region = <&zap_shader_region>;
@@ -148,7 +159,7 @@
 };
 
 &mdss {
-	status = "disabled"; // TODO: enable this when panel works
+	status = "okay";
 };
 
 &mmcc {
@@ -172,6 +183,14 @@
 	qcom,max-voltage-uv= <4408000>;
 
 	status = "okay";
+};
+
+&pm660l_gpios {
+	lcd_pwr_en_default: lcd-pwr-en-default-state {
+		pins = "gpio5";
+		function = "normal";
+		bias-disable;
+	};
 };
 
 &pm660_rradc {
@@ -553,14 +572,14 @@
 &tlmm {
 	gpio-reserved-ranges = <0 4>;
 
-	mdss_dsi_active: mdss-dsi-active-state {
+	mdss_dsi_reset: mdss-dsi-reset-state {
 		pins = "gpio62";
 		function = "gpio";
 		drive-strength = <8>;
 		bias-disable;
 	};
 
-	mdss_te_active: mdss-te-active-state {
+	mdss_vsync_active: mdss-vsync-active-state {
 		pins = "gpio59";
 		function = "mdp_vsync";
 		drive-strength = <2>;
