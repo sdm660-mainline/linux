@@ -13,13 +13,26 @@
 	qcom,msm-id = <324 0>;
 	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>, <0x0001001b 0x0201011a 0x0 0x0>,<0x0001001b 0x0102001a 0x0 0x0>;
 
+	lcd_pwr: lcd-power-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "lcd_pwr";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+
+		gpio = <&pm660l_gpios 5 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_pwr_en_default>;
+	};
+
 	vreg_bl_vddio: lcd-backlight-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vreg_bl_vddio";
 		regulator-min-microvolt = <3150000>;
 		regulator-max-microvolt = <3150000>;
 
-		gpio = <&tlmm 72 0>;
+		gpio = <&tlmm 72 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 
 		startup-delay-us = <70000>;
@@ -101,27 +114,23 @@
 };
 
 &mdss_dsi0 {
-	status = "disabled";
+	status = "okay";
 
 	#address-cells = <1>;
 	#size-cells = <0>;
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-supply = <&vreg_l1a_1p225>;
-	//vdda-1p2-supply = <0x109>; // pm660_ldoa1
-	//vdda-0p9-supply = <0x105>; // pm660l_ldob1
-	//vdda-3p3-supply = <0x197>; // pm660l_ldob6
-	//wqhd-vddio-supply = <0x17e>; // pm660_ldoa11
 
 	panel: panel@0 {
 		compatible = "boe,nt51021-10wu";
 		reg = <0>;
 
 		backlight = <&i2c_backlight>;
-
-		reset-gpios = <&tlmm 62 GPIO_ACTIVE_HIGH>;
+		avdd-supply = <&lcd_pwr>;
+		reset-gpios = <&tlmm 62 GPIO_ACTIVE_LOW>;
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+		pinctrl-0 = <&mdss_dsi_reset &mdss_vsync_active>;
 
 		port {
 			panel_in: endpoint {
@@ -139,6 +148,14 @@
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
 	status = "okay";
+};
+
+&pm660l_gpios {
+	lcd_pwr_en_default: lcd-pwr-en-default-state {
+		pins = "gpio5";
+		function = "gpio";
+		bias-disable;
+	};
 };
 
 &simplefb {
