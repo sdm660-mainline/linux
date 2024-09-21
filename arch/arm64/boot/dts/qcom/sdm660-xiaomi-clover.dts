@@ -31,6 +31,52 @@
 	};
 };
 
+&mdss_dsi0 {
+	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+
+	panel: panel@0 {
+		compatible = "boe,nt51021";
+		reg = <0>;
+
+		backlight = <&pm660l_wled>;
+
+		avdd-supply = <&lcd_pwr>;
+		reset-gpios = <&tlmm 62 GPIO_ACTIVE_LOW>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mdss_dsi_reset &mdss_vsync_active>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+	status = "okay";
+};
+
+&pm660l_wled {
+	status = "okay";
+
+	qcom,switching-freq = <800>;
+	qcom,current-limit-microamp = <20000>;
+	qcom,num-strings = <3>;
+};
+
 &simplefb {
 	/*
 	 * Prevent unused clocks and power domains from being disabled. It's
