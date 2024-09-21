@@ -14,6 +14,10 @@
 	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>, <0x0001001b 0x0201011a 0x0 0x0>,<0x0001001b 0x0102001a 0x0 0x0>;
 };
 
+&adreno_gpu {
+	status = "diabled"; // TODO: enable when panel support is added
+};
+
 &blsp_i2c3 {
 	status = "okay";
 
@@ -29,6 +33,10 @@
 		touchscreen-size-x = <1200>;
 		touchscreen-size-y = <1920>;
 	};
+};
+
+&mdss {
+	status = "disabled"; // TODO: enable when panel support is added
 };
 
 &simplefb {
