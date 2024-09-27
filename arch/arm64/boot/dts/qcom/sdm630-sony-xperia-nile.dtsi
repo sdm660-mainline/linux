@@ -684,7 +684,7 @@
 
 	panel_te_gpio: panel-te-gpio-state {
 		pins = "gpio59";
-		function = "gpio";
+		function = "mdp_vsync";
 		drive-strength =  <2>;
 		bias-pull-down;
 	};
