@@ -235,7 +235,8 @@ static enum qcom_scm_convention __get_convention(void)
 	 * convention can only be used when the client is 64-bit, otherwise
 	 * system will encounter the undefined behaviour.
 	 */
-#if IS_ENABLED(CONFIG_ARM64)
+//#if IS_ENABLED(CONFIG_ARM64)
+#if 0
 	/*
 	 * Device isn't required as there is only one argument - no device
 	 * needed to dma_map_single to secure world
