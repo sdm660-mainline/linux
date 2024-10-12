@@ -240,6 +240,7 @@ static enum qcom_scm_convention __get_convention(void)
 	 * Device isn't required as there is only one argument - no device
 	 * needed to dma_map_single to secure world
 	 */
+	pr_info("qcom_scm: __get_convention: trying SMC_CONVENTION_ARM_64");
 	probed_convention = SMC_CONVENTION_ARM_64;
 	ret = __scm_smc_call(NULL, &desc, probed_convention, &res, true);
 	if (!ret && res.result[0] == 1)
@@ -258,6 +259,7 @@ static enum qcom_scm_convention __get_convention(void)
 	}
 #endif
 
+	pr_info("qcom_scm: __get_convention: trying SMC_CONVENTION_ARM_32");
 	probed_convention = SMC_CONVENTION_ARM_32;
 	ret = __scm_smc_call(NULL, &desc, probed_convention, &res, true);
 	if (!ret && res.result[0] == 1)

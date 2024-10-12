@@ -44,12 +44,22 @@ static void __scm_smc_do_quirk(const struct arm_smccc_args *smc,
 	quirk.state.a6 = 0;
 
 	do {
+		printk(KERN_WARNING "__scm_smc_do_quirk: doing scm call "
+			"with a0-a7: %08lx-%08lx-%08lx-%08lx-%08lx-%08lx-%08lx-%08lx",
+			a0, smc->args[1], smc->args[2], smc->args[3],
+			smc->args[4], smc->args[5], quirk.state.a6, smc->args[7]);
 		arm_smccc_smc_quirk(a0, smc->args[1], smc->args[2],
 				    smc->args[3], smc->args[4], smc->args[5],
 				    quirk.state.a6, smc->args[7], res, &quirk);
 
-		if (res->a0 == QCOM_SCM_INTERRUPTED)
+		if (res->a0 == QCOM_SCM_INTERRUPTED) {
 			a0 = res->a0;
+			printk(KERN_WARNING "  results: (a0-a4): %08lx-%08lx-%08lx-%08lx (interrupted)",
+				res->a0, res->a1, res->a2, res->a3);
+		} else {
+			printk(KERN_WARNING "  results: (a0-a4): %08lx-%08lx-%08lx-%08lx (ret ok)",
+				res->a0, res->a1, res->a2, res->a3);
+		}
 
 	} while (res->a0 == QCOM_SCM_INTERRUPTED);
 }
