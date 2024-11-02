@@ -140,6 +140,10 @@
 	status = "okay";
 };
 
+&blsp_spi7 {
+	status = "okay";
+};
+
 &blsp1_uart2 {
 	status = "okay";
 };
