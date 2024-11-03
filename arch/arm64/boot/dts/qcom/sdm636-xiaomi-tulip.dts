@@ -10,8 +10,6 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
 
-/delete-node/ &tz_mem;
-
 / {
 	model = "Xiaomi Redmi Note 6 Pro";
 	compatible = "xiaomi,tulip", "qcom,sdm660", "qcom,sdm636";
@@ -44,15 +42,6 @@
 			height = <2280>;
 			stride = <(1080 * 4)>;
 			format = "a8r8g8b8";
-
-			/* In order to allow simple-framebuffer to know
-			 * physical dimensions */
-			panel = <&fb_panel>;
-
-			fb_panel: fb-panel {
-				width-mm = <68>;
-				height-mm = <143>;
-			};
 		};
 	};
 
@@ -116,8 +105,6 @@
 };
 
 &adsp_pil {
-	firmware-name = "adsp.mdt";
-
 	status = "okay";
 };
 
@@ -481,6 +468,13 @@
 			regulator-enable-ramp-delay = <250>;
 		};
 
+		vreg_l16a_2p7: l16 {
+			regulator-min-microvolt = <2800000>;
+			regulator-max-microvolt = <2800000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-always-on;
+		};
+
 		vreg_l17a_1p8: l17 {
 			regulator-min-microvolt = <1650000>;
 			regulator-max-microvolt = <2950000>;
@@ -553,7 +547,7 @@
 
 	mdss_te_active: mdss_te_active {
 		pins = "gpio59";
-		function = "gpio";
+		function = "mdp_vsync";
 		drive-strength = <2>;
 		bias-pull-down;
 	};
@@ -591,8 +585,6 @@
 	phys = <&qusb2phy0>;
 	phy-names = "usb2-phy";
 	dr_mode = "peripheral";
-
-	status = "okay";
 };
 
 &venus {
