@@ -81,23 +81,9 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
-		ramoops@a0000000 {
-			compatible = "ramoops";
-			reg = <0x0 0xa0000000 0x0 0x400000>;
-			console-size = <0x20000>;
-			record-size = <0x20000>;
-			ftrace-size = <0x0>;
-			pmsg-size = <0x20000>;
-		};
 
 		adsp_region: adsp@92a00000 {
 			reg = <0x0 0x92a00000 0x0 0x1f00000>;
-			no-map;
-		};
-
-		zap_shader_region: gpu@f0b00000 {
-			compatible = "shared-dma-pool";
-			reg = <0x0 0xf0b00000 0x0 0x2000>;
 			no-map;
 		};
 
@@ -113,6 +99,21 @@
 
 		framebuffer_memory@9d400000 {
 			reg = <0x0 0x9d400000 0x0 (1200 * 1920 * 4)>;
+			no-map;
+		};
+
+		ramoops@9fe00000 {
+			compatible = "ramoops";
+			reg = <0x0 0x9fe00000 0x0 0x100000>;
+			console-size = <0x80000>;
+			record-size = <0x1000>;
+			ftrace-size = <0x1000>;
+			pmsg-size = <0x8000>;
+		};
+
+		zap_shader_region: gpu@f0b00000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xf0b00000 0x0 0x2000>;
 			no-map;
 		};
 	};
