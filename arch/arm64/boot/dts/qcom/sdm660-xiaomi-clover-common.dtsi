@@ -15,6 +15,7 @@
 /delete-node/ &buffer_mem;
 /delete-node/ &mba_region;
 /delete-node/ &zap_shader_region;
+/delete-node/ &venus_region;
 
 / {
 	aliases {
@@ -102,6 +103,11 @@
 			no-map;
 		};
 
+		venus_region: venus@9cc00000 {
+			reg = <0x0 0x9cc00000 0x0 0x800000>;
+			no-map;
+		};
+
 		ramoops@9fe00000 {
 			compatible = "ramoops";
 			reg = <0x0 0x9fe00000 0x0 0x100000>;
@@ -116,6 +122,7 @@
 			reg = <0x0 0xf0b00000 0x0 0x2000>;
 			no-map;
 		};
+
 	};
 };
 
