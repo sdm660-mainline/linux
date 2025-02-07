@@ -154,25 +154,36 @@
 	 */
 	extcon_usb: extcon-usb {
 		compatible = "linux,extcon-usb-gpio";
-		id-gpio = <&tlmm 58 GPIO_ACTIVE_HIGH>;
+		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
 	};
 	
 	gpio-keys {
 		compatible = "gpio-keys";
 		
-		vol_down: vol-down {
+		key-voldown {
 			label = "Volume Down";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
 			linux,code = <KEY_VOLUMEDOWN>;
-			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
 	};
 };
 
+&adreno_gpu {
+	status = "okay";
+};
+
+&adreno_gpu_zap {
+	firmware-name = "qcom/a508_zap.mdt";
+};
+
+&adsp_pil {
+	firmware-name = "adsp.mdt";
+};
+
 &blsp2_uart1 {
 	status = "okay";
+
 	/* HCI Bluetooth */
 	bluetooth {
 		compatible = "qcom,wcn3990-bt"; // common for all QCOM
@@ -193,6 +204,7 @@
 
 &blsp_i2c4 {
 	status = "okay";
+
 	touchscreen@38 {
 		compatible = "edt,edt-ft5406", "edt,edt-ft5x06";
 		reg = <0x38>;
@@ -211,27 +223,12 @@
 	status = "okay";
 };
 
-&adsp_pil {
-	status = "okay";
-	firmware-name = "adsp.mdt";
-};
-
-&pon_pwrkey {
+&camss {
 	status = "okay";
 };
 
-&pon_resin {
+&mdss {
 	status = "okay";
-
-	linux,code = <KEY_VOLUMEUP>;
-};
-
-&qusb2phy0 {
-	status = "okay";
-
-	vdd-supply = <&vreg_l1b_0p925>;
-	vdda-pll-supply = <&vreg_l10a_1p8>;
-	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
 &mdss_dsi0 {
@@ -239,6 +236,7 @@
 	#size-cells = <0>;
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-supply = <&vreg_l1a_1p225>;
+
 	status = "okay";
 
 	panel@0 {
@@ -267,27 +265,7 @@
 
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
-	status = "okay";
-};
 
-&adsp_pil {
-	status = "okay";
-	firmware-name = "adsp.mdt";
-};
-
-&lpass_smmu {
-	status = "okay";
-};
-
-&gcc {
-	status = "okay";
-};
-
-&gpucc {
-	status = "okay";
-};
-
-&mmcc {
 	status = "okay";
 };
 
@@ -295,42 +273,16 @@
 	status = "okay";
 };
 
-&kgsl_smmu {
-	status = "okay";
-};
-
-&anoc2_smmu {
-	status = "okay";
-};
-
-&mdss {
-	status = "okay";
-};
-
-&cci {
-	status = "okay";
-};
-
-&camss {
-	status = "okay";
-};
-
-&adreno_gpu {
-	status = "okay";
-	zap-shader {
-		memory-region = <&zap_shader_region>;
-		firmware-name = "qcom/a508_zap.mdt";
-	};
-};
-
 &pm660l_wled {
-	status = "okay";
 	default-brightness = <512>;
+
+	status = "okay";
 };
 
 &pm660_charger {
-	status = "okay";
 	monitored-battery = <&battery>;
+
+	status = "okay";
 };
 
 &pm660_fg {
@@ -345,12 +297,22 @@
 	status = "okay";
 };
 
-&qusb2phy0 {
+&pon_pwrkey {
 	status = "okay";
+};
 
+&pon_resin {
+	linux,code = <KEY_VOLUMEUP>;
+
+	status = "okay";
+};
+
+&qusb2phy0 {
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-pll-supply = <&vreg_l10a_1p8>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
 };
 
 &rpm_requests {
@@ -628,11 +590,11 @@
 
 &remoteproc_mss {
 	firmware-name = "mba.mbn", "modem.mdt";
+
 	status = "okay";
 };
 
 &sdhc_1 {
-	status = "okay";
 	bus-width = <8>;
 	non-removable;
 	mmc-ddr-1_8v;
@@ -640,47 +602,57 @@
 	mmc-hs400-1_8v;
 	vmmc-supply = <&vreg_l4b_2p95>;
 	vqmmc-supply = <&vreg_l8a_1p8>;  
+
+	status = "okay";
 };
 
 &sdhc_2 {
-	status = "okay";
-
 	vmmc-supply = <&vreg_l5b_2p95>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
+
+	status = "okay";
+};
+
+&sound {
+	model = "sdm660";
+
+	status = "disabled";
 };
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 
-	panel_reset_gpio: panel-reset-gpio {
+	panel_reset_gpio: panel-reset-gpio-state {
 		pins = "gpio53";
 		function = "gpio";
 		drive-strength = <8>;
-		bias-disable = <0>;
+		bias-disable;
 	};
 
-	mdss_dsi_suspend: mdss-dsi-suspend {
+	mdss_dsi_suspend: mdss-dsi-suspend-state {
 		pins = "gpio53";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-down;
 	};
 
-	panel_te_gpio: panel-te-gpio {
+	panel_te_gpio: panel-te-gpio-state {
 		pins = "gpio59";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-down;
 	};
 
-	ts_int_active: ts-int-active {
+	ts_int_active: ts-int-active-state {
 		pins = "gpio67";
+		function = "gpio";
 		drive-strength = <8>;
 		bias-pull-up;
 	};
 
-	ts_rst: ts-rst {
+	ts_rst: ts-rst-state {
 		pins = "gpio66";
+		function = "gpio";
 		drive-strength = <8>;
 		bias-pull-up;
 	};
@@ -701,14 +673,10 @@
 	extcon = <&extcon_usb>;
 };
 
-&sound {
-	status = "disabled";
-	model = "sdm660";
-};
-
 &venus {
-	status = "disabled";
 	firmware-name = "qcom/venus-4.4/venus.mdt";
+
+	status = "okay";
 };
 
 &wifi {
