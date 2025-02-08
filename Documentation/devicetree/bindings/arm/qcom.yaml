@@ -872,6 +872,7 @@ properties:
 
       - items:
           - enum:
+              - nokia,6.1
               - sony,discovery-row
               - sony,kirin-row
               - sony,pioneer-row
