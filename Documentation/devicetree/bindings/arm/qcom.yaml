@@ -892,6 +892,7 @@ properties:
       - items:
           - enum:
               - sony,mermaid-row
+              - asus,x00td
           - const: qcom,sdm636
 
       - items:
