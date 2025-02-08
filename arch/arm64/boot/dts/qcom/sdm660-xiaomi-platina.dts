@@ -19,6 +19,7 @@
 / {
 	model = "Xiaomi Mi 8 Lite";
 	compatible = "xiaomi,platina", "qcom,sdm660";
+	chassis-type = "handset";
 
 	aliases {
 		serial0 = &blsp1_uart2;
@@ -197,7 +198,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&vol_up_gpio_default>;
 
-		vol_up {
+		key-vol-up {
 			label = "Volume Up";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
 			linux,input-type = <EV_KEY>;
@@ -213,7 +214,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&hall_sensor_default>;
 
-		hall-sensor {
+		switch {
 			label = "Hall Effect Sensor";
 			gpios = <&tlmm 75 GPIO_ACTIVE_LOW>;
 			linux,input-type = <EV_SW>;
@@ -230,8 +231,12 @@
 	 */
 	extcon_usb: extcon-usb {
 		compatible = "linux,extcon-usb-gpio";
-		id-gpio = <&tlmm 58 GPIO_ACTIVE_HIGH>;
+		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
 	};
+};
+
+&adreno_gpu {
+	status = "disabled";
 };
 
 &blsp_i2c2 {
@@ -246,11 +251,12 @@
 
 &blsp_i2c4 {
 	status = "okay";
+
 	/* Novatek device tree node */
 	novatek@62 {
 		compatible = "novatek,nt36525";
 		reg = <0x62>;
-		vcc-supply = <&vreg_l11a_1p8>;
+		vdd-supply = <&vreg_l11a_1p8>;
 		pinctrl-0 = <&ts_int_active &ts_rst_n>;
 		pinctrl-names = "default";
 		interrupt-parent = <&tlmm>;
@@ -265,8 +271,68 @@
 	status = "okay";
 };
 
+&gpucc {
+	status = "disabled";
+};
+
+&mmcc {
+	status = "disabled";
+};
+
+&pm660_gpios {
+	nfc_clk_req_n: nfc-clkreq-n-state {
+		pins = "gpio4";
+		function = PMIC_GPIO_FUNC_NORMAL;
+		bias-disable;
+		input-enable;
+		power-source = <1>;
+	};
+};
+
+&pm660l_gpios {
+	cam_dvdd_front_default: cam-dvdd-front-default-state {
+		pins = "gpio3";
+		function = "normal";
+		output-low;
+		power-source = <0>;
+	};
+
+	cam_dvdd_rear_default: cam-dvdd-rear-default-state {
+		pins = "gpio4";
+		function = "normal";
+		output-low;
+		power-source = <0>;
+	};
+
+	vol_up_gpio_default: vol-up-gpio-default-state {
+		pins = "gpio7";
+		function = "normal";
+		bias-pull-up;
+		input-enable;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
+	};
+};
+
+&pon_resin {
+	linux,code = <KEY_VOLUMEDOWN>;
+
+	status = "okay";
+};
+
+&pon_pwrkey {
+	status = "okay";
+};
+
+&qusb2phy0 {
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
+	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
+};
+
 &rpm_requests {
-	pm660l-regulators {
+	regulators-0 {
 		compatible = "qcom,rpm-pm660l-regulators";
 
 		vdd_s1-supply = <&vph_pwr>;
@@ -394,7 +460,7 @@
 	};
 
 
-	pm660-regulators {
+	regulators-1 {
 		compatible = "qcom,rpm-pm660-regulators";
 
 		vdd_s1-supply = <&vph_pwr>;
@@ -574,7 +640,6 @@
 };
 
 &sdhc_1 {
-	status = "okay";
 	supports-cqe;
 
 	mmc-ddr-1_8v;
@@ -583,70 +648,29 @@
 
 	vmmc-supply = <&vreg_l4b_2p95>;
 	vqmmc-supply = <&vreg_l8a_1p8>;
+
+	status = "okay";
 };
 
 &sdhc_2 {
-	status = "disabled";
-
 	vmmc-supply = <&vreg_l5b_29p5>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
-};
 
-&pm660_gpios {
-	nfc_clk_req_n: nfc-clkreq-n {
-		pins = "gpio4";
-		function = PMIC_GPIO_FUNC_NORMAL;
-		bias-disable;
-		input-enable;
-		power-source = <1>;
-	};
-};
-
-&pm660l_gpios {
-	cam_dvdd_front_default: cam-dvdd-front-default {
-		pins = "gpio3";
-		function = "normal";
-		output-low;
-		power-source = <0>;
-	};
-
-	cam_dvdd_rear_default: cam-dvdd-rear-default {
-		pins = "gpio4";
-		function = "normal";
-		output-low;
-		power-source = <0>;
-	};
-
-	vol_up_gpio_default: vol-up-gpio-default {
-		pins = "gpio7";
-		function = "normal";
-		bias-pull-up;
-		input-enable;
-		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
-	};
-};
-
-&pon_resin {
-	linux,code = <KEY_VOLUMEDOWN>;
-	status = "okay";
-};
-
-&pon_pwrkey {
-	status = "okay";
+	status = "disabled";
 };
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 
-	camera_rear_default: camera-rear-default {
-		mclk0 {
+	camera_rear_default: camera-rear-default-state {
+		mclk0-pins {
 			pins = "gpio32";
 			function = "cam_mclk";
 			drive-strength = <4>;
 			bias-disable;
 		};
 
-		rst {
+		rst-pins {
 			pins = "gpio46";
 			function = "gpio";
 			drive-strength = <16>;
@@ -654,15 +678,15 @@
 		};
 	};
 
-	camera_front_default: camera-front-default {
-		mclk1 {
+	camera_front_default: camera-front-default-state {
+		mclk1-pins {
 			pins = "gpio33";
 			function = "cam_mclk";
 			drive-strength = <4>;
 			bias-disable;
 		};
 
-		rst {
+		rst-pins {
 			pins = "gpio47";
 			function = "gpio";
 			drive-strength = <16>;
@@ -670,15 +694,15 @@
 		};
 	};
 
-	camera_front_iris_default: camera-front-iris-default {
-		mclk1 {
+	camera_front_iris_default: camera-front-iris-default-state {
+		mclk1-pins {
 			pins = "gpio35";
 			function = "cam_mclk";
 			drive-strength = <4>;
 			bias-disable;
 		};
 
-		rst {
+		rst-pins {
 			pins = "gpio52";
 			function = "gpio";
 			drive-strength = <16>;
@@ -686,89 +710,70 @@
 		};
 	};
 
-	cam_avdd_front_default: cam-avdd-front-default {
+	cam_avdd_front_default: cam-avdd-front-default-state {
 		pins = "gpio49";
 		function = "gpio";
 		bias-disable;
 		drive-strength = <2>;
 	};
 
-	cam_actuator_rear_default: cam-actuator-rear-default {
+	cam_actuator_rear_default: cam-actuator-rear-default-state {
 		pins = "gpio50";
 		function = "gpio";
 		bias-disable;
 		drive-strength = <2>;
 	};
 
-	cam_avdd_rear_default: cam-avdd-rear-default {
+	cam_avdd_rear_default: cam-avdd-rear-default-state {
 		pins = "gpio51";
 		function = "gpio";
 		bias-disable;
 		drive-strength = <2>;
 	};
 
-	panel_reset_n: panel-rst-n {
+	panel_reset_n: panel-rst-n-state {
 		pins = "gpio53";
 		function = "gpio";
 		drive-strength = <8>;
 		bias-disable;
 	};
 
-	mdp_vsync_n: mdp-vsync-n {
+	mdp_vsync_n: mdp-vsync-n-state {
 		pins = "gpio59";
 		function = "mdp_vsync";
 		drive-strength = <2>;
 		bias-pull-down;
 	};
 
-	ts_rst_n: ts-rst-n {
+	ts_rst_n: ts-rst-n-state {
 		pins = "gpio66";
 		function = "gpio";
 		bias-disable;
 		drive-strength = <8>;
 	};
 
-	ts_int_active: ts-int-active {
+	ts_int_active: ts-int-active-state {
 		pins = "gpio67";
+		function = "gpio";
 		drive-strength = <16>;
 		bias-pull-up;
 	};
 
-	ts_vdd_default: ts-vdd-default {
+	ts_vdd_default: ts-vdd-default-state {
 		pins = "gpio73";
 		function = "gpio";
 		bias-disable;
 		drive-strength = <8>;
 	};
 
-	hall_sensor_default: hall-sensor-default {
+	hall_sensor_default: hall-sensor-default-state {
 		pins = "gpio75";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
-		input-enable;
+		output-disable;
 	};
 
-};
-
-&adreno_gpu {
-	status = "disabled";
-};
-
-&gpucc {
-	status = "disabled";
-};
-
-&mmcc {
-	status = "disabled";
-};
-
-&qusb2phy0 {
-	status = "okay";
-
-	vdd-supply = <&vreg_l1b_0p925>;
-	vdda-pll-supply = <&vreg_l10a_1p8>;
-	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
 &usb3 {
