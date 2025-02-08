@@ -20,7 +20,7 @@
 
 / {
 	model = "Asus Zenfone Max Pro M1";
-	compatible = "asus,x00td", "qcom,sdm660", "qcom,sdm636";
+	compatible = "asus,x00td", "qcom,sdm636";
 	chassis-type = "handset";
 
 	qcom,msm-id = <0x159 0x0>;
@@ -58,21 +58,21 @@
 		status = "okay";
 		compatible = "gpio-keys";
 
-		vol_up {
+		key-vol-up {
 			label = "Volume Up";
 			gpios = <&tlmm 44 GPIO_ACTIVE_LOW>;
 			linux,input-type = <1>;
 			linux,code = <KEY_VOLUMEUP>;
-			gpio-key,wakeup;
+			wakeup-source;
 			debounce-interval = <15>;
 		};
 
-		vol_down {
+		key-vol-down {
 			label = "Volume Down";
 			gpios = <&tlmm 43 GPIO_ACTIVE_LOW>;
 			linux,input-type = <1>;
 			linux,code = <KEY_VOLUMEDOWN>;
-			gpio-key,wakeup;
+			wakeup-source;
 			debounce-interval = <15>;
 		};
 	};
@@ -149,7 +149,7 @@
 	 */
 	extcon_usb: extcon-usb {
 		compatible = "linux,extcon-usb-gpio";
-		id-gpio = <&tlmm 58 GPIO_ACTIVE_HIGH>;
+		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
 	};
 
 	vph_pwr: vph-pwr-regulator {
@@ -173,10 +173,6 @@
 &adreno_gpu {
 	status = "okay";
 
-	zap-shader {
-		memory-region = <&zap_shader_region>;
-		firmware-name = "qcom/a512_zap.mdt";
-	};
 	// These OPPs are correct, but we are lacking support for the
 	// GPU regulator. Hence, disable them for now to prevent the
 	// platform from hanging on high graphics loads
@@ -186,13 +182,13 @@
 	};
 };
 
-&adsp_pil {
-	status = "okay";
-	firmware-name = "adsp.mdt";
+&adreno_gpu_zap {
+	memory-region = <&zap_shader_region>;
+	firmware-name = "qcom/a512_zap.mdt";
 };
 
-&anoc2_smmu {
-	status = "okay";
+&adsp_pil {
+	firmware-name = "adsp.mdt";
 };
 
 &blsp1_uart2 {
@@ -201,6 +197,7 @@
 
 &blsp2_uart1 {
 	status = "okay";
+
 	/* HCI Bluetooth */
 	bluetooth {
 		compatible = "qcom,wcn3990-bt";
@@ -218,6 +215,7 @@
 &blsp_i2c4 {
 	#address-cells = <1>;
 	#size-cells = <0>;
+
 	status = "okay";
 
 	touchscreen@62 {
@@ -245,18 +243,6 @@
 };
 
 &blsp_i2c7 { /* for P/L Sensor */
-	status = "okay";
-};
-
-&gpucc {
-	status = "okay";
-};
-
-&kgsl_smmu {
-	status = "okay";
-};
-
-&lpass_smmu {
 	status = "okay";
 };
 
@@ -298,10 +284,7 @@
 
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
-	status = "okay";
-};
 
-&mmcc {
 	status = "okay";
 };
 
@@ -310,8 +293,9 @@
 };
 
 &pm660_charger {
-	status = "okay";
 	monitored-battery = <&battery>;
+
+	status = "okay";
 };
 
 &pm660_fg {
@@ -331,8 +315,9 @@
 };
 
 &pm660l_wled {
-	status = "okay";
 	default-brightness = <512>;
+
+	status = "okay";
 };
 
 &pon_pwrkey {
@@ -340,14 +325,15 @@
 };
 
 &qusb2phy0 {
-	status = "okay";
-
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
 };
 
 &remoteproc_mss {
 	firmware-name = "mba.mbn", "modem.mdt";
+
 	status = "okay";
 };
 
@@ -606,35 +592,36 @@
 };
 
 &sdhc_1 {
-	status = "okay";
 	bus-width = <8>;
 	non-removable;
 	mmc-ddr-1_8v;    
 	mmc-hs200-1_8v;  
 	mmc-hs400-1_8v; 
 	vmmc-supply = <&vreg_l4b_2p95>;
-	vqmmc-supply = <&vreg_l8a_1p8>;  
+	vqmmc-supply = <&vreg_l8a_1p8>;
+
+	status = "okay";
 };
 
 
 &sdhc_2 {
-	status = "okay";
-
 	vmmc-supply = <&vreg_l5b_2p95>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
+
+	status = "okay";
 };
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 
-	mdss_dsi_active: mdss_dsi_active {
+	mdss_dsi_active: mdss_dsi_active-state {
 		function = "gpio";
 		pins = "gpio53";
 		drive-strength = <8>;
 		bias-disable;
 	};
 
-	mdss_te_active: mdss_te_active {
+	mdss_te_active: mdss_te_active-state {
 		pins = "gpio59";
 		function = "mdp_vsync";
 		drive-strength = <2>;
@@ -670,18 +657,20 @@
 };
 
 &usb3_dwc3 {
-	status = "okay";
 	dr_mode = "peripheral";
 	extcon = <&extcon_usb>;
 
 	maximum-speed = "high-speed";
 	phys = <&qusb2phy0>;
 	phy-names = "usb2-phy";
+
+	status = "okay";
 };
 
 &venus {
-	status = "okay";
 	firmware-name = "qcom/venus-4.4/venus.mdt";
+
+	status = "okay";
 };
 
 &wifi {
