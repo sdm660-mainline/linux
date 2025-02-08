@@ -904,6 +904,7 @@ properties:
       - items:
           - enum:
               - xiaomi,lavender
+              - xiaomi,platina
           - const: qcom,sdm660
 
       - items:
