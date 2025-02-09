@@ -116,14 +116,10 @@
 
 &adreno_gpu {
 	status = "okay";
-
-	zap-shader {
-		memory-region = <&zap_shader_region>;
-	};
 };
 
-&anoc2_smmu {
-	status = "okay";
+&adreno_gpu_zap {
+	firmware-name = "qcom/a512_zap.mdt";
 };
 
 &blsp1_uart2 {
@@ -162,18 +158,6 @@
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <2160>;
 	};
-};
-
-&gpucc {
-	status = "okay";
-};
-
-&kgsl_smmu {
-	status = "okay";
-};
-
-&lpass_smmu {
-	status = "okay";
 };
 
 &mdss {
@@ -216,6 +200,7 @@
 
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
+
 	status = "okay";
 };
 
@@ -247,11 +232,11 @@
 };
 
 &pm660l_wled {
-	status = "okay";
-
 	qcom,switching-freq = <800>;
 	qcom,current-limit-microamp = <20000>;
 	qcom,num-strings = <2>;
+
+	status = "okay";
 };
 
 &pon_pwrkey {
@@ -259,20 +244,21 @@
 };
 
 &pon_resin {
-	status = "okay";
-
 	linux,code = <KEY_VOLUMEDOWN>;
+
+	status = "okay";
 };
 
 &qusb2phy0 {
-	status = "okay";
-
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
 };
 
 &remoteproc_mss {
 	firmware-name = "mba.mbn", "modem.mdt";
+
 	status = "okay";
 };
 
@@ -549,7 +535,6 @@
 };
 
 &sdhc_1 {
-	status = "okay";
 	supports-cqe;
 
 	mmc-hs200-1_8v;
@@ -558,13 +543,15 @@
 
 	vmmc-supply = <&vreg_l4b_2p95>;
 	vqmmc-supply = <&vreg_l8a_1p8>;
+
+	status = "okay";
 };
 
 &sdhc_2 {
-	status = "okay";
-
 	vmmc-supply = <&vreg_l5b_2p95>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
+
+	status = "okay";
 };
 
 &tlmm {
@@ -591,14 +578,14 @@
 		bias-disable;
 	};
 
-	panel_reset_n: panel-rst-n {
+	panel_reset_n: panel-rst-n-state {
 		pins = "gpio53";
 		function = "gpio";
 		drive-strength = <8>;
 		bias-disable;
 	};
 
-	mdp_vsync_n: mdp-vsync-n {
+	mdp_vsync_n: mdp-vsync-n-state {
 		pins = "gpio59";
 		function = "mdp_vsync";
 		drive-strength = <2>;
