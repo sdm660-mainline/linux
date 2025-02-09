@@ -813,6 +813,7 @@ properties:
           - enum:
               - sony,mermaid-row
               - asus,x00td
+              - xiaomi,tulip
           - const: qcom,sdm636
 
       - items:
