@@ -818,6 +818,7 @@ properties:
 
       - items:
           - enum:
+              - xiaomi,jasmine
               - xiaomi,lavender
               - xiaomi,platina
           - const: qcom,sdm660
