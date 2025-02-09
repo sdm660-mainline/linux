@@ -863,6 +863,7 @@ properties:
 
       - items:
           - enum:
+              - xiaomi,jasmine
               - xiaomi,lavender
               - xiaomi,lavender-boe
               - xiaomi,lavender-tianma
