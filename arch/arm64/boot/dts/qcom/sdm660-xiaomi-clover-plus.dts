@@ -15,6 +15,7 @@
 
 	vreg_bl_vddio: lcd-backlight-regulator {
 		compatible = "regulator-fixed";
+
 		regulator-name = "vreg_bl_vddio";
 		regulator-min-microvolt = <3150000>;
 		regulator-max-microvolt = <3150000>;
@@ -35,21 +36,22 @@
 	touchscreen@5d {
 		compatible = "goodix,gt9110";
 		reg = <0x5d>;
+
 		AVDD28-supply = <&vreg_l3b_3p0>;
 		VDDIO-supply = <&vreg_l11a_1p8>;
-		interrupt-parent = <&tlmm>;
-		interrupts = <67 IRQ_TYPE_LEVEL_LOW>;
+
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_LEVEL_LOW>;
+
 		pinctrl-names = "default", "int-output-low", "int-output-high", "int-input";
 		pinctrl-0 = <&ts_int_default>;
 		pinctrl-1 = <&ts_int_output_low>;
 		pinctrl-2 = <&ts_int_output_high>;
 		pinctrl-3 = <&ts_int_input>;
+
 		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
-		touchscreen-max-id = <10>;
+
 		touchscreen-size-x = <1200>;
 		touchscreen-size-y = <1920>;
-		touchscreen-max-w = <512>;
-		touchscreen-max-p = <512>;
 	};
 };
 
@@ -134,6 +136,7 @@
 
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
+
 	status = "okay";
 };
 
@@ -181,50 +184,30 @@
 		bias-disable;
 	};
 
-	ts_int_default: ts_int_default {
-		mux {
-			pins = "gpio67";
-			function = "gpio";
-		};
-		config {
-			pins = "gpio67";
-			drive-strength = <16>;
-			input-enable;
-			bias-disable;
-		};
+	ts_int_default: ts-int-default-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <16>;
+		output-disable;
+		bias-disable;
 	};
 
-	ts_int_output_high: ts_int_output_high {
-		mux {
-			pins = "gpio67";
-			function = "gpio";
-		};
-		config {
-			pins = "gpio67";
-			output-high;
-		};
+	ts_int_output_high: ts-int-output-high-state {
+		pins = "gpio67";
+		function = "gpio";
+		output-high;
 	};
 
-	ts_int_output_low: ts_int_output_low {
-		mux {
-			pins = "gpio67";
-			function = "gpio";
-		};
-		config {
-			pins = "gpio67";
-			output-low;
-		};
+	ts_int_output_low: ts-int-output-low-state {
+		pins = "gpio67";
+		function = "gpio";
+		output-low;
 	};
 
-	ts_int_input: ts_int_input {
-		mux {
-			pins = "gpio67";
-			function = "gpio";
-		};
-		config {
-			pins = "gpio67";
-			input-enable;
-			bias-disable;
-		};
+	ts_int_input: ts-int-input-state {
+		pins = "gpio67";
+		function = "gpio";
+		output-disable;
+		bias-disable;
 	};
 };
