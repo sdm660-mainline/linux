@@ -129,15 +129,11 @@
 
 &adreno_gpu {
 	status = "okay";
-
-	zap-shader {
-		memory-region = <&zap_shader_region>;
-		firmware-name = "a512_zap.mdt";
-	};
 };
 
-&anoc2_smmu {
-	status = "okay";
+&adreno_gpu_zap {
+	firmware-name = "a512_zap.mdt";
+	memory-region = <&zap_shader_region>;
 };
 
 &blsp2_uart1 {
@@ -145,11 +141,19 @@
 
 	bluetooth {
 		compatible = "qcom,wcn3990-bt";
-		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
-		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
-		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
+		vddxo-supply = <&vreg_l9a_1p8>;
+		vddrf-supply = <&vreg_l6a_1p3>;
+		vddch0-supply = <&vreg_l19a_3p3>;
 		max-speed = <3200000>;
 	};
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mmss_smmu {
+	status = "okay";
 };
 
 &pm660l_lpg {
@@ -169,34 +173,6 @@
 			color = <LED_COLOR_ID_RED>;
 		};
 	};
-};
-
-&blsp1_uart2 {
-	status = "disabled";
-};
-
-&gpucc {
-	status = "okay";
-};
-
-&kgsl_smmu {
-	status = "okay";
-};
-
-&lpass_smmu {
-	status = "okay";
-};
-
-&mdss {
-	status = "okay";
-};
-
-&mmcc {
-	status = "okay";
-};
-
-&mmss_smmu {
-	status = "okay";
 };
 
 &pm660_charger {
@@ -231,20 +207,21 @@
 };
 
 &pon_resin {
-	status = "okay";
-
 	linux,code = <KEY_VOLUMEDOWN>;
+
+	status = "okay";
 };
 
 &qusb2phy0 {
-	status = "okay";
-
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
 };
 
 &remoteproc_mss {
 	firmware-name = "mba.mbn", "modem.mdt";
+
 	status = "okay";
 };
 
@@ -583,19 +560,20 @@
 };
 
 &sdhc_1 {
-	status = "okay";
 	bus-width = <8>;
 	non-removable;
 	mmc-ddr-1_8v;
 	mmc-hs200-1_8v;
 	mmc-hs400-1_8v;
+
+	status = "okay";
 };
 
 &sdhc_2 {
-	status = "okay";
-
 	vmmc-supply = <&vreg_l5b_2p95>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
+
+	status = "okay";
 };
 
 &tlmm {
@@ -633,6 +611,7 @@
 
 &venus {
 	firmware-name = "qcom/venus-4.4/venus.mdt";
+
 	status = "okay";
 };
 

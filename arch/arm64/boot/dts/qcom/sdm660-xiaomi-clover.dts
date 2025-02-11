@@ -18,26 +18,28 @@
 	status = "okay";
 
 	touchscreen@38 {
-		compatible = "edt,edt-ft5406", "edt,edt-ft5x06";
+		compatible = "edt,edt-ft5406";
 		reg = <0x38>;
+
 		vcc-supply = <&vreg_l11a_1p8>;
+
 		pinctrl-0 = <&ts_int_active &ts_rst>;
 		pinctrl-names = "default";
-		interrupt-parent = <&tlmm>;
-		interrupts = <67 IRQ_TYPE_EDGE_FALLING>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
 		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+
 		touchscreen-size-x = <1200>;
 		touchscreen-size-y = <1920>;
 	};
 };
 
 &mdss_dsi0 {
-	status = "okay";
-
 	#address-cells = <1>;
 	#size-cells = <0>;
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-supply = <&vreg_l1a_1p225>;
+
+	status = "okay";
 
 	panel: panel@0 {
 		compatible = "boe,nt51021";
@@ -66,15 +68,16 @@
 
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
+
 	status = "okay";
 };
 
 &pm660l_wled {
-	status = "okay";
-
 	qcom,switching-freq = <800>;
 	qcom,current-limit-microamp = <20000>;
 	qcom,num-strings = <3>;
+
+	status = "okay";
 };
 
 &simplefb {
@@ -113,14 +116,16 @@
 };
 
 &tlmm {
-	ts_int_active: ts-int-active {
+	ts_int_active: ts-int-active-state {
 		pins = "gpio67";
+		function = "gpio";
 		drive-strength = <8>;
 		bias-pull-up;
 	};
 
-	ts_rst: ts-rst {
+	ts_rst: ts-rst-state {
 		pins = "gpio66";
+		function = "gpio";
 		drive-strength = <8>;
 		bias-pull-up;
 	};
