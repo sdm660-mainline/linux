@@ -802,6 +802,7 @@ properties:
       - items:
           - enum:
               - inforce,ifc6560
+              - xiaomi,clover-wifi
           - const: qcom,sda660
 
       - items:
@@ -820,6 +821,8 @@ properties:
 
       - items:
           - enum:
+              - xiaomi,clover-lte
+              - xiaomi,clover-plus
               - xiaomi,jasmine
               - xiaomi,lavender
               - xiaomi,platina
