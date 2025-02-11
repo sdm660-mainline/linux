@@ -8,7 +8,7 @@
 
 / {
 	model = "Xiaomi Mi Pad 4";	
-	compatible = "xiaomi,clover", "qcom,sdm660";
+	compatible = "xiaomi,clover", "qcom,sda660";
 	qcom,board-id = <11 0>;
 	qcom,msm-id = <324 0>;
 	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>, <0x0001001b 0x0201011a 0x0 0x0>,<0x0001001b 0x0102001a 0x0 0x0>;
