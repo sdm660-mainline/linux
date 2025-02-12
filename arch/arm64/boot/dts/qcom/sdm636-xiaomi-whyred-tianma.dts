@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileCopyrightText: 2025 Mathesh Velayudan <123v.mathesh@gmail.com>
+// SPDX-FileCopyrightText: 2025 Alexey Minnekhanov <alexeymin@postmarketos.org>
+
+/dts-v1/;
+
+#include "sdm636-xiaomi-whyred-common.dtsi"
+
+/ {
+	model = "Xiaomi Redmi Note 5 Pro (Tianma)";
+	compatible = "xiaomi,whyred-tianma", "qcom,sdm636";
+};
+
+&panel {
+	compatible = "tianma,tl060fvms47-00";
+};
