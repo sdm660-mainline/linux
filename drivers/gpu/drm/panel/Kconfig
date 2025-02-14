@@ -702,6 +702,15 @@ config DRM_PANEL_SAMSUNG_AMS581VF01
 	  Say Y or M here if you want to enable support for the
 	  Samsung AMS581VF01 FHD Plus (2340x1080@60Hz) CMD mode panel.
 
+config DRM_PANEL_SAMSUNG_AMS601NT12
+	tristate "Samsung AMS601NT12 panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y or M here if you want to enable support for the
+	  Samsung AMS601NT12 FHD Plus (2160x1080@60Hz) CMD mode panel.
+
 config DRM_PANEL_SAMSUNG_AMS639RQ08
 	tristate "Samsung AMS639RQ08 panel"
 	depends on OF
