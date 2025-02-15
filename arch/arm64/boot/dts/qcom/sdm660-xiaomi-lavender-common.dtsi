@@ -128,14 +128,11 @@
 
 &adreno_gpu {
 	status = "okay";
-
-	zap-shader {
-		memory-region = <&zap_shader_region>;
-	};
 };
 
-&anoc2_smmu {
-	status = "okay";
+&adreno_gpu_zap {
+	firmware-name = "a512_zap.mbn";
+	memory-region = <&zap_shader_region>;
 };
 
 &blsp1_uart2 {
@@ -155,18 +152,6 @@
 		/* Path is relative to the qca/ subdir in lib/firmware. */
 		/* firmware-name = "crnv21.bin"; */ // default
 	};
-};
-
-&gpucc {
-	status = "okay";
-};
-
-&kgsl_smmu {
-	status = "okay";
-};
-
-&lpass_smmu {
-	status = "okay";
 };
 
 &mdss {
@@ -238,11 +223,11 @@
 };
 
 &pm660l_wled {
-	status = "okay";
-
 	qcom,switching-freq = <800>;
 	qcom,current-limit-microamp = <20000>;
 	qcom,num-strings = <2>;
+
+	status = "okay";
 };
 
 &pon_pwrkey {
@@ -250,20 +235,21 @@
 };
 
 &pon_resin {
-	status = "okay";
-
 	linux,code = <KEY_VOLUMEDOWN>;
+
+	status = "okay";
 };
 
 &qusb2phy0 {
-	status = "okay";
-
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
 };
 
 &remoteproc_mss {
 	firmware-name = "mba.mbn", "modem.mdt";
+
 	status = "okay";
 };
 
