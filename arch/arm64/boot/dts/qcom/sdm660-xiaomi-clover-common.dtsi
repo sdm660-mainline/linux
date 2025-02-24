@@ -11,6 +11,8 @@
 #include <dt-bindings/input/gpio-keys.h>
 #include <dt-bindings/leds/common.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+#include <dt-bindings/sound/qcom,q6afe.h>
+#include <dt-bindings/sound/qcom,q6asm.h>
 
 /delete-node/ &adsp_region;
 /delete-node/ &cdsp_region;
@@ -142,7 +144,6 @@
 			reg = <0x0 0xf0b00000 0x0 0x2000>;
 			no-map;
 		};
-
 	};
 };
 
@@ -173,6 +174,43 @@
 };
 
 &mmss_smmu {
+	status = "okay";
+};
+
+&q6afedai {
+	dai@81 {
+		reg = <INT0_MI2S_RX>;
+		qcom,sd-lines = <0 1>;
+	};
+
+	dai@88 {
+		reg = <INT3_MI2S_TX>;
+		qcom,sd-lines = <0 1>;
+	};
+};
+&q6asmdai {
+	dai@0 {
+		reg = <0>;
+	};
+	dai@1 {
+		reg = <1>;
+	};
+};
+
+&lpass_codec {
+	clocks = <&int_cdc_bclk>,
+		 <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+	clock-names = "ahbix-clk", "mclk";
+	assigned-clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+	assigned-clock-rates = <9600000>;
+	status = "okay";
+};
+&pm660l_codec {
+	vdd-micbias-supply = <&vreg_l7b_3p125>;
+
+	qcom,micbias-lvl = <2600>;
+	qcom,micbias1-ext-cap;
+
 	status = "okay";
 };
 
@@ -596,6 +634,66 @@
 	vqmmc-supply = <&vreg_l2b_2p95>;
 
 	status = "okay";
+};
+
+&sound {
+	compatible = "qcom,sdm660-internal-sndcard";
+	model = "Xiaomi Mi Pad 4 (Plus)";
+	pinctrl-0 = <&cdc_pdm_default>,
+			<&cdc_dmic_default>;
+	pinctrl-names = "default";
+	audio-routing = "RX_BIAS", "Digital MCLK",
+			"INT_LDO_H", "Digital MCLK",
+			"Digital RX_I2S_CLK", "Digital MCLK",
+			"Digital TX_I2S_CLK", "Digital MCLK",
+			"Digital ADC1", "ADC1",
+			"Digital ADC2", "ADC2",
+			"Digital ADC3", "ADC3",
+			"PDM_RX1", "Digital PDM_RX1",
+			"PDM_RX2", "Digital PDM_RX2",
+			"PDM_RX3", "Digital PDM_RX3",
+			"Digital LPASS_PDM_TX", "PDM_TX",
+			"AMIC1", "MIC BIAS External1",
+			"AMIC2", "MIC BIAS External2";
+	mm1-dai-link {
+		link-name = "MultiMedia1";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+		};
+	};
+	mm2-dai-link {
+		link-name = "MultiMedia2";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
+		};
+	};
+	int0-mi2s-dai-link {
+		link-name = "Internal MI2S Playback";
+		cpu {
+			sound-dai = <&q6afedai INT0_MI2S_RX>;
+		};
+		platform {
+			sound-dai = <&q6routing>;
+		};
+		codec {
+			sound-dai = <&pm660l_codec 0>,
+					<&lpass_codec 0>;
+		};
+	};
+
+	int3-mi2s-dai-link {
+		link-name = "Internal MI2S Capture";
+		cpu {
+			sound-dai = <&q6afedai INT3_MI2S_TX>;
+		};
+		platform {
+			sound-dai = <&q6routing>;
+		};
+		codec {
+			sound-dai = <&pm660l_codec 1>,
+					<&lpass_codec 1>;
+		};
+	};
 };
 
 &tlmm {
