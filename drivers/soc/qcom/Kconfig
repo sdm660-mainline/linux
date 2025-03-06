@@ -171,6 +171,25 @@ config QCOM_RPMH
 	  of hardware components aggregate requests for these resources and
 	  help apply the aggregated state on the resource.
 
+config QCOM_SNS_REG
+	tristate "Qualcomm Sensors Registry service"
+	select QCOM_QMI_HELPERS
+	select AUXILIARY_BUS
+	depends on NET && QRTR && (ARCH_QCOM || COMPILE_TEST)
+	default QCOM_RPROC_COMMON
+	help
+	  Qualcomm Sensor Registry is a QMI service used by the Snapdragon
+	  Sensor Core (SSC) on Qualcomm SoCs such as MSM8996 to get platform
+	  specific sensor data. It is served by the application processor, and
+	  SSC requests data from it in the form of groups of keys. This server
+	  emulates the proprietary sensor daemon used in Android and provides
+	  SSC with the data it needs to function.
+	  This sensor registry server reads a sensor registry firmware file from
+	  qcom/sensors/sns.reg to obtain data requested by SSC. On Android
+	  devices this file is usually available on "persist" partition on path:
+	  /persist/sensors/sns.reg. This service can be used to enable sensor
+	  readings on wide range of SoCs: from MSM8226 to SDM660.
+
 config QCOM_SMEM
 	tristate "Qualcomm Shared Memory Manager (SMEM)"
 	depends on ARCH_QCOM || COMPILE_TEST
