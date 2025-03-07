@@ -41,6 +41,13 @@ struct qcom_rproc_pdm {
 	struct auxiliary_device *adev;
 };
 
+struct qcom_rproc_sns_reg {
+	struct rproc_subdev subdev;
+	struct device *rproc_dev;
+	int rproc_index;
+	struct auxiliary_device *adev;
+};
+
 void qcom_minidump(struct rproc *rproc, unsigned int minidump_id,
 			void (*rproc_dumpfn_t)(struct rproc *rproc,
 				struct rproc_dump_segment *segment, void *dest, size_t offset,
@@ -61,6 +68,9 @@ void qcom_remove_ssr_subdev(struct rproc *rproc, struct qcom_rproc_ssr *ssr);
 
 void qcom_add_pdm_subdev(struct rproc *rproc, struct qcom_rproc_pdm *pdm);
 void qcom_remove_pdm_subdev(struct rproc *rproc, struct qcom_rproc_pdm *pdm);
+
+void qcom_add_sns_reg_subdev(struct rproc *rproc, struct qcom_rproc_sns_reg *sns_reg);
+void qcom_remove_sns_reg_subdev(struct rproc *rproc, struct qcom_rproc_sns_reg *sns_reg);
 
 #if IS_ENABLED(CONFIG_QCOM_SYSMON)
 struct qcom_sysmon *qcom_add_sysmon_subdev(struct rproc *rproc,
