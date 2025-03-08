@@ -5160,6 +5160,38 @@ static const struct panel_desc_dsi auo_b080uan01 = {
 	.lanes = 4,
 };
 
+static const struct drm_display_mode boe_520_v0_mode = {
+	.clock = (1080 + 104 + 4 + 100) * (1920 + 8 + 2 + 4) * 60 / 1000,
+	.hdisplay = 1080,
+	.hsync_start = 1080 + 104,
+	.hsync_end = 1080 + 104 + 4,
+	.htotal = 1080 + 104 + 4 + 100,
+	.vdisplay = 1920,
+	.vsync_start = 1920 + 8,
+	.vsync_end = 1920 + 8 + 2,
+	.vtotal = 1920 + 8 + 2 + 4,
+	.width_mm = 64,
+	.height_mm = 115,
+	.type = DRM_MODE_TYPE_DRIVER,
+};
+
+static const struct panel_desc_dsi boe_520_v0 = {
+	.desc = {
+		.modes = &boe_520_v0_mode,
+		.num_modes = 1,
+		.bpc = 8,
+		.size = {
+			.width = 64,
+			.height = 115,
+		},
+		.connector_type = DRM_MODE_CONNECTOR_DSI,
+	},
+	.flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+		 MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_LPM,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+};
+
 static const struct drm_display_mode boe_tv080wum_nl0_mode = {
 	.clock = 160000,
 	.hdisplay = 1200,
@@ -5400,6 +5432,9 @@ static const struct of_device_id dsi_of_match[] = {
 	{
 		.compatible = "auo,b080uan01",
 		.data = &auo_b080uan01
+	}, {
+		.compatible = "boe,520-v0-simple",
+		.data = &boe_520_v0
 	}, {
 		.compatible = "boe,tv080wum-nl0",
 		.data = &boe_tv080wum_nl0
