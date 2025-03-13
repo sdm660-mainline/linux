@@ -274,7 +274,7 @@
 		/* SDHCI 3.3V signal doesn't seem to be supported. */
 		vreg_l2b_2p95: l2 {
 			regulator-min-microvolt = <1648000>;
-			regulator-max-microvolt = <2696000>;
+			regulator-max-microvolt = <3100000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
@@ -316,7 +316,6 @@
 			regulator-enable-ramp-delay = <250>;
 			regulator-ramp-delay = <0>;
 			regulator-allow-set-load;
-			regulator-system-load = <800000>;
 		};
 
 		vreg_l6b_3p3: l6 {
@@ -560,16 +559,21 @@
 };
 
 &sdhc_1 {
-	bus-width = <8>;
-	non-removable;
-	mmc-ddr-1_8v;
+	supports-cqe;
+
 	mmc-hs200-1_8v;
 	mmc-hs400-1_8v;
+	mmc-hs400-enhanced-strobe;
+
+	vmmc-supply = <&vreg_l4b_2p95>;
+	vqmmc-supply = <&vreg_l8a_1p8>;
 
 	status = "okay";
 };
 
 &sdhc_2 {
+	cd-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
+
 	vmmc-supply = <&vreg_l5b_2p95>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
 
