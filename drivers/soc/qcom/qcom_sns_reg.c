@@ -204,11 +204,17 @@ static const struct sns_reg_of_match_data sns_reg_target_slpi = { .target_rproc 
 static const struct of_device_id sns_reg_supported_socs[] __maybe_unused = {
 	{ .compatible = "qcom,apq8096", .data = &sns_reg_target_slpi, },
 	{ .compatible = "qcom,msm8226", .data = &sns_reg_target_adsp, }, /* untested */
+	{ .compatible = "qcom,msm8917", .data = &sns_reg_target_adsp, },
+	{ .compatible = "qcom,msm8920", .data = &sns_reg_target_adsp, },
+	{ .compatible = "qcom,msm8937", .data = &sns_reg_target_adsp, },
+	{ .compatible = "qcom,msm8940", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,msm8953", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,msm8974", .data = &sns_reg_target_adsp, }, /* untested */
 	{ .compatible = "qcom,msm8996", .data = &sns_reg_target_slpi, },
 	{ .compatible = "qcom,msm8998", .data = &sns_reg_target_slpi, }, /* presumably, untested */
 	{ .compatible = "qcom,sda660", .data = &sns_reg_target_adsp, },
+	{ .compatible = "qcom,sdm429", .data = &sns_reg_target_adsp, },
+	{ .compatible = "qcom,sdm439", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm450", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm630", .data = &sns_reg_target_adsp, }, /* untested */
 	{ .compatible = "qcom,sdm632", .data = &sns_reg_target_adsp, },
