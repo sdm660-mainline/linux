@@ -126,7 +126,7 @@
 };
 
 &adreno_gpu_zap {
-	firmware-name = "qcom/a512_zap.mdt";
+	firmware-name = "a512_zap.mbn";
 };
 
 &blsp_i2c1 {
@@ -233,9 +233,7 @@
 
 &pm660_fg {
 	monitored-battery = <&battery>;
-	qcom,battery-capacity-ua = <4000000>;
-	qcom,min-voltage-uv= <3400000>;
-	qcom,max-voltage-uv= <4408000>;
+	power-supplies = <&pm660_charger>;
 
 	status = "okay";
 };
@@ -325,7 +323,7 @@
 		/* SDHCI 3.3V signal doesn't seem to be supported. */
 		vreg_l2b_2p95: l2 {
 			regulator-min-microvolt = <1648000>;
-			regulator-max-microvolt = <2696000>;
+			regulator-max-microvolt = <3100000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
@@ -361,7 +359,6 @@
 			regulator-max-microvolt = <3328000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
-			regulator-system-load = <800000>;
 		};
 
 		vreg_l7b_3p125: l7 {
@@ -566,6 +563,7 @@
 };
 
 &sdhc_2 {
+	cd-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
 	vmmc-supply = <&vreg_l5b_2p95>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
 
@@ -583,14 +581,14 @@
 		output-disable;
 	};
 
-	mdss_dsi_active: mdss_dsi_active-state {
+	mdss_dsi_active: mdss-dsi-active-state {
 		function = "gpio";
 		pins = "gpio53";
 		drive-strength = <8>;
 		bias-disable;
 	};
 
-	mdss_te_active: mdss_te_active-state {
+	mdss_te_active: mdss-te-active-state {
 		pins = "gpio59";
 		function = "mdp_vsync";
 		drive-strength = <2>;
