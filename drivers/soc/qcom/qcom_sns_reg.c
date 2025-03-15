@@ -211,12 +211,12 @@ static const struct of_device_id sns_reg_supported_socs[] __maybe_unused = {
 	{ .compatible = "qcom,msm8953", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,msm8974", .data = &sns_reg_target_adsp, }, /* untested */
 	{ .compatible = "qcom,msm8996", .data = &sns_reg_target_slpi, },
-	{ .compatible = "qcom,msm8998", .data = &sns_reg_target_slpi, }, /* presumably, untested */
+	{ .compatible = "qcom,msm8998", .data = &sns_reg_target_slpi, }, /* untested */
 	{ .compatible = "qcom,sda660", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm429", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm439", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm450", .data = &sns_reg_target_adsp, },
-	{ .compatible = "qcom,sdm630", .data = &sns_reg_target_adsp, }, /* untested */
+	{ .compatible = "qcom,sdm630", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm632", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm636", .data = &sns_reg_target_adsp, },
 	{ .compatible = "qcom,sdm660", .data = &sns_reg_target_adsp, },
@@ -239,6 +239,12 @@ static enum sns_reg_target_rproc get_target_rproc(void)
 struct qcom_sns_reg_data {
 	refcount_t refcnt;
 
+	/*
+	 * This driver is not bound to specific device; however for logging
+	 * purposes we can use the first one that triggered our probe.
+	 */
+	struct auxiliary_device *first_auxdev;
+
 	struct qmi_handle svc_handle;
 	bool qmi_svc_started;
 
@@ -253,6 +259,16 @@ struct qcom_sns_reg_data {
 
 static DEFINE_MUTEX(qcom_sns_reg_mutex); /* protects __qcom_sns_reg_data */
 static struct qcom_sns_reg_data *__qcom_sns_reg_data;
+
+/* little helpers to save from typing too long lines */
+#define sns_reg_info(fmt, ...) \
+	dev_info(&__qcom_sns_reg_data->first_auxdev->dev, fmt, ##__VA_ARGS__)
+#define sns_reg_err(fmt, ...) \
+	dev_err(&__qcom_sns_reg_data->first_auxdev->dev, fmt, ##__VA_ARGS__)
+#define sns_reg_warn(fmt, ...) \
+	dev_warn(&__qcom_sns_reg_data->first_auxdev->dev, fmt, ##__VA_ARGS__)
+#define sns_reg_dbg(fmt, ...) \
+	dev_dbg(&__qcom_sns_reg_data->first_auxdev->dev, fmt, ##__VA_ARGS__)
 
 /*
  * SSC firmware will ask us for a group of configs keys stored
@@ -293,16 +309,15 @@ static void qcom_sns_reg_get_group_req_handler(
 		 * This might be totally normal, depending on SoC.
 		 * Not all SoCs have all the groups.
 		 */
-		pr_warn("sns-reg: got request for unmapped group id=%u\n", req->id);
+		sns_reg_warn("got request for unmapped group id=%u", req->id);
 	} else {
 		/* bounds check */
 		if (!__qcom_sns_reg_data->fw
 			|| group->offset >= __qcom_sns_reg_data->fw->size
 			|| (group->offset + group->size) >= __qcom_sns_reg_data->fw->size)
 		{
-			pr_err("sns-reg: no firmware or it is buggy\n");
+			sns_reg_err("no firmware or it is buggy!\n");
 		} else {
-			pr_info("sns-reg: answering for group id=%d size=%lu\n", req->id, group->size);
 			/* Success, fill in the response struct fields */
 			rsp->result = QMI_RESULT_SUCCESS_V01;
 			rsp->data_len = group->size;
@@ -313,7 +328,7 @@ static void qcom_sns_reg_get_group_req_handler(
 	ret = qmi_send_response(qmi, sq, txn, SNS_REG_GROUP_MSG_ID,
 		SNS_REG_GROUP_RESP_MAX_LEN, sns_reg_group_resp_ei, rsp);
 	if (ret)
-		pr_err("sns-reg: failed to send group response: %d\n", ret);
+		sns_reg_err("failed to send group response: %d\n", ret);
 
 	mutex_unlock(&qcom_sns_reg_mutex);
 
@@ -341,10 +356,9 @@ static int qcom_sns_reg_qmi_service_start(void)
 	ret = qmi_add_server(&__qcom_sns_reg_data->svc_handle,
 		SNS_REG_QMI_SVC_ID, SNS_REG_QMI_SVC_V1, SNS_REG_QMI_INS_ID);
 	if (ret) {
-		pr_err("sns-reg: error adding QMI server %d\n", ret);
+		sns_reg_err("error adding QMI server %d\n", ret);
 	} else {
 		__qcom_sns_reg_data->qmi_svc_started = true;
-		pr_info("sns-reg: QMI server started OK\n");
 	}
 
 	return ret;
@@ -370,15 +384,14 @@ static int qcom_sns_reg_load_firmware(struct auxiliary_device *auxdev)
 	if (!fwname[0] || !fwname[1])
 		return -ENOMEM;
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < ARRAY_SIZE(fwname); i++) {
 		if (!fwname[i])
 			continue;
 
-		/* TODO: maybe remove the following print: */
-		dev_info(&auxdev->dev, "sns-reg: requesting firmware [%s]...\n", fwname[i]);
 		ret = request_firmware(&__qcom_sns_reg_data->fw, fwname[i], &auxdev->dev);
 		if (ret == 0) {
-			dev_info(&auxdev->dev, "fw loaded OK. size = %lu\n", __qcom_sns_reg_data->fw->size);
+			if (i > 0)
+				dev_info(&auxdev->dev, "firmware loaded, error above can be ignored.\n");
 			goto fw_free_ret;
 		}
 	}
@@ -401,12 +414,12 @@ static void qcom_sns_reg_maybe_start(void)
 	switch(__qcom_sns_reg_data->target_rproc)
 	{
 	case RPROC_ADSP:
-		pr_info("sns-reg: maybe_start: waiting for: ADSP\n");
+		sns_reg_dbg("maybe_start: waiting for: ADSP\n");
 		if (adsp_started)
 			do_start = true;
 		break;
 	case RPROC_SLPI:
-		pr_info("sns-reg: maybe_start: waiting for: SLPI\n");
+		sns_reg_dbg("maybe_start: waiting for: SLPI\n");
 		if (slpi_started)
 			do_start = true;
 		break;
@@ -415,10 +428,10 @@ static void qcom_sns_reg_maybe_start(void)
 	}
 
 	if (do_start) {
-		pr_info("sns-reg:   ... and the wait is over\n");
+		sns_reg_dbg("   ... and the wait is over\n");
 		qcom_sns_reg_qmi_service_start();
 	} else
-		pr_warn("sns-reg:   ... not time to start yet\n");
+		sns_reg_dbg("   ... not time to start yet\n");
 }
 
 static void qcom_sns_reg_ssr_notifier_work(struct work_struct *work)
@@ -432,28 +445,11 @@ static void qcom_sns_reg_ssr_notifier_work(struct work_struct *work)
 
 static int qcom_sns_reg_ssr_notify_handler(struct notifier_block *nb, unsigned long action, void *data)
 {
-	struct qcom_ssr_notify_data *notify_data = data;
-
 	switch (action) {
-	case QCOM_SSR_BEFORE_POWERUP:
-		pr_info("sns-reg: received SSR starting event\n");
-		break;
-
 	case QCOM_SSR_AFTER_POWERUP:
-		pr_info("sns-reg: received SSR running event\n");
 		schedule_work(&__qcom_sns_reg_data->work);
 		break;
-
-	case QCOM_SSR_BEFORE_SHUTDOWN:
-		pr_info("sns-reg: received SSR %s event\n", notify_data->crashed ? "crashed" : "stopping");
-		break;
-
-	case QCOM_SSR_AFTER_SHUTDOWN:
-		pr_info("sns-reg: received SSR offline event\n");
-		break;
-
 	default:
-		pr_err("sns-reg: received unknown SSR event %lu\n", action);
 		break;
 	}
 
@@ -466,8 +462,7 @@ static int qcom_sns_reg_probe_once(struct auxiliary_device *auxdev)
 	int ret;
 	const char *target_ssr_name;
 
-	dev_info(&auxdev->dev, "qcom_sns_reg_probe_once() called for auxdev [%s.%u]\n",
-		auxdev->name, auxdev->id);
+	__qcom_sns_reg_data->first_auxdev = auxdev;
 
 	/*
 	 * Determine if current SoC supports Sensor Manager (SMGR) at all.
@@ -531,9 +526,6 @@ static int qcom_sns_reg_probe(struct auxiliary_device *auxdev,
 {
 	struct qcom_sns_reg_data *data;
 	int ret = 0;
-
-	dev_info(&auxdev->dev, "qcom_sns_reg_probe() for auxdev [%s.%u]\n",
-		auxdev->name, auxdev->id);
 
 	/*
 	 * This probe() function might be called from multiple remoteproc
