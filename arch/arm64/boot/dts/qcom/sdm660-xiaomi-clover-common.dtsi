@@ -186,17 +186,13 @@
 
 	status = "okay";
 
-	multi-led {
-		color = <LED_COLOR_ID_RGB>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	led@3 {
+		reg = <3>;
+		color = <LED_COLOR_ID_WHITE>;
 		function = LED_FUNCTION_STATUS;
-
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		led@3 {
-			reg = <3>;
-			color = <LED_COLOR_ID_RED>;
-		};
 	};
 };
 
