@@ -301,9 +301,7 @@
 &pm660_fg {
 	status = "okay";
 	monitored-battery = <&battery>;
-	qcom,battery-capacity-ua = <5000000>;
-	qcom,min-voltage-uv= <3400000>;
-	qcom,max-voltage-uv= <4350000>;
+	power-supplies = <&pm660_charger>;
 };
 
 &pm660_haptics {
@@ -538,7 +536,7 @@
 		/* SDHCI 3.3V signal doesn't seem to be supported. */
 		vreg_l2b_2p95: l2 {
 			regulator-min-microvolt = <1648000>;
-			regulator-max-microvolt = <2696000>;
+			regulator-max-microvolt = <3100000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
@@ -574,7 +572,6 @@
 			regulator-max-microvolt = <3328000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
-			regulator-system-load = <800000>;
 		};
 
 		vreg_l7b_3p125: l7 {
@@ -605,6 +602,8 @@
 
 
 &sdhc_2 {
+	cd-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
+
 	vmmc-supply = <&vreg_l5b_2p95>;
 	vqmmc-supply = <&vreg_l2b_2p95>;
 
