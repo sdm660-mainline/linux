@@ -11,6 +11,7 @@
 #include "pm660l.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
+#include <dt-bindings/leds/common.h>
 
 / {
 	model = "Xiaomi Redmi Note 7";
@@ -163,6 +164,21 @@
 
 &pm660_rradc {
 	status = "okay";
+};
+
+&pm660l_lpg {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	qcom,power-source = <1>;
+
+	status = "okay";
+
+	/* White LED is connected to red channel */
+	led@3 {
+		reg = <3>;
+		color = <LED_COLOR_ID_WHITE>;
+		function = LED_FUNCTION_STATUS;
+	};
 };
 
 &pm660l_wled {
