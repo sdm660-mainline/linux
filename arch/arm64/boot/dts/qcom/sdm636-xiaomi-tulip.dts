@@ -48,10 +48,9 @@
 
 	gpio-hall-sensor {
 		compatible = "gpio-keys";
-		label = "Hall effect sensor";
 
+		pinctrl-0 = <&gpio_hall_sensor_default>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&hall_sensor_default>;
 
 		switch {
 			label = "Hall Effect Sensor";
@@ -588,12 +587,11 @@
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 
-	hall_sensor_default: hall-sensor-state {
+	gpio_hall_sensor_default: gpio-hall-sensor-default-state {
 		pins = "gpio75";
 		function = "gpio";
-		drive-strength = <2>;
-		bias-disable;
-		output-disable;
+		drive-strength = <6>;
+		bias-pull-up;
 	};
 
 	mdss_dsi_active: mdss-dsi-active-state {
