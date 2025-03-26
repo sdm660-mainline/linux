@@ -71,8 +71,11 @@
 	gpio-keys {
 		compatible = "gpio-keys";
 
+		pinctrl-0 = <&vol_up_default>;
+		pinctrl-names = "default";
+
 		key-volup {
-			label = "Volume up";
+			label = "Volume Up";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_VOLUMEUP>;
 			debounce-interval = <15>;
@@ -194,6 +197,14 @@
 		pins = "gpio5";
 		function = PMIC_GPIO_FUNC_NORMAL;
 		bias-disable;
+	};
+
+	vol_up_default: vol-up-default-state {
+		pins = "gpio7";
+		function = PMIC_GPIO_FUNC_NORMAL;
+		bias-pull-up;
+		input-enable;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
 	};
 };
 
