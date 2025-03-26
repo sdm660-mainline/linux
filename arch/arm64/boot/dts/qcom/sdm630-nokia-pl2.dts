@@ -8,6 +8,7 @@
 #include "sdm630.dtsi"
 #include "pm660.dtsi"
 #include "pm660l.dtsi"
+#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
 / {
 	chassis-type = "handset";
@@ -159,7 +160,10 @@
 	
 	gpio-keys {
 		compatible = "gpio-keys";
-		
+
+		pinctrl-0 = <&vol_up_default>;
+		pinctrl-names = "default";
+
 		key-voldown {
 			label = "Volume Down";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
@@ -295,6 +299,16 @@
 
 &pm660_rradc {
 	status = "okay";
+};
+
+&pm660l_gpios {
+	vol_up_default: vol-up-default-state {
+		pins = "gpio7";
+		function = PMIC_GPIO_FUNC_NORMAL;
+		bias-pull-up;
+		input-enable;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
+	};
 };
 
 &pon_pwrkey {
