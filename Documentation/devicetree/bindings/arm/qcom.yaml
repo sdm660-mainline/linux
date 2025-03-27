@@ -935,6 +935,8 @@ properties:
               - sony,mermaid-row
               - asus,x00td
               - xiaomi,tulip
+              - xiaomi,whyred-shenchao
+              - xiaomi,whyred-tianma
           - const: qcom,sdm636
 
       - items:
