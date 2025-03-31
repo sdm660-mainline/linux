@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/panel/tianma,td4310.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Tianma TD4310 DSI Display Panel
+
+maintainers:
+  - Alexey Minnekhanov <alexeymin@postmarketos.org>
+
+allOf:
+  - $ref: panel-common.yaml#
+
+properties:
+  compatible:
+    enum:
+      - tianma,td4310-xiaomi-whyred
+
+  reg:
+    maxItems: 1
+
+  reset-gpios:
+    description: specifies a GPIO used for the rest pin
+
+  backlight:
+    description: phandle of the backlight device attached to the panel
+
+  port: true
+  rotation: true
+  width-mm: true
+  height-mm: true
+
+required:
+  - compatible
+  - reg
+  - reset-gpios
+
+unevalueatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+    dsi {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        panel@0 {
+            compatible = "tianma,td4310-xiaomi-whyred";
+            reg = <0>;
+            reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+            backlight = <&pm660l_wled>;
+            port {
+                panel_in: endpoint {
+                    remote-endpoint = <&mdss_dsi0_out>;
+                };
+            };
+        };
+    };
+
+...
