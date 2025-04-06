@@ -1370,6 +1370,15 @@ static void do_coreboot_entry(struct module *mod, void *symval)
 	module_alias_printf(mod, false, "coreboot:t%08X", tag);
 }
 
+/* Looks like: qrtr:N:N */
+static void do_qrtr_entry(struct module *mod, void *symval)
+{
+	DEF_FIELD(symval, qrtr_device_id, service);
+	DEF_FIELD(symval, qrtr_device_id, instance);
+
+	module_alias_printf(mod, false, "qrtr:%x:%x", service, instance);
+}
+
 /* Does namelen bytes of name exactly match the symbol? */
 static bool sym_is(const char *name, unsigned namelen, const char *symbol)
 {
@@ -1466,6 +1475,7 @@ static const struct devtable devtable[] = {
 	{"usb", SIZE_usb_device_id, do_usb_entry_multi},
 	{"pnp", SIZE_pnp_device_id, do_pnp_device_entry},
 	{"pnp_card", SIZE_pnp_card_device_id, do_pnp_card_entry},
+	{"qrtr", SIZE_qrtr_device_id, do_qrtr_entry},
 };
 
 /* Create MODULE_ALIAS() statements.
