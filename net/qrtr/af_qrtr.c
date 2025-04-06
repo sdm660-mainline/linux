@@ -435,6 +435,7 @@ static void qrtr_node_assign(struct qrtr_node *node, unsigned int nid)
 int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 {
 	struct qrtr_node *node = ep->node;
+	const struct qrtr_ctrl_pkt *pkt;
 	const struct qrtr_hdr_v1 *v1;
 	const struct qrtr_hdr_v2 *v2;
 	struct qrtr_sock *ipc;
@@ -443,6 +444,7 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	size_t size;
 	unsigned int ver;
 	size_t hdrlen;
+	int ret = 0;
 
 	if (len == 0 || len & 3)
 		return -EINVAL;
@@ -516,12 +518,24 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 
 	qrtr_node_assign(node, cb->src_node);
 
+	pkt = data + hdrlen;
+
 	if (cb->type == QRTR_TYPE_NEW_SERVER) {
 		/* Remote node endpoint can bridge other distant nodes */
-		const struct qrtr_ctrl_pkt *pkt;
-
-		pkt = data + hdrlen;
 		qrtr_node_assign(node, le32_to_cpu(pkt->server.node));
+
+		/* Create a QRTR device */
+		ret = ep->add_device(ep, le32_to_cpu(pkt->server.node),
+					       le32_to_cpu(pkt->server.port),
+					       le32_to_cpu(pkt->server.service),
+					       le32_to_cpu(pkt->server.instance));
+		if (ret)
+			goto err;
+	} else if (cb->type == QRTR_TYPE_DEL_SERVER) {
+		/* Remove QRTR device corresponding to service */
+		ret = ep->del_device(ep, le32_to_cpu(pkt->server.port));
+		if (ret)
+			goto err;
 	}
 
 	if (cb->type == QRTR_TYPE_RESUME_TX) {
@@ -543,8 +557,7 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 
 err:
 	kfree_skb(skb);
-	return -EINVAL;
-
+	return ret ? ret : -EINVAL;
 }
 EXPORT_SYMBOL_GPL(qrtr_endpoint_post);
 
