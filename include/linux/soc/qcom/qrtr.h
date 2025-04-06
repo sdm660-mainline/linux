@@ -13,6 +13,8 @@ struct qrtr_device {
 
 #define to_qrtr_device(d) container_of(d, struct qrtr_device, dev)
 
+#define QRTR_INSTANCE(qmi_version, qmi_instance) (qmi_version | qmi_instance << 8)
+
 struct qrtr_driver {
 	int (*probe)(struct qrtr_device *qdev);
 	void (*remove)(struct qrtr_device *qdev);
