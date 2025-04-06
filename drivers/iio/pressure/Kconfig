@@ -67,6 +67,16 @@ config IIO_CROS_EC_BARO
 	  To compile this driver as a module, choose M here: the module
 	  will be called cros_ec_baro.
 
+config IIO_QCOM_SMGR_PRESSURE
+	tristate "Qualcomm SSC Sensor Manager Pressure Sensor"
+	depends on IIO_QCOM_SMGR
+	select IIO_BUFFER
+	select IIO_KFIFO_BUF
+	help
+	  Say yes here to get support for pressure sensors connected to
+	  a Qualcomm Snapdragon Sensor Core and accessed through its Sensor
+	  Manager service.
+
 config DLHL60D
 	tristate "All Sensors DLHL60D and DLHL60G low voltage digital pressure sensors"
 	depends on I2C
