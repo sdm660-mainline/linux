@@ -1,0 +1,16 @@
+#
+# Qualcomm Sensor Manager IIO
+#
+
+config IIO_QCOM_SMGR
+	tristate "Qualcomm SSC Sensor Manager"
+	depends on ARCH_QCOM
+	depends on QCOM_RPROC_COMMON
+	select QCOM_QMI_HELPERS
+	select IIO_BUFFER
+	help
+	  Say yes here to build core support for the Sensor Manager (SMGR)
+	  service provided by the Qualcomm Snapdragon Sensor Core (SSC).
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called smgr.
