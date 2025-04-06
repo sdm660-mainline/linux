@@ -20578,6 +20578,24 @@ F:	Documentation/networking/device_drivers/cellular/qualcomm/rmnet.rst
 F:	drivers/net/ethernet/qualcomm/rmnet/
 F:	include/linux/if_rmnet.h
 
+QUALCOMM SENSOR MANAGER IIO DRIVER
+M:	Yassine Oudjana <y.oudjana@protonmail.com>
+L:	linux-iio@vger.kernel.org
+L:	linux-arm-msm@vger.kernel.org
+S:	Maintained
+F:	drivers/iio/accel/qcom_smgr_accel.c
+F:	drivers/iio/common/qcom_smgr/Kconfig
+F:	drivers/iio/common/qcom_smgr/Makefile
+F:	drivers/iio/common/qcom_smgr/qcom_smgr.c
+F:	drivers/iio/common/qcom_smgr/qmi/Makefile
+F:	drivers/iio/common/qcom_smgr/qmi/sns_smgr.c
+F:	drivers/iio/common/qcom_smgr/qmi/sns_smgr.h
+F:	drivers/iio/gyro/qcom_smgr_gyro.c
+F:	drivers/iio/magnetometer/qcom_smgr_mag.c
+F:	drivers/iio/pressure/qcom_smgr_pressure.c
+F:	drivers/iio/proximity/qcom_smgr_prox.c
+F:	include/linux/iio/common/qcom_smgr.h
+
 QUALCOMM TRUST ZONE MEMORY ALLOCATOR
 M:	Bartosz Golaszewski <bartosz.golaszewski@linaro.org>
 L:	linux-arm-msm@vger.kernel.org
