@@ -139,6 +139,15 @@ config MMC35240
 	  To compile this driver as a module, choose M here: the module
 	  will be called mmc35240.
 
+config IIO_QCOM_SMGR_MAG
+	tristate "Qualcomm SSC Sensor Manager Magnetometer"
+	depends on IIO_QCOM_SMGR
+	select IIO_BUFFER
+	select IIO_KFIFO_BUF
+	help
+	  Say yes here to get support for magnetometers connected to a Qualcomm
+	  Snapdragon Sensor Core and accessed through its Sensor Manager service.
+
 config IIO_ST_MAGN_3AXIS
 	tristate "STMicroelectronics magnetometers 3-Axis Driver"
 	depends on (I2C || SPI_MASTER) && SYSFS

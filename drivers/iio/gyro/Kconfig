@@ -147,6 +147,16 @@ config IIO_ST_GYRO_3AXIS
 	  Also need to enable at least one of I2C and SPI interface drivers
 	  below.
 
+config IIO_QCOM_SMGR_GYRO
+	tristate "Qualcomm SSC Sensor Manager Gyroscope Sensor"
+	depends on IIO_QCOM_SMGR
+	select IIO_BUFFER
+	select IIO_KFIFO_BUF
+	help
+	  Say yes here to get support for gyroscopes connected to
+	  a Qualcomm Snapdragon Sensor Core and accessed through its
+	  Sensor Manager service.
+
 config IIO_ST_GYRO_I2C_3AXIS
 	tristate "STMicroelectronics gyroscopes 3-Axis I2C Interface"
 	depends on I2C && IIO_ST_GYRO_3AXIS
