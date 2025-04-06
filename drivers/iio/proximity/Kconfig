@@ -46,6 +46,16 @@ config HX9023S
 	  To compile this driver as a module, choose M here: the
 	  module will be called hx9023s.
 
+config IIO_QCOM_SMGR_PROX
+	tristate "Qualcomm SSC Sensor Manager Proximity Sensor"
+	depends on IIO_QCOM_SMGR
+	select IIO_BUFFER
+	select IIO_KFIFO_BUF
+	help
+	  Say yes here to get support for proximity sensors connected to
+	  a Qualcomm Snapdragon Sensor Core and accessed through its Sensor
+	  Manager service.
+
 config IRSD200
 	tristate "Murata IRS-D200 PIR sensor"
 	select IIO_BUFFER
