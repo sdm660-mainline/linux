@@ -13,6 +13,7 @@ obj-$(CONFIG_BMP280_SPI) += bmp280-spi.o
 obj-$(CONFIG_DLHL60D) += dlhl60d.o
 obj-$(CONFIG_DPS310) += dps310.o
 obj-$(CONFIG_IIO_CROS_EC_BARO) += cros_ec_baro.o
+obj-$(CONFIG_IIO_QCOM_SMGR_PROX) += qcom_smgr_pressure.o
 obj-$(CONFIG_HID_SENSOR_PRESS)   += hid-sensor-press.o
 obj-$(CONFIG_HP03) += hp03.o
 obj-$(CONFIG_HSC030PA) += hsc030pa.o

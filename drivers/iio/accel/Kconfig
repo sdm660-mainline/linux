@@ -407,6 +407,16 @@ config IIO_CROS_EC_ACCEL_LEGACY
 	  Sensor data is retrieved through IO memory.
 	  Newer devices should use IIO_CROS_EC_SENSORS.
 
+config IIO_QCOM_SMGR_ACCEL
+	tristate "Qualcomm SSC Sensor Manager Accelerometer Sensor"
+	depends on IIO_QCOM_SMGR
+	select IIO_BUFFER
+	select IIO_KFIFO_BUF
+	help
+	  Say yes here to get support for accelerometers connected to
+	  a Qualcomm Snapdragon Sensor Core and accessed through its
+	  Sensor Manager service.
+
 config IIO_ST_ACCEL_3AXIS
 	tristate "STMicroelectronics accelerometers 3-Axis Driver"
 	depends on (I2C || SPI_MASTER) && SYSFS
