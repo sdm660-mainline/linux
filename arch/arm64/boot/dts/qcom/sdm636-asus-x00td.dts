@@ -184,7 +184,7 @@
 
 &adreno_gpu_zap {
 	memory-region = <&zap_shader_region>;
-	firmware-name = "qcom/a512_zap.mdt";
+	firmware-name = "a512_zap.mbn";
 };
 
 &adsp_pil {
