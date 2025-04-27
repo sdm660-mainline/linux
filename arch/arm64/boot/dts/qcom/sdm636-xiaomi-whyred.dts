@@ -156,25 +156,6 @@
 
 &adreno_gpu {
 	status = "okay";
-
-	/* Limit GPU frequencies to lowest to allow it to probe somehow */
-	opp-table {
-		/delete-node/ opp-700000000;
-
-		opp-430000000 {
-			opp-hz = /bits/ 64 <430000000>;
-			opp-level = <RPM_SMD_LEVEL_SVS_PLUS>;
-			opp-peak-kBps = <2724000>;
-			opp-supported-hw = <0xff>;
-		};
-
-		opp-370000000 {
-			opp-hz = /bits/ 64 <370000000>;
-			opp-level = <RPM_SMD_LEVEL_SVS>;
-			opp-peak-kBps = <2188000>;
-			opp-supported-hw = <0xff>;
-		};
-	};
 };
 
 &adreno_gpu_zap {
