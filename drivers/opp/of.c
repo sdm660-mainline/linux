@@ -537,13 +537,16 @@ static bool _opp_is_supported(struct device *dev, struct opp_table *opp_table,
 
 			/* Check if the level is supported */
 			if (!(val & opp_table->supported_hw[j])) {
+				printk(KERN_WARNING "opp not supported: %s (0x%x & 0x%x)\n", np->name, val, opp_table->supported_hw[j]);
 				supported = false;
 				break;
 			}
 		}
 
-		if (supported)
+		if (supported) {
+			printk(KERN_INFO "opp is  supported: %s\n", np->name);
 			return true;
+		}
 	}
 
 	return false;
