@@ -1720,6 +1720,57 @@ static void check_speed_bin(struct device *dev)
 	devm_pm_opp_set_supported_hw(dev, &val, 1);
 }
 
+/* TODO: this is a copy from a6xx one */
+static u32 fuse_to_supp_hw(const struct adreno_info *info, u32 fuse)
+{
+	if (!info->speedbins)
+		return UINT_MAX;
+
+	for (int i = 0; info->speedbins[i].fuse != SHRT_MAX; i++)
+		if (info->speedbins[i].fuse == fuse)
+			return BIT(info->speedbins[i].speedbin);
+
+	return UINT_MAX;
+}
+
+/* Unlike a6xx_set_supported_hw, we don't need to handle softfuse quirks here */
+static int a5xx_set_supported_hw(struct device *dev, const struct adreno_info *info)
+{
+	u32 supp_hw;
+	u32 speedbin;
+	int ret;
+
+	ret = adreno_read_speedbin(dev, &speedbin);
+	/*
+	 * -ENOENT means that the platform doesn't support speedbin which is
+	 * fine
+	 */
+	if (ret == -ENOENT) {
+		return 0;
+	} else if (ret) {
+		return dev_err_probe(dev, ret,
+			"failed to read speed-bin. Some OPPs may not be supported by hardware\n");
+	}
+
+	supp_hw = fuse_to_supp_hw(info, speedbin);
+	dev_info(dev, "GPU speedbin fuse %d (0x%x), mapped to opp-supp-hw 0x%x\n",
+		speedbin, speedbin, supp_hw);
+
+	if (supp_hw == UINT_MAX) {
+		DRM_DEV_ERROR(dev,
+			"missing support for speed-bin: %u. Some OPPs may not be supported by hardware\n",
+			speedbin);
+		supp_hw = BIT(0); /* Default */
+	}
+
+	ret = devm_pm_opp_set_supported_hw(dev, &supp_hw, 1);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+
 static struct msm_gpu *a5xx_gpu_init(struct drm_device *dev)
 {
 	struct msm_drm_private *priv = dev->dev_private;
@@ -1744,7 +1795,24 @@ static struct msm_gpu *a5xx_gpu_init(struct drm_device *dev)
 
 	a5xx_gpu->lm_leakage = 0x4E001A;
 
-	check_speed_bin(&pdev->dev);
+	/*
+	 * The switch to a new method requires porting over affected device
+	 * trees (changing opp-supported-hw to use bits from ADRENO_SPEEDBINS).
+	 * Use the new method for those that were ported so far, while keeping
+	 * the old way (check_speed_bin) until the rest platforms (a530, a540)
+	 * are ported too.
+	 */
+	if (of_machine_is_compatible("qcom,sdm630") ||
+	    of_machine_is_compatible("qcom,sdm636") ||
+	    of_machine_is_compatible("qcom,sdm660")) {
+		ret = a5xx_set_supported_hw(&pdev->dev, config->info);
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to set opp-supported-hw: %d\n", ret);
+			return ERR_PTR(ret);
+		}
+	} else {
+		check_speed_bin(&pdev->dev);
+	}
 
 	nr_rings = 4;
 
