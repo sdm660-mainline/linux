@@ -1126,44 +1126,75 @@
 
 			gpu_sdm630_opp_table: opp-table {
 				compatible = "operating-points-v2";
+
+				/*
+				 * 775MHz is only available on default speed bin
+				 * or 162 (bit 3). Though it cannot be used for now
+				 * due to interconnect framework not supporting
+				 * multiple frequencies at the same opp-level.
+				 *
 				opp-775000000 {
 					opp-hz = /bits/ 64 <775000000>;
 					opp-level = <RPM_SMD_LEVEL_TURBO>;
 					opp-peak-kBps = <5412000>;
-					opp-supported-hw = <0xa2>;
+					opp-supported-hw = <0x8>;
+				}; */
+
+				/* bins 162, 146 -> bits 3, 2 */
+				opp-700000000 {
+					opp-hz = /bits/ 64 <700000000>;
+					opp-level = <RPM_SMD_LEVEL_TURBO>;
+					opp-peak-kBps = <5184000>;
+					opp-supported-hw = <0xc>;
 				};
+
+				/* bins 162, 146, 135 -> bits 3, 2, 1 */
 				opp-647000000 {
 					opp-hz = /bits/ 64 <647000000>;
 					opp-level = <RPM_SMD_LEVEL_NOM_PLUS>;
 					opp-peak-kBps = <4068000>;
-					opp-supported-hw = <0xff>;
+					opp-supported-hw = <0xe>;
 				};
+
+				/* 588 MHz and below are supported by all bins */
 				opp-588000000 {
 					opp-hz = /bits/ 64 <588000000>;
 					opp-level = <RPM_SMD_LEVEL_NOM>;
 					opp-peak-kBps = <3072000>;
 					opp-supported-hw = <0xff>;
 				};
+
 				opp-465000000 {
 					opp-hz = /bits/ 64 <465000000>;
 					opp-level = <RPM_SMD_LEVEL_SVS_PLUS>;
 					opp-peak-kBps = <2724000>;
 					opp-supported-hw = <0xff>;
 				};
+
 				opp-370000000 {
 					opp-hz = /bits/ 64 <370000000>;
 					opp-level = <RPM_SMD_LEVEL_SVS>;
 					opp-peak-kBps = <2188000>;
 					opp-supported-hw = <0xff>;
 				};
+
 				opp-240000000 {
 					opp-hz = /bits/ 64 <240000000>;
 					opp-level = <RPM_SMD_LEVEL_LOW_SVS>;
 					opp-peak-kBps = <1648000>;
 					opp-supported-hw = <0xff>;
 				};
+
 				opp-160000000 {
 					opp-hz = /bits/ 64 <160000000>;
+					opp-level = <RPM_SMD_LEVEL_MIN_SVS>;
+					opp-peak-kBps = <1200000>;
+					opp-supported-hw = <0xff>;
+				};
+
+				/* Idle, parented to gpucc_cxo */
+				opp-19200000 {
+					opp-hz = /bits/ 64 <19200000>;
 					opp-level = <RPM_SMD_LEVEL_MIN_SVS>;
 					opp-peak-kBps = <1200000>;
 					opp-supported-hw = <0xff>;
