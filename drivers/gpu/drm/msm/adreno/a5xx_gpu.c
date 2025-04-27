@@ -1773,7 +1773,24 @@ struct msm_gpu *a5xx_gpu_init(struct drm_device *dev)
 
 	a5xx_gpu->lm_leakage = 0x4E001A;
 
-	check_speed_bin(&pdev->dev);
+	/*
+	 * The switch to a new method requires porting over affected device
+	 * trees (changing opp-supported-hw to use bits from ADRENO_SPEEDBINS).
+	 * Use the new method for those that were ported so far, while keeping
+	 * the old way (check_speed_bin) until the rest platforms (a530, a540)
+	 * are ported too.
+	 */
+	if (of_machine_is_compatible("qcom,sdm630") ||
+	    of_machine_is_compatible("qcom,sdm636") ||
+	    of_machine_is_compatible("qcom,sdm660")) {
+		ret = adreno_set_supported_hw(&pdev->dev, config->info);
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to set opp-supported-hw: %d\n", ret);
+			return ERR_PTR(ret);
+		}
+	} else {
+		check_speed_bin(&pdev->dev);
+	}
 
 	nr_rings = 4;
 
