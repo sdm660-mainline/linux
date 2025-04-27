@@ -172,14 +172,6 @@
 
 &adreno_gpu {
 	status = "okay";
-
-	// These OPPs are correct, but we are lacking support for the
-	// GPU regulator. Hence, disable them for now to prevent the
-	// platform from hanging on high graphics loads
-	opp-table {
-		/delete-node/ opp-700000000;
-		/delete-node/ opp-266000000;
-	};
 };
 
 &adreno_gpu_zap {
