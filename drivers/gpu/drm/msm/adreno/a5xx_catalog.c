@@ -58,6 +58,12 @@ static const struct adreno_info a5xx_gpus[] = {
 		.quirks = ADRENO_QUIRK_LMLOADKILL_DISABLE,
 		.funcs = &a5xx_gpu_funcs,
 		.zapfw = "a508_zap.mdt",
+		.speedbins = ADRENO_SPEEDBINS(
+			{  0, 3}, /* default bin, same as 162 one */
+			{135, 1}, /* up to 647 MHz */
+			{146, 2}, /* up to 700 MHz */
+			{162, 3}, /* up to 775 MHz */
+		),
 	}, {
 		.chip_ids = ADRENO_CHIP_IDS(0x05000900),
 		.family = ADRENO_5XX,
@@ -76,6 +82,15 @@ static const struct adreno_info a5xx_gpus[] = {
 		.funcs = &a5xx_gpu_funcs,
 		/* Adreno 509 uses the same ZAP as 512 */
 		.zapfw = "a512_zap.mdt",
+		.speedbins = ADRENO_SPEEDBINS(
+			{  0, 6}, /* default bin, same as 157 one */
+			{ 78, 1}, /* up to 370 MHz */
+			{ 90, 2}, /* up to 430 MHz */
+			{122, 3}, /* up to 585 MHz */
+			{135, 4}, /* up to 647 MHz */
+			{146, 5}, /* up to 700 MHz */
+			{157, 6}, /* up to 750 MHz */
+		),
 	}, {
 		.chip_ids = ADRENO_CHIP_IDS(0x05010000),
 		.family = ADRENO_5XX,
@@ -108,6 +123,15 @@ static const struct adreno_info a5xx_gpus[] = {
 		.quirks = ADRENO_QUIRK_LMLOADKILL_DISABLE,
 		.funcs = &a5xx_gpu_funcs,
 		.zapfw = "a512_zap.mdt",
+		.speedbins = ADRENO_SPEEDBINS(
+			{  0, 6}, /* default bin, same as 157 one */
+			{ 78, 1}, /* up to 370 MHz */
+			{ 90, 2}, /* up to 430 MHz */
+			{122, 3}, /* up to 585 MHz */
+			{135, 4}, /* up to 647 MHz */
+			{146, 5}, /* up to 700 MHz */
+			{157, 6}, /* up to 750 MHz */
+		),
 	}, {
 		.chip_ids = ADRENO_CHIP_IDS(
 			0x05030002,
