@@ -49,14 +49,14 @@
 
 	status = "okay";
 
-	panel@0 {
+	panel: panel@0 {
 		compatible = "truly,td4322";
 		reg = <0>;
 
 		backlight = <&pm660l_wled>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
-		pinctrl-0 = <&panel_reset_gpio>;
+		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
 		pinctrl-names = "default";
 
 		port {
@@ -86,4 +86,18 @@
 
 	qcom,num-strings = <2>;
 	qcom,current-limit-microamp = <17500>;
+};
+
+/* Identifies itself as Synaptics TD4322Test */
+&touchscreen {
+	/*
+	 * No reset GPIO for touch anywhere, neither in downstream DTB node,
+	 * nor in Xperia XA2 schematics. Use the same GPIO_53 as panel.
+	 * This makes it go through kernel's shared GPIO facility and probe
+	 * fine every time in predictable order.
+	 */
+	reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+
+	/* This might be common for all nile devices, not only pioneer */
+	vio-supply = <&vreg_l11a_1p8>;
 };
