@@ -49,14 +49,14 @@
 
 	status = "okay";
 
-	panel@0 {
+	panel: panel@0 {
 		compatible = "truly,td4322";
 		reg = <0>;
 
 		backlight = <&pm660l_wled>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
-		pinctrl-0 = <&panel_reset_gpio>;
+		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
 		pinctrl-names = "default";
 
 		port {
@@ -86,4 +86,13 @@
 
 	qcom,num-strings = <2>;
 	qcom,current-limit-microamp = <17500>;
+};
+
+/* Identifies itself as Synaptics TD4322Test */
+&touchscreen {
+	/*
+	 * Due to how fw_devlink works, abuse follower API to make touch probe
+	 * after panel, so that panel resets the gpio first, otherwise it fails
+	 */
+	panel = <&panel>;
 };
