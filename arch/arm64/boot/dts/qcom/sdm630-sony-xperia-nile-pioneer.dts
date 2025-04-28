@@ -49,14 +49,14 @@
 
 	status = "okay";
 
-	panel@0 {
+	panel: panel@0 {
 		compatible = "truly,td4322";
 		reg = <0>;
 
 		backlight = <&pm660l_wled>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
-		pinctrl-0 = <&panel_reset_gpio>;
+		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
 		pinctrl-names = "default";
 
 		port {
@@ -86,4 +86,18 @@
 
 	qcom,num-strings = <2>;
 	qcom,current-limit-microamp = <17500>;
+};
+
+/* Identifies itself as Synaptics TD4322Test */
+&touchscreen {
+	/*
+	 * Because synaptics driver doesn't support reset-gpio,
+	 * we need to delay initialization of rmi_i2c driver
+	 * long enough until display subsystem probes and flips
+	 * gpio53.
+	 */
+	syna,startup-delay-ms = <600>;
+
+	/* This might be common for all nile devices, not only pioneer */
+	vio-supply = <&vreg_l11a_1p8>;
 };
