@@ -14,7 +14,6 @@
 #include <linux/workqueue.h>
 #include <trace/events/sock.h>
 #include <linux/soc/qcom/qmi.h>
-#include <linux/soc/qcom/qrtr.h>
 
 static struct socket *qmi_sock_create(struct qmi_handle *qmi,
 				      struct sockaddr_qrtr *sq);
@@ -174,7 +173,7 @@ static void qmi_send_new_lookup(struct qmi_handle *qmi, struct qmi_service *svc)
 	memset(&pkt, 0, sizeof(pkt));
 	pkt.cmd = cpu_to_le32(QRTR_TYPE_NEW_LOOKUP);
 	pkt.server.service = cpu_to_le32(svc->service);
-	pkt.server.instance = cpu_to_le32(QRTR_INSTANCE(svc->version, svc->instance));
+	pkt.server.instance = cpu_to_le32(svc->version | svc->instance << 8);
 
 	sq.sq_family = qmi->sq.sq_family;
 	sq.sq_node = qmi->sq.sq_node;
@@ -237,7 +236,7 @@ static void qmi_send_new_server(struct qmi_handle *qmi, struct qmi_service *svc)
 	memset(&pkt, 0, sizeof(pkt));
 	pkt.cmd = cpu_to_le32(QRTR_TYPE_NEW_SERVER);
 	pkt.server.service = cpu_to_le32(svc->service);
-	pkt.server.instance = cpu_to_le32(QRTR_INSTANCE(svc->version, svc->instance));
+	pkt.server.instance = cpu_to_le32(svc->version | svc->instance << 8);
 	pkt.server.node = cpu_to_le32(qmi->sq.sq_node);
 	pkt.server.port = cpu_to_le32(qmi->sq.sq_port);
 
