@@ -280,9 +280,5 @@ int main(void)
 	DEVID(coreboot_device_id);
 	DEVID_FIELD(coreboot_device_id, tag);
 
-	DEVID(qrtr_device_id);
-	DEVID_FIELD(qrtr_device_id, service);
-	DEVID_FIELD(qrtr_device_id, instance);
-
 	return 0;
 }
