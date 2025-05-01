@@ -138,7 +138,21 @@ reset_set(void *data, u64 val)
 	return 0;
 }
 
+static int speedbin_get(void *data, u64 *val)
+{
+	struct drm_device *dev = data;
+	struct msm_drm_private *priv = dev->dev_private;
+	struct msm_gpu *gpu = priv->gpu;
+	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+
+	if (val)
+		*val = adreno_gpu->speedbin;
+
+	return 0;
+}
+
 DEFINE_DEBUGFS_ATTRIBUTE(reset_fops, NULL, reset_set, "%llx\n");
+DEFINE_DEBUGFS_ATTRIBUTE(speedbin_fops, speedbin_get, NULL, "%llu\n");
 
 
 void a5xx_debugfs_init(struct msm_gpu *gpu, struct drm_minor *minor)
@@ -156,4 +170,6 @@ void a5xx_debugfs_init(struct msm_gpu *gpu, struct drm_minor *minor)
 
 	debugfs_create_file_unsafe("reset", S_IWUGO, minor->debugfs_root, dev,
 				&reset_fops);
+	debugfs_create_file_unsafe("speedbin", S_IRUGO, minor->debugfs_root, dev,
+				&speedbin_fops);
 }
