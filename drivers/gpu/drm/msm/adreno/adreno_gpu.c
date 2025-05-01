@@ -1171,6 +1171,8 @@ int adreno_set_supported_hw(struct device *dev, const struct adreno_info *info)
 	}
 
 	supp_hw = fuse_to_supp_hw(info, speedbin);
+	dev_info(dev, "GPU speedbin fuse %d (0x%x), mapped to opp-supp-hw 0x%x\n",
+		 speedbin, speedbin, supp_hw);
 
 	if (supp_hw == UINT_MAX) {
 		DRM_DEV_ERROR(dev,
