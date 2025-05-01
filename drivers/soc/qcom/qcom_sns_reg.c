@@ -15,6 +15,7 @@
 #include <linux/of.h>
 #include <linux/refcount.h>
 #include <linux/remoteproc/qcom_rproc.h>
+#include <linux/slab.h>
 #include <linux/soc/qcom/qmi.h>
 #include <linux/workqueue.h>
 
