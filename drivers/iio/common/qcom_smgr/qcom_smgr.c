@@ -550,7 +550,7 @@ static int qcom_smgr_probe(struct qrtr_device *qdev)
 			smgr->sensors[i].data_types->cur_sample_rate =
 				smgr->sensors[i].data_types->max_sample_rate;
 
-			dev_dbg(smgr->dev, "0x%02x,%d: %s %s\n",
+			dev_info(smgr->dev, "0x%02x,%d: %s %s\n",
 				smgr->sensors[i].id, j,
 				smgr->sensors[i].data_types[j].vendor,
 				smgr->sensors[i].data_types[j].name);
