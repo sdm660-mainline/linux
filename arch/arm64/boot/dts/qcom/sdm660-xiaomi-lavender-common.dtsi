@@ -577,14 +577,14 @@
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 
-	mdss_dsi_active: mdss_dsi_active {
+	mdss_dsi_active: mdss_dsi_active-state {
 		function = "gpio";
 		pins = "gpio53";
 		drive-strength = <8>;
 		bias-disable;
 	};
 
-	mdss_te_active: mdss_te_active {
+	mdss_te_active: mdss_te_active-state {
 		pins = "gpio59";
 		function = "mdp_vsync";
 		drive-strength = <2>;
