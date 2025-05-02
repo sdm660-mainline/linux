@@ -198,7 +198,9 @@ patternProperties:
 
   "^vibrator@[0-9a-f]+$":
     type: object
-    $ref: /schemas/input/qcom,pm8xxx-vib.yaml#
+    oneOf:
+      - $ref: /schemas/input/qcom,spmi-haptics.yaml#
+      - $ref: /schemas/input/qcom,pm8xxx-vib.yaml#
 
   "^mpps@[0-9a-f]+$":
     type: object
