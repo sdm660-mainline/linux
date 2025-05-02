@@ -32,6 +32,6 @@ jobs:
           python3 -m venv venv_dtschema
           . venv_dtschema/bin/activate
           pip3 install dtschema
-          make O=build-dtbs-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CHECK_DTBS=y qcom/sdm630-*.dtb qcom/sdm636-*.dtb qcom/sdm660-*.dtb
+          make O=build-dtbs-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CHECK_DTBS=y qcom/sdm630-*.dtb qcom/sdm636-*.dtb qcom/sdm660-*.dtb qcom/sda660-*.dtb
           deactivate
           rm -r venv_dtschema
