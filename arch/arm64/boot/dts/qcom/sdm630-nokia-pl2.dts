@@ -194,6 +194,7 @@
 		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
 		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
 		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
+		vddio-supply = <&vreg_l13a_1p8>;
 		max-speed = <3200000>;
 	};
 };
@@ -210,7 +211,7 @@
 	status = "okay";
 
 	touchscreen@38 {
-		compatible = "edt,edt-ft5406", "edt,edt-ft5x06";
+		compatible = "edt,edt-ft5406";
 		reg = <0x38>;
 		vcc-supply = <&vreg_l11a_1p8>;
 		pinctrl-0 = <&ts_int_active &ts_rst>;
