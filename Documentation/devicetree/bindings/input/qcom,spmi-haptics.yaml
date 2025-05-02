@@ -23,6 +23,7 @@ properties:
           - qcom,pmi8998-haptics
           - qcom,pmi8996-haptics
           - qcom,pmi8941-haptics
+      - const: qcom,spmi-haptics
 
   reg:
     maxItems: 1
@@ -73,7 +74,6 @@ properties:
     description: |
       Wave sample durection in microseconds, 1/f where f
       is the resonant frequency of the actuator.
-    $ref: /schemas/types.yaml#/definitions/uint32
     minimum: 0
     maximum: 20475
 
