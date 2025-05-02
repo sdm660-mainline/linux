@@ -938,6 +938,7 @@ properties:
               - xiaomi,tulip
               - xiaomi,whyred-shenchao
               - xiaomi,whyred-tianma
+              - motorola,beckham
           - const: qcom,sdm636
 
       - items:
