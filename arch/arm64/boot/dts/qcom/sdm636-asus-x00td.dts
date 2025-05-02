@@ -196,6 +196,7 @@
 		vddxo-supply = <&vreg_l9a_1p8>;
 		vddrf-supply = <&vreg_l6a_1p3>;
 		vddch0-supply = <&vreg_l19a_3p3>;
+		vddio-supply = <&vreg_l13a_1p8>;
 		max-speed = <3200000>;
 	};
 };
@@ -228,10 +229,7 @@
 &blsp_i2c6 {
 	status = "okay";
 
-	tfa98xx@34 {
-		compatible = "nxp,tfa98xx";
-		reg = <0x34>;
-	};
+	/* tfa98xx@34 */
 };
 
 &blsp_i2c7 { /* for P/L Sensor */
@@ -317,6 +315,7 @@
 
 &qusb2phy0 {
 	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 
 	status = "okay";
