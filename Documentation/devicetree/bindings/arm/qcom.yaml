@@ -897,6 +897,7 @@ properties:
               - asus,x00td
               - xiaomi,tulip
               - xiaomi,whyred
+              - motorola,beckham
           - const: qcom,sdm636
 
       - items:
