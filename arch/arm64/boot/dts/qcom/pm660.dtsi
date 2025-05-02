@@ -233,7 +233,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		pm660_haptics: haptics@c000 {
+		pm660_haptics: vibrator@c000 {
 			compatible = "qcom,pmi8998-haptics", "qcom,spmi-haptics";
 			reg = <0xc000>;
 
