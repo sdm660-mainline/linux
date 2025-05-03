@@ -43,6 +43,7 @@ static int truly_td4322_on(struct truly_td4322 *ctx)
 	mipi_dsi_generic_write_seq(dsi, 0xb0, 0x00);
 	mipi_dsi_generic_write_seq(dsi, 0xd5,
 				   0x03, 0x00, 0x00, 0x02, 0x23, 0x02, 0x23);
+	mipi_dsi_dcs_set_tear_on(dsi, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
 
 	ret = mipi_dsi_dcs_set_display_on(dsi);
 	if (ret < 0) {
