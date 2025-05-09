@@ -51,6 +51,7 @@ obj-$(CONFIG_DRM_PANEL_NOVATEK_NT35560) += panel-novatek-nt35560.o
 obj-$(CONFIG_DRM_PANEL_NOVATEK_NT35950) += panel-novatek-nt35950.o
 obj-$(CONFIG_DRM_PANEL_NOVATEK_NT36523) += panel-novatek-nt36523.o
 obj-$(CONFIG_DRM_PANEL_NOVATEK_NT36672A) += panel-novatek-nt36672a.o
+obj-$(CONFIG_DRM_PANEL_NOVATEK_NT36672A_TIANMAPLUS) += panel-nt36672a-tianmaplus.o
 obj-$(CONFIG_DRM_PANEL_NOVATEK_NT36672E) += panel-novatek-nt36672e.o
 obj-$(CONFIG_DRM_PANEL_NOVATEK_NT36672_TIANMA_JASMINE) += panel-novatek-nt36672-tianma-jasmine.o
 obj-$(CONFIG_DRM_PANEL_NOVATEK_NT36672_TXD) += panel-novatek-nt36672-txd.o
