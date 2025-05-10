@@ -307,6 +307,7 @@
 			regulator-max-microvolt = <1950000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
+			regulator-system-load = <14000>;
 		};
 
 		vreg_l11a_1p8: l11 {
