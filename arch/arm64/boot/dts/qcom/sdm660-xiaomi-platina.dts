@@ -573,6 +573,7 @@
 			regulator-enable-ramp-delay = <250>;
 			regulator-ramp-delay = <0>;
 			regulator-allow-set-load;
+			regulator-system-load = <14000>;
 		};
 
 		vreg_l11a_1p8: l11 {
