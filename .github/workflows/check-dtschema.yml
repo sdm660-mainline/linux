@@ -8,8 +8,8 @@ on:
     tags:
       - v*-sdm660
 jobs:
-  check-dbts:
-    runs-on: ubuntu-22.04
+  dbts-check:
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +32,12 @@ jobs:
           python3 -m venv venv_dtschema
           . venv_dtschema/bin/activate
           pip3 install dtschema
-          make O=build-dtbs-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CHECK_DTBS=y qcom/sdm630-*.dtb qcom/sdm636-*.dtb qcom/sdm660-*.dtb qcom/sda660-*.dtb
+          make O=build-dtbs-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j1 CHECK_DTBS=y \
+              qcom/sdm630-*.dtb qcom/sdm636-*.dtb qcom/sdm660-*.dtb qcom/sda660-*.dtb 2>&1 | \
+              tee build-dtbs-check/results.txt
           deactivate
           rm -r venv_dtschema
+      - name: Analyze results
+        continue-on-error: true
+        run: |
+          python3 .github/workflows/analyze_dtbs_check.py build-dtbs-check/results.txt
