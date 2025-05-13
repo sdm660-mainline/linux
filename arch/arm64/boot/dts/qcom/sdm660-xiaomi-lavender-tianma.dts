@@ -35,8 +35,8 @@
 };
 
 &panel {
-	compatible = "mdss,nt36672a-tianmaplus";
-	iovcc-supply = <&vreg_l11a_1p8>;
+	compatible = "tianma,nt36672a-xiaomi-lavender";
+	vddio-supply = <&vreg_l11a_1p8>;
 	// There is no lcdb driver yet
 	// vsn-supply = <>;
 	// vsp-supply = <>
