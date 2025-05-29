@@ -15,24 +15,29 @@
 &blsp_i2c1 {
 	status = "okay";
 
-	/* Novatek NT36672A touchscreen */
-	touchscreen@62 {
-		compatible = "novatek,nt36525";
-		reg = <0x62>;
-		vdd-supply = <&vreg_l11a_1p8>;
-		interrupt-parent = <&tlmm>;
-		interrupts = <67 IRQ_TYPE_EDGE_RISING>;
+	touchscreen@1 {
+		compatible = "novatek,nt36672a-ts";
+		reg = <0x1>;
+
+		iovcc-supply = <&vreg_l11a_1p8>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_RISING>;
+
+		panel = <&panel>;
+
 		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&ts_pins_active>;
 		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
-		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <2340>;
 	};
 };
 
 &panel {
-	compatible = "tianma,nt36672a-xiaomi-lavender-simple";
+	compatible = "tianma,tl063fvmca01-00", "novatek,nt36672a";
+	vddio-supply = <&vreg_l11a_1p8>;
 };
 
 &tlmm {
