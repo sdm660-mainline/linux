@@ -444,8 +444,17 @@ static int tianma_lavender_init_cmds(struct drm_panel *panel)
 
 	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xb0, 0x01);
 	mipi_dsi_dcs_set_tear_on_multi(&dsi_ctx, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
-	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x68, 0x03, 0x04);
-	mipi_dsi_dcs_set_display_brightness_multi(&dsi_ctx, 0x00b8);
+
+	if (of_device_is_compatible(dev_of_node(&pinfo->link->dev),
+				    "novatek,nt36672a-tianma-lavender")) {
+		/* lavender specific part */
+		mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x68, 0x03, 0x04);
+		mipi_dsi_dcs_set_display_brightness_multi(&dsi_ctx, 0x00b8);
+	} else {
+		/* tulip specific part */
+		mipi_dsi_dcs_set_display_brightness_multi(&dsi_ctx, 0x00ff);
+	}
+
 	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_WRITE_CONTROL_DISPLAY, 0x2c);
 	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_WRITE_POWER_SAVE, 0x00);
 
@@ -707,6 +716,40 @@ static const struct nt36672a_panel_desc tianma_jasmine_panel_desc = {
 	.off_cmds = tianma_lavender_off_cmds,
 };
 
+static const struct drm_display_mode tianmaplus_e7t_tulip_mode = {
+	.clock		= (1080 + 100 + 28 + 120) * (2280 + 10 + 3 + 8) * 60 / 1000,
+	.hdisplay	= 1080,
+	.hsync_start	= 1080 + 100,
+	.hsync_end	= 1080 + 100 + 28,
+	.htotal		= 1080 + 100 + 28 + 120,
+
+	.vdisplay	= 2280,
+	.vsync_start	= 2280 + 10,
+	.vsync_end	= 2280 + 10 + 3,
+	.vtotal		= 2280 + 10 + 3 + 8,
+
+	.width_mm = 68,
+	.height_mm = 143,
+	.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+};
+
+static const struct nt36672a_panel_desc tianmaplus_e7t_tulip_panel_desc = {
+	.display_mode = &tianmaplus_e7t_tulip_mode,
+
+	.width_mm = 68,
+	.height_mm = 143,
+
+	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+			MIPI_DSI_CLOCK_NON_CONTINUOUS,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+	.reset_gpio_flags = GPIOD_OUT_HIGH,
+
+	/* tulip panel uses almost the same init/off sequences as lavender */
+	.init_cmds = tianma_lavender_init_cmds,
+	.off_cmds = tianma_lavender_off_cmds,
+};
+
 static int nt36672a_panel_add(struct nt36672a_panel *pinfo)
 {
 	struct device *dev = &pinfo->link->dev;
@@ -787,6 +830,7 @@ static const struct of_device_id panel_nt36672a_match[] = {
 	{ .compatible = "tianma,fhd-video", .data = &tianma_fhd_video_panel_desc },
 	{ .compatible = "tianma,tl060fvxs16-00", .data = &tianma_jasmine_panel_desc },
 	{ .compatible = "tianma,tl063fvmca01-00", .data = &tianma_lavender_panel_desc },
+	{ .compatible = "tianma,tl063fvmc43-02", .data = &tianmaplus_e7t_tulip_panel_desc },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, panel_nt36672a_match);
