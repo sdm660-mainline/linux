@@ -55,7 +55,12 @@ static int qcom_smgr_register_sensor(struct qcom_smgr *smgr,
 				     struct qcom_smgr_sensor *sensor)
 {
 	struct platform_device *pdev;
-	const char *name = qcom_smgr_sensor_type_platform_names[sensor->type];
+	const char *name;
+
+	if (sensor->type == SNS_SMGR_SENSOR_TYPE_UNKNOWN)
+		return -ENODEV;
+
+	name = qcom_smgr_sensor_type_platform_names[sensor->type];
 
 	pdev = platform_device_register_data(smgr->dev, name, sensor->id,
 					     &sensor, sizeof(sensor));
