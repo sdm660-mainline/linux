@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2025, Paul Sajna <hello@paulsajna.com>
+ */
+
+/*
+ * There are two variants of bbry-athena, one with synaptics panel and one with boe panel.
+ * Currently only boe panel is supported
+ */
+
+/dts-v1/;
+
+#include "sdm660.dtsi"
+#include "sdm660-bbry-common.dtsi"
+
+/ {
+	model = "BlackBerry KEY2";
+	chassis-type = "handset";
+};
+
+&adreno_gpu_zap {
+	firmware-name = "qcom/sdm660/athena/a512_zap.mbn";
+};
+
+&adsp_pil {
+	firmware-name = "qcom/sdm660/athena/adsp.mbn";
+};
+
+&remoteproc_mss {
+	firmware-name = "qcom/sdm660/athena/mba.mbn", "qcom/sdm660/athena/modem.mbn";
+};
+
+&venus {
+	firmware-name = "qcom/sdm660/athena/venus.mbn";
+};
+
+&wifi {
+	qcom,ath10k-calibration-variant = "bbry_athena";
+};
