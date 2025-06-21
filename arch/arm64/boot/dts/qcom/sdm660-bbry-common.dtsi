@@ -1,0 +1,758 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2025, Paul Sajna <hello@paulsajna.com>
+ */
+
+/*
+ * Common devicetree for bbry-athena and bbry-luna
+ */
+
+#include "pm660.dtsi"
+#include "pm660l.dtsi"
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/input/gpio-keys.h>
+
+/delete-node/ &qhee_code;
+/delete-node/ &tz_mem;
+/delete-node/ &zap_shader_region;
+/delete-node/ &rmtfs_mem;
+
+/ {
+	aliases {
+		i2c1 = &blsp_i2c1;
+		i2c2 = &blsp_i2c2;
+		i2c4 = &blsp_i2c4;
+		i2c6 = &blsp_i2c6;
+	};
+
+	chosen {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		stdout-path = "framebuffer0";
+
+		framebuffer0: framebuffer@9d400000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0x9d400000 0x0 (1080 * 1620 * 4)>;
+			status = "okay";
+			width = <1080>;
+			height = <1620>;
+			stride = <(1080 * 4)>;
+			format = "a8r8g8b8";
+
+			/*
+			* Prevent unused clocks and power domains from being disabled. It's
+			* needed to keep bootloader-enabled display stack (and therefore
+			* framebuffer) working. So we can boot with simplefb without
+			* clk_ignore_unused pd_ignore_unused.
+			*/
+			assigned-clocks = <&mmcc MDSS_MDP_CLK>, /* from mdp */
+					<&mmcc MDSS_VSYNC_CLK>;
+			assigned-clock-rates = <300000000>,
+					<19200000>;
+			clocks = <&mmcc MDSS_AHB_CLK>, /* from mdss & mdp */
+				<&mmcc MDSS_AXI_CLK>,
+				<&mmcc MDSS_VSYNC_CLK>,
+				<&mmcc MDSS_MDP_CLK>,
+				<&mmcc BYTE0_CLK_SRC>, /* from mdss_dsi0 */
+				<&mmcc PCLK0_CLK_SRC>,
+				<&mmcc MDSS_BYTE0_CLK>,
+				<&mmcc MDSS_BYTE0_INTF_CLK>,
+				<&mmcc MNOC_AHB_CLK>,
+				<&mmcc MISC_AHB_CLK>,
+				<&mmcc MDSS_PCLK0_CLK>,
+				<&mmcc MDSS_ESC0_CLK>;
+
+			power-domains = <&rpmpd SDM660_VDDCX>, <&mmcc MDSS_GDSC>;
+
+			/* In order to allow simpledrm framebuffer to know
+			 * physical dimensions */
+			panel = <&fb_panel>;
+
+			fb_panel: fb-panel {
+				width-mm = <63>;
+				height-mm = <95>;
+			};
+		};
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+
+		key-vol-up {
+			label = "Volume Up";
+			gpios = <&pm660l_gpios 0x07 0x01>;
+			linux,code = <KEY_VOLUMEUP>;
+			debounce-interval = <15>;
+		};
+
+		conven-key {
+			label = "conven-key";
+			gpios = <&tlmm 0x71 0x01>;
+			linux,code = <KEY_MEDIA>;
+			debounce-interval = <15>;
+		};
+	};
+
+	/* Dummy regulator until PM6660 has LCDB VSP/VSN support */
+	lcdb_dummy: regulator-lcdb-dummy {
+		compatible = "regulator-fixed";
+		regulator-name = "lcdb_dummy";
+		regulator-min-microvolt = <5500000>;
+		regulator-max-microvolt = <5500000>;
+	};
+
+	reserved-memory {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		ranges;
+
+		framebuffer_mem: memory@9d400000 {
+			reg = <0x0 0x9d400000 0x0 (1080 * 1620 * 4)>;
+			no-map;
+		};
+
+		zap_shader_region: gpu-zap-mem@fe000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xfe000000 0x0 0x2000>;
+			no-map;
+		};
+
+		venus_fw_region {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x80000000 0x00 0x20000000>;
+			reusable;
+			alignment = <0x00 0x400000>;
+			size = <0x00 0x800000>;
+		};
+
+		adsp_fw_region {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			reusable;
+			alignment = <0x00 0x400000>;
+			size = <0x00 0x800000>;
+		};
+
+		qseecom_region {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			reusable;
+			alignment = <0x00 0x400000>;
+			size = <0x00 0x1c00000>;
+		};
+
+		secure_region {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			reusable;
+			alignment = <0x00 0x400000>;
+			size = <0x00 0x5c00000>;
+		};
+
+		linux,cma {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			reusable;
+			alignment = <0x00 0x400000>;
+			size = <0x00 0x2c00000>;
+			linux,cma-default;
+		};
+
+		rmtfs_mem: memory@fdc00000 {
+			compatible = "qcom,rmtfs-mem";
+			reg = <0x0 0xfdc00000 0x0 0x400000>;
+			no-map;
+
+			qcom,client-id = <1>;
+			qcom,vmid = <QCOM_SCM_VMID_MSS_MSA>;
+		};
+	};
+
+	vph_pwr: vph-pwr-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vph_pwr";
+		regulator-min-microvolt = <3700000>;
+		regulator-max-microvolt = <3700000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <3000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4350000>;
+	};
+
+	keypad_vdd_vreg: keypad-vdd-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "keypad_vdd_vreg";
+		gpio = <&tlmm 42 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_s4a_2p04>;
+
+		pinctrl-0 = <&keypad_pwr_en>;
+		pinctrl-names = "default";
+	};
+};
+
+
+&pon_pwrkey {
+	status = "okay";
+};
+
+&pon_resin {
+	linux,code = <KEY_VOLUMEDOWN>;
+
+	status = "okay";
+};
+
+&adreno_gpu {
+	status = "okay";
+};
+
+&adreno_gpu_zap {
+	memory-region = <&zap_shader_region>;
+
+	status = "okay";
+};
+
+&adsp_pil {
+	status = "okay";
+};
+
+&blsp2_uart1 {
+	status = "okay";
+
+	/* HCI Bluetooth */
+	bluetooth {
+		compatible = "qcom,wcn3990-bt";
+		vddxo-supply = <&vreg_l9a_1p8>;
+		vddrf-supply = <&vreg_l6a_1p3>;
+		vddch0-supply = <&vreg_l3b_3p3>;
+		vddio-supply = <&vreg_l9a_1p8>;
+		max-speed = <3200000>;
+		firmware-name = "crnv21.bin";
+	};
+};
+
+&blsp1_uart2 {
+	status = "okay";
+};
+
+
+&blsp_i2c1 {
+	status = "okay";
+
+	stmpe1801: port-expander@40
+	{
+		compatible = "st,stmpe1801";
+		reg = <0x40>;
+		vcc-supply = <&keypad_vdd_vreg>;
+		vio-supply = <&keypad_vdd_vreg>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&keypad_int_active &keypad_reset_active>;
+		wakeup-source;
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
+
+		keyboard-controller {
+			compatible="st,stmpe-keypad";
+			st,scan-count = <2>;
+			debounce-interval = <10>;
+			keypad,num-rows = <8>;
+			keypad,num-columns = <8>;
+
+			linux,keymap = <
+				/* Row 1 */
+				MATRIX_KEY(3, 1, KEY_Q)
+				MATRIX_KEY(3, 7, KEY_W)
+				MATRIX_KEY(4, 1, KEY_E)
+				MATRIX_KEY(5, 1, KEY_R)
+				MATRIX_KEY(5, 4, KEY_T)
+				MATRIX_KEY(6, 4, KEY_Y)
+				MATRIX_KEY(6, 1, KEY_U)
+				MATRIX_KEY(7, 4, KEY_I)
+				MATRIX_KEY(7, 1, KEY_O)
+				MATRIX_KEY(4, 2, KEY_P)
+				/* Row 2 */
+				MATRIX_KEY(3, 4, KEY_A)
+				MATRIX_KEY(4, 7, KEY_S)
+				MATRIX_KEY(4, 4, KEY_D)
+				MATRIX_KEY(5, 5, KEY_F)
+				MATRIX_KEY(5, 7, KEY_G)
+				MATRIX_KEY(6, 7, KEY_H)
+				MATRIX_KEY(6, 5, KEY_J)
+				MATRIX_KEY(7, 5, KEY_K)
+				MATRIX_KEY(7, 7, KEY_L)
+				MATRIX_KEY(7, 2, KEY_BACKSPACE)
+				/* Row 3 */
+				MATRIX_KEY(3, 6, KEY_LEFTALT)
+				MATRIX_KEY(4, 0, KEY_Z)
+				MATRIX_KEY(4, 6, KEY_X)
+				MATRIX_KEY(5, 0, KEY_C)
+				MATRIX_KEY(5, 6, KEY_V)
+				MATRIX_KEY(6, 6, KEY_B)
+				MATRIX_KEY(6, 0, KEY_N)
+				MATRIX_KEY(7, 0, KEY_M)
+				MATRIX_KEY(7, 6, KEY_DOLLAR)
+				MATRIX_KEY(6, 2, KEY_ENTER)
+				/* Row 4 */
+				MATRIX_KEY(4, 5, KEY_LEFTSHIFT)
+				MATRIX_KEY(3, 5, KEY_DICTATE)
+				MATRIX_KEY(3, 0, KEY_SPACE)
+				MATRIX_KEY(3, 2, KEY_RIGHTALT)
+				MATRIX_KEY(5, 2, KEY_RIGHTMETA)
+			>;
+		};
+	};
+};
+
+&blsp_i2c4 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	status = "okay";
+
+	/* Focaltech ft8707 */
+	touchscreen@38 {
+		compatible = "focaltech,ft8719";
+		reg = <0x38>;
+		pinctrl-0 = <&ts_int_active &ts_reset_active>;
+		pinctrl-1 = <&ts_int_sleep &ts_reset_sleep>;
+		pinctrl-names = "default", "sleep";
+		interrupt-parent = <&tlmm>;
+		interrupts = <67 IRQ_TYPE_EDGE_FALLING>;
+		vcc-supply = <&vreg_l3b_3p3>;
+		iovcc-supply = <&vreg_l9a_1p8>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <1620>;
+		wakeup-source;
+	};
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+
+	status = "okay";
+
+
+	panel: panel@0 {
+		reg = <0>;
+
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		backlight = <&pm660l_wled>;
+		width-mm = <63>;
+		height-mm = <95>;
+
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+		pinctrl-1 = <&mdss_dsi_sleep &mdss_te_sleep>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+
+	status = "okay";
+};
+
+&mmss_smmu {
+	status = "okay";
+};
+
+&pm660_charger {
+	monitored-battery = <&battery>;
+
+	status = "okay";
+};
+
+&pm660_fg {
+	monitored-battery = <&battery>;
+	power-supplies = <&pm660_charger>;
+
+	status = "okay";
+};
+
+&pm660_haptics {
+	status = "okay";
+};
+
+&pm660_rradc {
+	status = "okay";
+};
+
+&pm660l_wled {
+	default-brightness = <512>;
+
+	status = "okay";
+};
+
+&pon_pwrkey {
+	status = "okay";
+};
+
+&qusb2phy0 {
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l9a_1p8>;
+	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
+
+	status = "okay";
+};
+
+&remoteproc_mss {
+	status = "okay";
+};
+
+&rpm_requests {
+	regulators-0 {
+		compatible = "qcom,rpm-pm660-regulators";
+
+		vdd_s1-supply = <&vph_pwr>;
+		vdd_s2-supply = <&vph_pwr>;
+		vdd_s3-supply = <&vph_pwr>;
+		vdd_s4-supply = <&vph_pwr>;
+		vdd_s5-supply = <&vph_pwr>;
+		vdd_s6-supply = <&vph_pwr>;
+
+		vdd_l1_l6_l7-supply = <&vreg_s5a_1p35>;
+		vdd_l2_l3-supply = <&vreg_s2b_1p05>;
+		vdd_l5-supply = <&vreg_s2b_1p05>;
+		vdd_l8_l9_l10_l11_l12_l13_l14-supply = <&vreg_s4a_2p04>;
+		vdd_l15_l16_l17_l18_l19-supply = <&vreg_bob>;
+
+		/*
+		 * S1A (FTAPC0), S2A (FTAPC1), S3A (HFAPC1) are managed
+		 * by the Core Power Reduction hardened (CPRh) and the
+		 * Operating State Manager (OSM) HW automatically.
+		 */
+
+		vreg_s4a_2p04: s4 {
+			regulator-min-microvolt = <1805000>;
+			regulator-max-microvolt = <2040000>;
+			regulator-enable-ramp-delay = <200>;
+			regulator-always-on;
+		};
+
+		vreg_s5a_1p35: s5 {
+			regulator-min-microvolt = <1224000>;
+			regulator-max-microvolt = <1350000>;
+			regulator-enable-ramp-delay = <200>;
+		};
+
+		vreg_s6a_0p87: s6 {
+			regulator-min-microvolt = <504000>;
+			regulator-max-microvolt = <992000>;
+			regulator-enable-ramp-delay = <150>;
+		};
+
+		/* LDOs */
+		vreg_l1a_1p225: l1 {
+			regulator-min-microvolt = <1150000>;
+			regulator-max-microvolt = <1250000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l2a_1p0: l2 {
+			regulator-min-microvolt = <950000>;
+			regulator-max-microvolt = <1010000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l3a_1p0: l3 {
+			regulator-min-microvolt = <950000>;
+			regulator-max-microvolt = <1010000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l5a_0p848: l5 {
+			regulator-min-microvolt = <525000>;
+			regulator-max-microvolt = <950000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l6a_1p3: l6 {
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1370000>;
+			regulator-allow-set-load;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l7a_1p2: l7 {
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1200000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l8a_1p8: l8 {
+			regulator-min-microvolt = <1750000>;
+			regulator-max-microvolt = <1900000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-system-load = <325000>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l9a_1p8: l9 {
+			regulator-min-microvolt = <1750000>;
+			regulator-max-microvolt = <1900000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+	};
+
+	regulators-1 {
+		compatible = "qcom,rpm-pm660l-regulators";
+
+		vdd_s1-supply = <&vph_pwr>;
+		vdd_s2-supply = <&vph_pwr>;
+		vdd_s3_s4-supply = <&vph_pwr>;
+		vdd_s5-supply = <&vph_pwr>;
+		vdd_s6-supply = <&vph_pwr>;
+
+		vdd_l1_l9_l10-supply = <&vreg_s2b_1p05>;
+		vdd_l2-supply = <&vreg_bob>;
+		vdd_l3_l5_l7_l8-supply = <&vreg_bob>;
+		vdd_l4_l6-supply = <&vreg_bob>;
+		vdd_bob-supply = <&vph_pwr>;
+
+		vreg_bob: bob {
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3600000>;
+			regulator-enable-ramp-delay = <500>;
+		};
+
+		vreg_s1b_1p125: s1 {
+			regulator-min-microvolt = <1125000>;
+			regulator-max-microvolt = <1125000>;
+			regulator-enable-ramp-delay = <200>;
+		};
+
+		vreg_s2b_1p05: s2 {
+			regulator-min-microvolt = <1050000>;
+			regulator-max-microvolt = <1050000>;
+			regulator-enable-ramp-delay = <200>;
+		};
+
+		/* LDOs */
+		vreg_l1b_0p925: l1 {
+			regulator-min-microvolt = <800000>;
+			regulator-max-microvolt = <925000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		/* SDHCI 3.3V signal doesn't seem to be supported. */
+		vreg_l2b_2p95: l2 {
+			regulator-min-microvolt = <1648000>;
+			regulator-max-microvolt = <3100000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l3b_3p3: l3 {
+			regulator-min-microvolt = <1700000>;
+			regulator-max-microvolt = <3600000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l4b_2p95: l4 {
+			regulator-min-microvolt = <1700000>;
+			regulator-max-microvolt = <2950000>;
+			regulator-enable-ramp-delay = <250>;
+
+			regulator-min-microamp = <200>;
+			regulator-max-microamp = <600000>;
+			regulator-system-load = <570000>;
+			regulator-allow-set-load;
+		};
+
+		/*
+		 * Downstream specifies a range of 1721-3600mV,
+		 * but the only assigned consumers are SDHCI2 VMMC
+		 * and Coresight QPDI that both request pinned 2.95V.
+		 * Tighten the range to 1.8-3.328 (closest to 3.3) to
+		 * make the mmc driver happy.
+		 */
+		vreg_l5b_2p95: l5 {
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <3328000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
+		vreg_l6b_3p3: l6 {
+			regulator-min-microvolt = <1700000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l7b_3p125: l7 {
+			regulator-min-microvolt = <2700000>;
+			regulator-max-microvolt = <3125000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+
+		vreg_l8b_3p3: l8 {
+			regulator-min-microvolt = <3200000>;
+			regulator-max-microvolt = <3400000>;
+			regulator-enable-ramp-delay = <250>;
+		};
+	};
+};
+
+&sdhc_1 {
+	bus-width = <8>;
+	non-removable;
+	mmc-ddr-1_8v;
+	mmc-hs200-1_8v;
+	mmc-hs400-1_8v;
+	vmmc-supply = <&vreg_l4b_2p95>;
+	vqmmc-supply = <&vreg_l8a_1p8>;
+
+	status = "okay";
+};
+
+&sdhc_2 {
+	cd-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
+
+	vmmc-supply = <&vreg_l5b_2p95>;
+	vqmmc-supply = <&vreg_l2b_2p95>;
+
+	status = "okay";
+};
+
+&tlmm {
+	gpio-reserved-ranges = <8 4>;
+
+	mdss_dsi_active: mdss-dsi-active-state {
+		pins = "gpio53";
+		function = "gpio";
+		bias-disable;
+		drive-strength = <0x08>;
+	};
+
+	mdss_dsi_sleep: mdss-dsi-sleep-state {
+		pins = "gpio53";
+		function = "gpio";
+		drive-strength = <0x02>;
+		bias-pull-down;
+	};
+
+	mdss_te_active: mdss-te-active-state {
+		pins = "gpio59";
+		function = "mdp_vsync";
+		drive-strength = <0x02>;
+		bias-pull-down;
+	};
+
+	mdss_te_sleep: mdss-te-sleep-state {
+		pins = "gpio59";
+		function = "mdp_vsync";
+		drive-strength = <0x02>;
+		bias-pull-down;
+	};
+
+	ts_int_active: ts-int-active-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	ts_int_sleep: ts-int-sleep-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	ts_reset_active: ts-reset-active-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	ts_reset_sleep: ts-reset-sleep-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-down;
+	};
+
+	keypad_int_active: keypad-int-active-state {
+		pins = "gpio13";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+
+	keypad_reset_active: keypad-reset-active-state {
+		pins = "gpio61";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	keypad_pwr_en: keypad-pwr-en-state {
+		pins = "gpio42";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-low;
+	};
+};
+
+&usb3 {
+	qcom,select-utmi-as-pipe-clk;
+
+	status = "okay";
+};
+
+&usb3_dwc3 {
+	dr_mode = "peripheral";
+	maximum-speed = "high-speed";
+	phys = <&qusb2phy0>;
+	phy-names = "usb2-phy";
+
+	status = "okay";
+};
+
+&venus {
+	status = "okay";
+};
+
+&wifi {
+	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p848>;
+	vdd-1.8-xo-supply = <&vreg_l9a_1p8>;
+	vdd-1.3-rfa-supply = <&vreg_l6a_1p3>;
+	vdd-3.3-ch0-supply = <&vreg_l3b_3p3>;
+	vdd-3.3-ch1-supply = <&vreg_l3b_3p3>;
+
+	status = "okay";
+};
