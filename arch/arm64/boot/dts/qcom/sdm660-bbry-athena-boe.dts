@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2025, Paul Sajna <hello@paulsajna.com>
+ */
+
+/dts-v1/;
+
+#include "sdm660-bbry-athena-common.dtsi"
+
+/ {
+	compatible = "bbry,athena-boe", "qcom,sdm660";
+};
+
+&panel {
+	compatible = "boe,bv045fhm-l00";
+};

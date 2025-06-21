@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2025, Paul Sajna <hello@paulsajna.com>
+ */
+
+/*
+ * There are two variants of bbry-luna, one with synaptics panel and one with boe panel.
+ * Currently only boe panel is supported
+ */
+
+
+/dts-v1/;
+
+#include "sdm636.dtsi"
+#include "sdm660-bbry-common.dtsi"
+
+/ {
+	model = "BlackBerry KEY2 LE";
+	chassis-type = "handset";
+};
+
+&adreno_gpu_zap {
+	firmware-name = "qcom/sdm636/luna/a512_zap.mbn";
+};
+
+&adsp_pil {
+	firmware-name = "qcom/sdm636/luna/adsp.mbn";
+};
+
+&remoteproc_mss {
+	firmware-name = "qcom/sdm636/luna/mba.mbn", "qcom/sdm636/luna/modem.mbn";
+};
+
+&venus {
+	firmware-name = "qcom/sdm636/luna/venus.mbn";
+};
+
+&wifi {
+	qcom,ath10k-calibration-variant = "bbry_luna";
+};
