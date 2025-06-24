@@ -636,9 +636,11 @@ static int nt51021_boe_probe(struct mipi_dsi_device *dsi)
 	struct boe_nt51021_desc *ctx;
 	int ret;
 
-	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
-	if (!ctx)
-		return -ENOMEM;
+	ctx = devm_drm_panel_alloc(dev, struct boe_nt51021_desc, panel,
+				   &nt51021_boe_panel_funcs,
+				   DRM_MODE_CONNECTOR_DSI);
+	if (IS_ERR(ctx))
+		return PTR_ERR(ctx);
 
 	ctx->variant = of_device_get_match_data(dev);
 	if (!ctx->variant)
@@ -662,8 +664,6 @@ static int nt51021_boe_probe(struct mipi_dsi_device *dsi)
 	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
 			  MIPI_DSI_MODE_NO_EOT_PACKET | MIPI_DSI_MODE_LPM;
 
-	drm_panel_init(&ctx->panel, dev, &nt51021_boe_panel_funcs,
-		       DRM_MODE_CONNECTOR_DSI);
 	ctx->panel.prepare_prev_first = true;
 
 	ret = drm_panel_of_backlight(&ctx->panel);
