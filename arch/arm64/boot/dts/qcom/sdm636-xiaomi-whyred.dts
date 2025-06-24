@@ -244,6 +244,7 @@
 
 		backlight = <&pm660l_wled>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		vddio-supply = <&vreg_l11a_1p8>;
 
 		pinctrl-0 = <&lcd_reset_active &mdss_te_active>;
 		pinctrl-1 = <&lcd_reset_sleep &mdss_te_sleep>;
