@@ -262,6 +262,7 @@ Runtime validation is controlled by kernel configuration:
 
 1. Enable ``CONFIG_KAPI_SPEC`` to build the framework
 2. Enable ``CONFIG_KAPI_RUNTIME_CHECKS`` for runtime validation
+3. Optionally enable ``CONFIG_KAPI_SPEC_DEBUGFS`` for debugfs interface
 
 Validation Behavior
 -------------------
@@ -309,6 +310,68 @@ specification. Kerneldoc annotations cannot set it, so it is only available to a
     /* In the parameter definition: */
     .constraint_type = KAPI_CONSTRAINT_CUSTOM,
     .validate = validate_buffer_size,
+
+DebugFS Interface
+=================
+
+The debugfs interface provides runtime access to API specifications:
+
+Directory Structure
+-------------------
+
+::
+
+    /sys/kernel/debug/kapi/
+    ├── list                     # Overview of all registered API specs
+    ├── specs/                   # Per-API specification files
+    │   ├── sys_open             # Human-readable spec for sys_open
+    │   ├── sys_close            # Human-readable spec for sys_close
+    │   ├── sys_read             # Human-readable spec for sys_read
+    │   ├── sys_write            # Human-readable spec for sys_write
+    │   └── sys_madvise          # Human-readable spec for sys_madvise
+    └── specs-json/              # Machine-readable counterpart of specs/
+        ├── sys_open             # JSON spec for sys_open
+        └── ...
+
+Usage Examples
+--------------
+
+List all available API specifications::
+
+    $ cat /sys/kernel/debug/kapi/list
+    Available Kernel API Specifications
+    ===================================
+
+    sys_open - Open or create a file
+    sys_close - Close a file descriptor
+    sys_read - Read data from a file descriptor
+    sys_write - Write data to a file descriptor
+    sys_madvise - Give advice about use of memory
+
+    Total: 5 specifications
+
+Query specific API::
+
+    $ cat /sys/kernel/debug/kapi/specs/sys_open
+    Kernel API Specification
+    ========================
+
+    Name: sys_open
+    Version: 1
+    Description: Open or create a file
+    ...
+
+The ``specs-json/`` files carry the complete specification: for each
+parameter the type class, flags and the constraint (type, range, valid
+mask, enumerated values, alignment, size and the index of the parameter
+holding a buffer's size), the return check, errors, locks, signals,
+signal masks, side effects, state transitions, capabilities, additional
+constraints and structure specifications. Masks and flag words are
+hex strings, enumerations are lower-case tokens such as
+``"constraint_type": "buffer"``, and ``size_param_idx`` is a 0-based
+index into ``parameters`` (``null`` when unused). The ``kapi`` tool
+reads these files with ``--debugfs`` and reports the same data as
+``--vmlinux``.
 
 Performance Considerations
 ==========================
@@ -620,20 +683,5 @@ Submitting Specifications
 1. Add specifications to the same file as the API implementation
 2. Follow existing patterns and naming conventions
 3. Test with CONFIG_KAPI_RUNTIME_CHECKS enabled
-4. Run scripts/checkpatch.pl on your changes
-
-Review Criteria
----------------
-
-Specifications will be reviewed for:
-
-1. **Completeness**: All parameters and errors documented
-2. **Accuracy**: Specification matches implementation
-3. **Clarity**: Descriptions are clear and helpful
-4. **Consistency**: Follows framework conventions
-5. **Performance**: No unnecessary runtime overhead
-
-Contact
--------
-
-- Maintainer: Sasha Levin <sashal@kernel.org>
+4. Verify debugfs output is correct
+5. Run scripts/checkpatch.pl on your changes
