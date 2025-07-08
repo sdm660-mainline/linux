@@ -939,6 +939,8 @@ properties:
               - xiaomi,whyred-shenchao
               - xiaomi,whyred-tianma
               - motorola,beckham
+              - bbry,luna-boe
+              - bbry,luna-syna
           - const: qcom,sdm636
 
       - items:
@@ -951,6 +953,8 @@ properties:
               - xiaomi,lavender-shenchao
               - xiaomi,lavender-tianma
               - xiaomi,platina
+              - bbry,athena-boe
+              - bbry,athena-syna
           - const: qcom,sdm660
 
       - items:
