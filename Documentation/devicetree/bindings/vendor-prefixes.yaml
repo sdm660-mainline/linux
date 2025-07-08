@@ -210,6 +210,8 @@ patternProperties:
     description: BAIKAL ELECTRONICS, JSC
   "^bananapi,.*":
     description: BIPAI KEJI LIMITED
+  "^bbry,.*":
+    description: BlackBerry Limited
   "^beacon,.*":
     description: Compass Electronics Group, LLC
   "^beagle,.*":
