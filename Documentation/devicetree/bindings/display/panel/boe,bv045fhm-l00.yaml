@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/panel/boe,bv045fhm-l00.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: BOE BV045FHM-L00 LCD DSI Panel
+
+maintainers:
+  - Paul Sajna <hello@paulsajna.com>
+
+allOf:
+  - $ref: panel-common.yaml#
+
+properties:
+  compatible:
+    enum:
+      - boe,bv045fhm-l00
+
+  reg:
+    maxItems: 1
+
+  reset-gpios:
+    description: specifies a GPIO used for the reset pin
+
+  backlight:
+    description: phandle of the backlight device attached to the panel
+
+  port: true
+  rotation: true
+  width-mm: true
+  height-mm: true
+
+required:
+  - compatible
+  - reg
+  - reset-gpios
+
+unevalueatedProperties: false
+
+examples:
+  - |
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    vdd-supply = <&vreg_l1b_0p925>;
+    vdda-supply = <&vreg_l1a_1p225>;
+
+    panel: panel@0 {
+      compatible = "boe,bv045fhm-l00";
+      reg = <0>;
+
+      backlight = <&pm660l_wled>;
+      reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+
+      pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+      pinctrl-1 = <&mdss_dsi_sleep &mdss_te_sleep>;
+      pinctrl-names = "default", "sleep";
+
+      width-mm = <63>;
+      height-mm = <95>;
+
+      port {
+        panel_in: endpoint {
+          remote-endpoint = <&mdss_dsi0_out>;
+        };
+      };
+    };
+...
