@@ -25,6 +25,7 @@ properties:
       - st,stmpe811
       - st,stmpe1600
       - st,stmpe1601
+      - st,stmpe1801
       - st,stmpe2401
       - st,stmpe2403
 
