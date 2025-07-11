@@ -2306,6 +2306,8 @@ source "kernel/Kconfig.kexec"
 
 source "kernel/liveupdate/Kconfig"
 
+source "kernel/api/Kconfig"
+
 endmenu		# General setup
 
 source "arch/Kconfig"
