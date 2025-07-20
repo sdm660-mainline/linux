@@ -10,6 +10,8 @@
 #include "pm660l.dtsi"
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
+/delete-node/ &zap_shader_region;
+
 / {
 	chassis-type = "handset";
 	
@@ -147,6 +149,13 @@
 			phandle = <0x134>;
 			linux,phandle = <0x134>;
 		};
+
+// [    8.747408] subsys-pil-tz soc:qcom,kgsl-hyp: a508_zap: loading from 0x00000000fd200000 to 0x00000000fd202000
+		zap_shader_region: gpu@fd200000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xfd200000 0x0 0x2000>;
+			no-map;
+		};
 	};
 	
 	/*
@@ -178,7 +187,8 @@
 };
 
 &adreno_gpu_zap {
-	firmware-name = "qcom/a508_zap.mdt";
+	firmware-name = "a508_zap.mbn";
+	memory-region = <&zap_shader_region>;
 };
 
 &adsp_pil {
@@ -228,9 +238,9 @@
 	status = "okay";
 };
 
-&camss {
-	status = "okay";
-};
+//&camss {
+//	status = "okay";
+//};
 
 &mdss {
 	status = "okay";
