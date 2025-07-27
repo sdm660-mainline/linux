@@ -16,6 +16,20 @@
  * be addressed when the aforementioned
  * peripherals will be enabled upstream.
  */
+/delete-node/ &cdsp_pil;
+/delete-node/ &cdsp_smmu;
+/delete-node/ &cdsp_region;
+
+/ {
+	/delete-node/ smp2p-cdsp;
+
+	reserved-memory {
+		buffer_mem: tzbuffer@94a00000 {
+			reg = <0x00 0x94a00000 0x00 0x100000>;
+			no-map;
+		};
+	};
+};
 
 &adreno_gpu {
 	compatible = "qcom,adreno-509.0", "qcom,adreno";
