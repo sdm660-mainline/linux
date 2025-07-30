@@ -7,11 +7,8 @@
 #include "sdm660-xiaomi-clover-common.dtsi"
 
 / {
-	model = "Xiaomi Mi Pad 4";	
+	model = "Xiaomi Mi Pad 4";
 	compatible = "xiaomi,clover", "qcom,sda660";
-	qcom,board-id = <11 0>;
-	qcom,msm-id = <324 0>;
-	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>, <0x0001001b 0x0201011a 0x0 0x0>,<0x0001001b 0x0102001a 0x0 0x0>;
 };
 
 &blsp_i2c3 {
@@ -76,6 +73,12 @@
 	qcom,switching-freq = <800>;
 	qcom,current-limit-microamp = <20000>;
 	qcom,num-strings = <3>;
+
+	status = "okay";
+};
+
+&remoteproc_mss {
+	firmware-name = "mba.mbn", "modemnm.mdt";
 
 	status = "okay";
 };

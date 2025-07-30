@@ -242,12 +242,6 @@
 	status = "okay";
 };
 
-&remoteproc_mss {
-	firmware-name = "mba.mbn", "modem.mdt";
-
-	status = "okay";
-};
-
 &rpm_requests {
 	regulators-0 {
 		compatible = "qcom,rpm-pm660l-regulators";

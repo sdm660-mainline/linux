@@ -9,9 +9,6 @@
 / {
 	model = "Xiaomi Mi Pad 4 Plus";
 	compatible = "xiaomi,clover-plus", "qcom,sdm660";
-	qcom,board-id = <11 0>;
-	qcom,msm-id = <324 0>;
-	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>, <0x0001001b 0x0201011a 0x0 0x0>,<0x0001001b 0x0102001a 0x0 0x0>;
 
 	vreg_bl_vddio: lcd-backlight-regulator {
 		compatible = "regulator-fixed";
@@ -136,6 +133,12 @@
 
 &mdss_dsi0_phy {
 	vcca-supply = <&vreg_l1b_0p925>;
+
+	status = "okay";
+};
+
+&remoteproc_mss {
+	firmware-name = "mba.mbn", "modem.mdt";
 
 	status = "okay";
 };
