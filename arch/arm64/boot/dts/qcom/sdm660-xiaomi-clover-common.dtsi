@@ -13,7 +13,7 @@
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
 /delete-node/ &adsp_region;
-/delete-node/ &buffer_mem;
+/delete-node/ &cdsp_region;
 /delete-node/ &mba_region;
 /delete-node/ &zap_shader_region;
 /delete-node/ &venus_region;
@@ -113,7 +113,7 @@
 			no-map;
 		};
 
-		buffer_mem: buffer_region@94b00000 {
+		cdsp_region: cdsp@94b00000 {
 			reg = <0x00 0x94b00000 0x00 0x600000>;
 			no-map;
 		};
