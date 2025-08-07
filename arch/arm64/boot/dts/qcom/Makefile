@@ -235,6 +235,7 @@ dtb-$(CONFIG_ARCH_QCOM)	+= sdm636-xiaomi-tulip.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm636-xiaomi-whyred.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-clover-plus.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-jasmine.dtb
+dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-lavender-shenchao.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-lavender-tianma.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-lavender-boe.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-platina.dtb
