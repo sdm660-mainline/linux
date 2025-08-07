@@ -71,6 +71,51 @@ static inline struct nt36672a_panel *to_nt36672a_panel(struct drm_panel *panel)
 	return container_of(panel, struct nt36672a_panel, base);
 }
 
+static int shenchao_lavender_init_cmds(struct drm_panel *panel)
+{
+	struct nt36672a_panel *pinfo = to_nt36672a_panel(panel);
+	struct mipi_dsi_multi_context dsi_ctx = { .dsi = pinfo->link };
+
+	pinfo->link->mode_flags |= MIPI_DSI_MODE_LPM;
+
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xff, 0x25);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfb, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x18, 0x96);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x05, 0x04);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xff, 0x27);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfb, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xd9, 0x10);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xff, 0x24);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfb, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x82, 0x13);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x84, 0x31);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x88, 0x13);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8a, 0x31);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8e, 0xe4);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x8f, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x90, 0x80);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9d, 0xb0);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xff, 0x26);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xfb, 0x01);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_READ_PPS_CONTINUE,
+				     0x12);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xaa, 0x10);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xae, 0x8a);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1c, 0xfa);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xff, 0x10);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xb0, 0x01);
+	mipi_dsi_dcs_exit_sleep_mode_multi(&dsi_ctx);
+	mipi_dsi_msleep(&dsi_ctx, 70);
+	mipi_dsi_dcs_set_display_brightness_multi(&dsi_ctx, 0x00b8);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x68, 0x03, 0x04);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_WRITE_CONTROL_DISPLAY,
+				     0x2c);
+	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_WRITE_POWER_SAVE, 0x00);
+	mipi_dsi_dcs_set_display_on_multi(&dsi_ctx);
+
+	return dsi_ctx.accum_err;
+}
+
 static int tianma_beryllium_init_cmds(struct drm_panel *panel)
 {
 	struct nt36672a_panel *pinfo = to_nt36672a_panel(panel);
@@ -903,6 +948,39 @@ static const struct nt36672a_panel_desc tianma_fhd_video_panel_desc = {
 	.off_cmds = tianma_beryllium_off_cmds,
 };
 
+static const struct drm_display_mode shenchao_lavender_panel_default_mode = {
+	.clock = (1080 + 90 + 2 + 120) * (2340 + 10 + 3 + 8) * 60 / 1000,
+
+	.hdisplay = 1080,
+	.hsync_start = 1080 + 90,
+	.hsync_end = 1080 + 90 + 2,
+	.htotal = 1080 + 90 + 2 + 120,
+
+	.vdisplay = 2340,
+	.vsync_start = 2340 + 10,
+	.vsync_end = 2340 + 10 + 3,
+	.vtotal = 2340 + 10 + 3 + 8,
+
+	.type = DRM_MODE_TYPE_DRIVER,
+};
+
+static const struct nt36672a_panel_desc shenchao_lavender_panel_desc = {
+	.display_mode = &shenchao_lavender_panel_default_mode,
+
+	.width_mm = 67,
+	.height_mm = 145,
+
+	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+			MIPI_DSI_CLOCK_NON_CONTINUOUS,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+	.reset_gpio_flags = GPIOD_OUT_HIGH,
+
+	.init_cmds = shenchao_lavender_init_cmds,
+	/* lavender shenchao panel uses the same off sequence as tianma one */
+	.off_cmds = tianma_lavender_off_cmds,
+};
+
 static const struct drm_display_mode tianma_lavender_panel_default_mode = {
 	.clock		= (1080 + 90 + 2 + 120) * (2340 + 10 + 3 + 8) * 60 / 1000,
 
@@ -1115,6 +1193,7 @@ static void nt36672a_panel_remove(struct mipi_dsi_device *dsi)
 }
 
 static const struct of_device_id panel_nt36672a_match[] = {
+	{ .compatible = "shenchao,fhdplus-video", .data = &shenchao_lavender_panel_desc },
 	{ .compatible = "tianma,fhd-video", .data = &tianma_fhd_video_panel_desc },
 	{ .compatible = "tianma,tl060fvxs16-00", .data = &tianma_jasmine_panel_desc },
 	{ .compatible = "tianma,tl063fvmca01-00", .data = &tianma_lavender_panel_desc },
