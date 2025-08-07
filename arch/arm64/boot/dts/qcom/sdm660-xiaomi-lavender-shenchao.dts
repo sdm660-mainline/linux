@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2024, Barnabas Czeman <trabarni@gmail.com>
+ */
+
+/dts-v1/;
+
+#include "sdm660-xiaomi-lavender-common.dtsi"
+
+/ {
+	model = "Xiaomi Redmi Note 7 (Shenchao)";
+	compatible = "xiaomi,lavender-shenchao", "qcom,sdm660";
+};
+
+&blsp_i2c1 {
+	status = "okay";
+
+	touchscreen@1 {
+		compatible = "novatek,nt36672a-ts";
+		reg = <0x1>;
+
+		iovcc-supply = <&vreg_l11a_1p8>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_RISING>;
+
+		panel = <&panel>;
+
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&ts_pins_active>;
+		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
+
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2340>;
+	};
+};
+
+&panel {
+	compatible = "shenchao,fhdplus-video", "novatek,nt36672a";
+	vddio-supply = <&vreg_l11a_1p8>;
+	vddneg-supply = <&lcdb_fixed>;
+	vddpos-supply = <&lcdb_fixed>;
+};
+
+&tlmm {
+	ts_pins_active: ts-pins-active-state {
+		pins = "gpio66", "gpio67";
+		function = "gpio";
+		drive-strength = <16>;
+		bias-pull-up;
+	};
+
+	ts_rst_sleep: ts-rst-sleep-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	ts_int_sleep: ts-int-sleep-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+};
