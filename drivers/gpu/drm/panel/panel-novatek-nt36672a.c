@@ -821,18 +821,24 @@ static int nt36672a_panel_power_off(struct drm_panel *panel)
 	return ret;
 }
 
-static int nt36672a_panel_unprepare(struct drm_panel *panel)
+static int nt36672a_panel_disable(struct drm_panel *panel)
 {
 	struct nt36672a_panel *pinfo = to_nt36672a_panel(panel);
-	int ret;
+	int ret = 0;
 
 	/* send off cmds */
 	if (pinfo->desc->off_cmds) {
 		ret = pinfo->desc->off_cmds(panel);
 		if (ret < 0)
 			dev_err(panel->dev, "failed to send DCS off cmds: %d\n", ret);
-		return ret;
 	}
+
+	return ret;
+}
+
+static int nt36672a_panel_unprepare(struct drm_panel *panel)
+{
+	int ret;
 
 	ret = nt36672a_panel_power_off(panel);
 	if (ret < 0)
@@ -909,6 +915,7 @@ static int nt36672a_panel_get_modes(struct drm_panel *panel,
 }
 
 static const struct drm_panel_funcs panel_funcs = {
+	.disable = nt36672a_panel_disable,
 	.unprepare = nt36672a_panel_unprepare,
 	.prepare = nt36672a_panel_prepare,
 	.get_modes = nt36672a_panel_get_modes,
