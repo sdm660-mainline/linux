@@ -2334,6 +2334,15 @@ static struct gdsc hlos2_vote_turing_adsp_gdsc = {
 	.flags = VOTABLE,
 };
 
+static struct gdsc hlos1_vote_lpass_adsp_gdsc = {
+	.gdscr = 0x7d034,
+	.pd = {
+		.name = "hlos1_vote_lpass_adsp_gdsc",
+	},
+	.pwrsts = PWRSTS_OFF_ON,
+	.flags = VOTABLE,
+};
+
 static struct clk_hw *gcc_sdm660_hws[] = {
 	&xo.hw,
 	&gpll0_early_div.hw,
@@ -2477,6 +2486,7 @@ static struct gdsc *gcc_sdm660_gdscs[] = {
 	[PCIE_0_GDSC] = &pcie_0_gdsc,
 	[HLOS1_VOTE_TURING_ADSP_GDSC] = &hlos1_vote_turing_adsp_gdsc,
 	[HLOS2_VOTE_TURING_ADSP_GDSC] = &hlos2_vote_turing_adsp_gdsc,
+	[HLOS1_VOTE_LPASS_ADSP_GDSC] = &hlos1_vote_lpass_adsp_gdsc,
 };
 
 static const struct qcom_reset_map gcc_sdm660_resets[] = {
