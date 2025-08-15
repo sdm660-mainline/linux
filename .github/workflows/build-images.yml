@@ -34,9 +34,9 @@ jobs:
         run: |
           mkdir -p .output
           make O=.output LOCALVERSION= defconfig sdm660_defconfig
-      - name: Build linux kernel (Image.gz)
+      - name: Build linux kernel (Image.gz, vmlinuz.efi) and modules
         run: |
-          make O=.output LOCALVERSION= -j$(nproc)
+          make O=.output LOCALVERSION= -j$(nproc) Image.gz vmlinuz.efi modules
       - name: Install modules into fake install prefix
         run: |
           make O=.output LOCALVERSION= INSTALL_MOD_PATH=PREFIX INSTALL_MOD_STRIP=1 modules_install
