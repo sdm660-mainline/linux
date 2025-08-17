@@ -8,9 +8,12 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_blend.h>
 #include <drm/drm_damage_helper.h>
+#include <drm/drm_fb_dma_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_gem_atomic_helper.h>
+#include <drm/drm_gem_dma_helper.h>
+#include <drm/drm_panic.h>
 #include <drm/drm_print.h>
 
 #include "mdp5_kms.h"
@@ -454,6 +457,58 @@ static void mdp5_plane_atomic_async_update(struct drm_plane *plane,
 	new_state->fb = old_fb;
 }
 
+static int mdp5_plane_get_scanout_buffer(struct drm_plane *plane,
+					 struct drm_scanout_buffer *sb)
+{
+	struct drm_display_mode mode;
+	struct drm_framebuffer *fb;
+	struct drm_gem_dma_object *dma_obj;
+	struct drm_gem_object *gem;
+
+	printk("mdp5_plane.c mdp5_plane_get_scanout_buffer");
+
+	if (!plane->state || !plane->state->fb) {
+		printk("mdp5_plane.c (!plane->state || !plane->state->fb)");
+		return -EINVAL;
+	}
+
+	mode = plane->state->crtc->mode;
+	fb = plane->state->fb;
+	/* Only support linear modifier */
+	if (fb->modifier != DRM_FORMAT_MOD_LINEAR) {
+		printk("mdp5_plane.c (fb->modifier != DRM_FORMAT_MOD_LINEAR)");
+		return -ENODEV;
+	}
+
+	//gem = drm_gem_fb_get_obj(fb, 0);
+	gem = fb->obj[0];
+	dma_obj = to_drm_gem_dma_obj(gem);
+
+	/* Buffer should be accessible from the CPU */
+	if (dma_obj->base.import_attach) {
+		printk("mdp5_plane.c (dma_obj->base.import_attach)");
+		return -ENODEV;
+	}
+
+	/* Buffer should be already mapped to CPU */
+	if (!dma_obj->vaddr) {
+		printk("mdp5_plane.c (!dma_obj->vaddr)");
+		return -ENODEV;
+	}
+
+	msm_gem_prime_vmap(gem, &sb->map[0]);
+
+	sb->format = fb->format;
+	// sb->height = fb->height;
+	// sb->width = fb->width;
+	sb->height = mode.vdisplay;
+	sb->width = mode.hdisplay;
+	sb->pitch[0] = fb->pitches[0];
+	printk("mdp5_plane.c returning sb->height=%d sb->width=%d sb->pitch[0]=%d", sb->height, sb->width, sb->pitch[0]);
+	printk("mdp5_plane.c fb->pitches[0]=%d fb->pitches[1]=%d fb->pitches[2]=%d fb->pitches[3]=%d", fb->pitches[0], fb->pitches[1], fb->pitches[2], fb->pitches[3]);
+	return 0;
+}
+
 static const struct drm_plane_helper_funcs mdp5_plane_helper_funcs = {
 		.prepare_fb = mdp5_plane_prepare_fb,
 		.cleanup_fb = mdp5_plane_cleanup_fb,
@@ -461,6 +516,7 @@ static const struct drm_plane_helper_funcs mdp5_plane_helper_funcs = {
 		.atomic_update = mdp5_plane_atomic_update,
 		.atomic_async_check = mdp5_plane_atomic_async_check,
 		.atomic_async_update = mdp5_plane_atomic_async_update,
+		.get_scanout_buffer = mdp5_plane_get_scanout_buffer,
 };
 
 static void set_scanout_locked(struct mdp5_kms *mdp5_kms,

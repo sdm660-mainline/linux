@@ -14,8 +14,11 @@
 #include <drm/drm_atomic_uapi.h>
 #include <drm/drm_blend.h>
 #include <drm/drm_damage_helper.h>
+#include <drm/drm_fb_dma_helper.h>
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_gem_atomic_helper.h>
+#include <drm/drm_gem_dma_helper.h>
+#include <drm/drm_panic.h>
 
 #include "msm_drv.h"
 #include "msm_mdss.h"
@@ -1099,6 +1102,58 @@ static int dpu_plane_virtual_atomic_check(struct drm_plane *plane,
 	return 0;
 }
 
+static int dpu_plane_get_scanout_buffer(struct drm_plane *plane,
+					struct drm_scanout_buffer *sb)
+{
+	struct drm_display_mode mode;
+	struct drm_gem_dma_object *dma_obj;
+	struct drm_gem_object *gem;
+	struct drm_framebuffer *fb;
+
+	printk("dpu_plane.c dpu_plane_get_scanout_buffer");
+
+	if (!plane->state || !plane->state->fb) {
+		printk("dpu_plane.c (!plane->state || !plane->state->fb)");
+		return -EINVAL;
+	}
+
+	mode = plane->state->crtc->mode;
+	fb = plane->state->fb;
+	/* Only support linear modifier */
+	if (fb->modifier != DRM_FORMAT_MOD_LINEAR) {
+		printk("dpu_plane.c (fb->modifier != DRM_FORMAT_MOD_LINEAR)");
+		return -ENODEV;
+	}
+
+	//gem = drm_gem_fb_get_obj(fb, 0);
+	gem = fb->obj[0];
+	dma_obj = to_drm_gem_dma_obj(gem);
+
+	/* Buffer should be accessible from the CPU */
+	if (dma_obj->base.import_attach) {
+		printk("dpu_plane.c (dma_obj->base.import_attach)");
+		return -ENODEV;
+	}
+
+	/* Buffer should be already mapped to CPU */
+	if (!dma_obj->vaddr) {
+		printk("dpu_plane.c (!dma_obj->vaddr)");
+		return -ENODEV;
+	}
+
+	msm_gem_prime_vmap(gem, &sb->map[0]);
+
+	sb->format = fb->format;
+	// sb->height = fb->height;
+	// sb->width = fb->width;
+	sb->height = mode.vdisplay;
+	sb->width = mode.hdisplay;
+	sb->pitch[0] = fb->pitches[0];
+	printk("dpu_plane.c returning sb->height=%d sb->width=%d sb->pitch[0]=%d", sb->height, sb->width, sb->pitch[0]);
+	printk("dpu_plane.c fb->pitches[0]=%d fb->pitches[1]=%d fb->pitches[2]=%d fb->pitches[3]=%d", fb->pitches[0], fb->pitches[1], fb->pitches[2], fb->pitches[3]);
+	return 0;
+}
+
 static int dpu_plane_virtual_assign_resources(struct drm_crtc *crtc,
 					      struct dpu_global_state *global_state,
 					      struct drm_atomic_state *state,
@@ -1600,6 +1655,7 @@ static const struct drm_plane_helper_funcs dpu_plane_helper_funcs = {
 		.cleanup_fb = dpu_plane_cleanup_fb,
 		.atomic_check = dpu_plane_atomic_check,
 		.atomic_update = dpu_plane_atomic_update,
+		.get_scanout_buffer = dpu_plane_get_scanout_buffer,
 };
 
 static const struct drm_plane_helper_funcs dpu_plane_virtual_helper_funcs = {
@@ -1607,6 +1663,7 @@ static const struct drm_plane_helper_funcs dpu_plane_virtual_helper_funcs = {
 	.cleanup_fb = dpu_plane_cleanup_fb,
 	.atomic_check = dpu_plane_virtual_atomic_check,
 	.atomic_update = dpu_plane_atomic_update,
+	.get_scanout_buffer = dpu_plane_get_scanout_buffer,
 };
 
 /* initialize plane */
