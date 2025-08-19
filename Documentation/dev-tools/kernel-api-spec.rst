@@ -180,6 +180,19 @@ DSL reference:
   from ``range:``.  The function-call
   form populates the matching aux fields
   (``range:`` / ``valid-mask:`` / ``size-param:``).
+* ``arch-mask:`` — extends a ``mask(...)`` constraint with bits that
+  are valid only on a named architecture.  The form is
+  ``arch-mask: <arch> = <bits-expr>`` and may appear multiple times.
+  The named arch must be one of the known short names
+  (``alpha``, ``arc``, ``arm``, ``arm64``, ``csky``, ``hexagon``,
+  ``loongarch``, ``m68k``, ``microblaze``, ``mips``, ``nios2``,
+  ``openrisc``, ``parisc``, ``powerpc``, ``riscv``, ``s390``, ``sh``,
+  ``sparc``, ``um``, ``x86``, ``xtensa``); the generator translates it
+  to the matching ``CONFIG_*`` symbol and emits the bits inside an
+  ``#ifdef`` so a single generated apispec.h compiles on every
+  architecture and folds in the arch-specific bits at compile time.
+  Use this for PROT/MAP bits whose UAPI symbols are defined only on
+  the matching arch.
 * ``lock: … type:`` accepts ``mutex``, ``spinlock``, ``rwlock``,
   ``seqlock``, ``rcu``, ``semaphore``, ``custom`` or ``KAPI_LOCK_*``.
 * ``signal: … direction:`` accepts ``receive``, ``send``, ``handle``,
@@ -265,6 +278,17 @@ does not list are only logged at debug level.
 The execution context recorded in a specification is not checked at runtime.
 The option is available on x86 and on architectures that use the generic
 ``__SYSCALL_DEFINEx()``.
+
+.. warning::
+
+   Userspace errno is affected when this option is on. For syscalls that
+   violate their parameter specification, KAPI short-circuits the call and
+   returns ``-EINVAL`` from the validator **before** the real handler runs.
+   That errno can differ from what the real handler would have produced for
+   the same condition (for example, ``-ENOMEM`` from an allocation path or
+   ``-EFAULT`` from a deeper copy-in). ``CONFIG_KAPI_RUNTIME_CHECKS`` is a
+   debug-only option; do not enable it on production kernels or in
+   userspace-visible test environments where error-code fidelity matters.
 
 Custom Validators
 -----------------
