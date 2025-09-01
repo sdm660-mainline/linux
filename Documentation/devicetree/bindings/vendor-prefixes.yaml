@@ -1713,6 +1713,8 @@ patternProperties:
     description: Turing Machines, Inc.
   "^tuxedo,.*":
     description: TUXEDO Computers GmbH
+  "^txd,.*":
+    description: Shenzhen TXD Technology Co., Ltd.
   "^tyan,.*":
     description: Tyan Computer Corporation
   "^tyhx,.*":
