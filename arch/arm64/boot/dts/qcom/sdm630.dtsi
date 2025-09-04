@@ -1999,7 +1999,7 @@
 			reg = <0x0c1b7000 0x600>;
 			interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
 
-			clocks = <&gcc GCC_BLSP2_QUP3_I2C_APPS_CLK>,
+			clocks = <&gcc GCC_BLSP2_QUP3_SPI_APPS_CLK>,
 				 <&gcc GCC_BLSP2_AHB_CLK>;
 			clock-names = "core", "iface";
 			clock-frequency = <400000>;
