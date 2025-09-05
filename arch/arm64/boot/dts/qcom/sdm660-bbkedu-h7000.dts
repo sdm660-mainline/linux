@@ -13,9 +13,9 @@
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
 / {
-	model = "Qualcomm Technologies, Inc. SDM 660 PM660 + PM660A, Headset Jacktype NO, RCM";
+	model = "EEBBK S5";
 	compatible = "qcom,sdm660-cdp", "qcom,sdm660", "qcom,cdp";
-	chassis-type = "handset";
+	chassis-type = "tablet";
 
 	aliases {
 		serial0 = &blsp1_uart2; /* Debug UART */
