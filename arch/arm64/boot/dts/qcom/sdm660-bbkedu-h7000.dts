@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
 /*
- * Copyright (c) 2025, xkts <3329989998@qq.com>
+ * Copyright (c) 2025, XKTS <3329989998@qq.com>
  */
 
 /dts-v1/;
@@ -347,10 +347,14 @@
 			regulator-allow-set-load;
 		};
 
-		vreg_l3b_3p3: l3 {
-			regulator-min-microvolt = <1700000>;
-			regulator-max-microvolt = <3300000>;
+		vreg_l3b_3p0: l3 {
+			regulator-min-microvolt = <3000000>;
+			regulator-max-microvolt = <3000000>;
 			regulator-enable-ramp-delay = <250>;
+			regulator-ramp-delay = <0>;
+			regulator-min-microamp = <200>;
+			regulator-max-microamp = <600000>;
+			regulator-system-load = <100000>;
 			regulator-allow-set-load;
 			regulator-always-on;
 		};
@@ -593,7 +597,7 @@
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 	
-    gpio_key_active {
+    gpio_key_active: gpio-key-active-state {
 		linux,phandle = <0x25b>;
 		phandle = <0x25b>;
 		pins = "gpio64", "gpio113";
@@ -602,14 +606,14 @@
 		bias-pull-up;
 	};
 
-	gpio_key_suspend {
+	gpio_key_suspend: gpio-key-suspend-state {
 		linux,phandle = <0x25c>;
 		phandle = <0x25c>;
 		pins = "gpio64", "gpio113";
 		function = "gpio";
 	};
 	
-	ts_int_defalut {
+	ts_int_default: ts-int-default-state {
 		pins = "gpio67";
 		function = "gpio";
 		drive-strength = <0x10>;
@@ -617,19 +621,19 @@
 		bias-disable;
 	};
 
-	ts_int_output_high {
+	ts_int_output_high: ts-int-output-high-state {
 		pins = "gpio67";
 		function = "gpio";
 		output-high;
 	};
 
-	ts_int_output_low {
+	ts_int_output_low: ts-int-output-low-state {
 		pins = "gpio67";
 		function = "gpio";
 		output-low;
 	};
 
-	ts_int_input {
+	ts_int_input: ts-int-input-state {
 		pins = "gpio67";
 		function = "gpio";
 		input-enable;
