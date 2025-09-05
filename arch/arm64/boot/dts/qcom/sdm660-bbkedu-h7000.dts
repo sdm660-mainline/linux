@@ -14,7 +14,7 @@
 
 / {
 	model = "EEBBK S5";
-	compatible = "qcom,sdm660-cdp", "qcom,sdm660", "qcom,cdp";
+	compatible = "bbkedu,h7000", "qcom,sdm660","qcom,cdp";
 	chassis-type = "tablet";
 
 	aliases {
