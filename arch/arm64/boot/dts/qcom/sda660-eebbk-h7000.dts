@@ -611,7 +611,7 @@ mdss_dsi0 {
 	ts_int_default: ts-int-default-state {
 		pins = "gpio67";
         function = "gpio";
-        drive-strength = <16>;
+        drive-strength = <10>;
         input-enable;
 		bias-disable;
 	};
