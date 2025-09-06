@@ -188,21 +188,19 @@
 
 	#address-cells = <1>;
 	#size-cells = <0>;
-
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-supply = <&vreg_l1a_1p225>;
 
-	panel@0 {
-		compatible = "mdss,nt36672-tianma";
+	panel: panel@0 {
+		compatible = "truly,nt35597";
 		reg = <0>;
 
+		backlight = <&i2c_backlight>;
+		avdd-supply = <&lcd_pwr>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
-		disp-te-gpios = <&tlmm 59 GPIO_ACTIVE_HIGH>;
-
-		backlight = <&pm660l_wled>;
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&panel_reset_n &mdp_vsync_n>;
+		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 
 		port {
 			panel_in: endpoint {
@@ -286,6 +284,7 @@
 
 &qusb2phy0 {
 	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 
 	status = "okay";
@@ -598,26 +597,22 @@
 	gpio-reserved-ranges = <8 4>;
 	
     gpio_key_active: gpio-key-active-state {
-		linux,phandle = <0x25b>;
-		phandle = <0x25b>;
-		pins = "gpio64", "gpio113";
-		function = "gpio";
-		drive-strength = <0x02>;
-		bias-pull-up;
+        pins = "gpio64", "gpio113";
+        function = "gpio";
+        bias-pull-up;
+        drive-strength = <2>;
 	};
 
 	gpio_key_suspend: gpio-key-suspend-state {
-		linux,phandle = <0x25c>;
-		phandle = <0x25c>;
 		pins = "gpio64", "gpio113";
 		function = "gpio";
 	};
 	
 	ts_int_default: ts-int-default-state {
 		pins = "gpio67";
-		function = "gpio";
-		drive-strength = <0x10>;
-		input-enable;
+        function = "gpio";
+        drive-strength = <16>;
+        input-enable;
 		bias-disable;
 	};
 
@@ -640,16 +635,22 @@
 		bias-disable;
 	};
 
-
-	panel_reset_n: panel-rst-n-state {
-		pins = "gpio53";
+	mdp_vsync_n: mdp-vsync-n-state {
+		pins = "gpio59";
+		function = "mdp_vsync";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+	
+	mdss_dsi_active: mdss-dsi-active-state {
+		pins = "gpio53", "gpio0", "gpio1";
 		function = "gpio";
 		drive-strength = <8>;
 		bias-disable;
 	};
-
-	mdp_vsync_n: mdp-vsync-n-state {
-		pins = "gpio59";
+		
+	mdss_te_active: mdss-te-active-state {
+	    pins = "gpio59";
 		function = "mdp_vsync";
 		drive-strength = <2>;
 		bias-pull-down;
