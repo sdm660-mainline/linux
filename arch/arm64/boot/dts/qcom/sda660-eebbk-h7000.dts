@@ -183,7 +183,7 @@
 	status = "okay";
 };
 
-mdss_dsi0 {
+&mdss_dsi0 {
 	status = "okay";
 
 	#address-cells = <1>;
@@ -192,12 +192,13 @@ mdss_dsi0 {
 	vdda-supply = <&vreg_l1a_1p225>;
 
 	panel: panel@0 {
-		compatible = "truly,nt35597";
+		compatible = "truly,nt35597-2K-display";
 		reg = <0>;
 
-		backlight = <&i2c_backlight>;
+		backlight = <&pm660l_wled>;
 		avdd-supply = <&lcd_pwr>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		mode-gpios = <&tlmm 53 GPIO_ACTIVE_HIGH>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
@@ -643,10 +644,17 @@ mdss_dsi0 {
 	};
 	
 	mdss_dsi_active: mdss-dsi-active-state {
-		pins = "gpio53", "gpio0", "gpio1";
+		pins = "gpio53";
 		function = "gpio";
 		drive-strength = <8>;
 		bias-disable;
+	};
+
+        mdss_dsi_suspend: mdss-dsi-suspend-state {
+		pins = "gpio53";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
 	};
 		
 	mdss_te_active: mdss-te-active-state {
