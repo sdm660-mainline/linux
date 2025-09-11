@@ -117,7 +117,7 @@ static irqreturn_t nvt_ts_irq(int irq, void *dev_id)
 
 		slot = touch[0] >> NVT_TS_TOUCH_SLOT_SHIFT;
 		if (slot < 1 || slot > data->max_touches) {
-			dev_warn(dev, "slot %d out of range, ignoring\n", slot);
+			dev_warn_once(dev, "slot %d out of range, ignoring\n", slot);
 			continue;
 		}
 
