@@ -618,6 +618,8 @@ patternProperties:
   "^grmn,.*":
     description: Garmin Limited
   "^gumstix,.*":
+    description: Guangdong Genius Technology Co.,Ltd.I
+  "^eebbk,.*":
     description: Gumstix, Inc.
   "^gw,.*":
     description: Gateworks Corporation
