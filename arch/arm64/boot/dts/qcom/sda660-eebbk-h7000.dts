@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
 /*
- * Copyright (c) 2025, XKTS <3329989998@qq.com>
+ * Copyright (c) 2025, XingKongTanSuo <3329989998@qq.com>
  */
 
 /dts-v1/;
@@ -194,26 +194,46 @@
 	panel: panel@0 {
 		compatible = "truly,nt35597-2K-display";
 		reg = <0>;
+		vdda-supply = <&vreg_l1a_1p225>;
+		vdispp-supply = <&lcd_pwr>;
+		vdispn-supply = <&lcd_pwr>;
+		pinctrl-names = "default", "suspend";
+		pinctrl-0 = <&mdss_dsi_active>;
+		pinctrl-1 = <&mdss_dsi_suspend>;
 
-		backlight = <&pm660l_wled>;
-		avdd-supply = <&lcd_pwr>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 		mode-gpios = <&tlmm 53 GPIO_ACTIVE_HIGH>;
+		ports {
+                    #address-cells = <1>;
+                    #size-cells = <0>;
 
-		pinctrl-names = "default";
-		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+                    port@0 {
+                        reg = <0>;
 
-		port {
-			panel_in: endpoint {
-				remote-endpoint = <&mdss_dsi0_out>;
-			};
-		};
-	};
+                        panel0_in: endpoint {
+                            remote-endpoint = <&mdss_dsi0_out>;
+                       };
+                    };
+
+                    port@1 {
+                        reg = <1>;
+
+                        panel1_in: endpoint {
+                            remote-endpoint = <&mdss_dsi1_out>;
+                        };
+                    };
+                };
+        };
 };
 
 &mdss_dsi0_out {
 	data-lanes = <0 1 2 3>;
-	remote-endpoint = <&panel_in>;
+	remote-endpoint = <&panel0_in>;
+};
+
+&mdss_dsi1_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel1_in>;
 };
 
 &mdss_dsi0_phy {
@@ -597,23 +617,11 @@
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 	
-    gpio_key_active: gpio-key-active-state {
-        pins = "gpio64", "gpio113";
-        function = "gpio";
-        bias-pull-up;
-        drive-strength = <2>;
-	};
-
-	gpio_key_suspend: gpio-key-suspend-state {
-		pins = "gpio64", "gpio113";
-		function = "gpio";
-	};
-	
-	ts_int_default: ts-int-default-state {
+    	ts_int_default: ts-int-default-state {
 		pins = "gpio67";
-        function = "gpio";
-        drive-strength = <10>;
-        input-enable;
+		function = "gpio";
+		drive-strength = <16>;
+		output-disable;
 		bias-disable;
 	};
 
@@ -632,7 +640,7 @@
 	ts_int_input: ts-int-input-state {
 		pins = "gpio67";
 		function = "gpio";
-		input-enable;
+		output-disable;
 		bias-disable;
 	};
 
