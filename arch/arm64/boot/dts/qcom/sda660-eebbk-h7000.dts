@@ -67,8 +67,8 @@
     lcd_pwr: lcd-power-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "lcd_pwr";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
+		regulator-min-microvolt = <3400000>;
+		regulator-max-microvolt = <3700000>;
 		gpio = <&pm660l_gpios 5 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		pinctrl-names = "default";
@@ -154,25 +154,15 @@
 	};
 };
 
-&blsp_i2c3 {
+&blsp_i2c1 {
 	status = "okay";
 
-	touchscreen@5d {
-		compatible = "goodix,gt9110";
-		reg = <0x5d>;
-
-		AVDD28-supply = <&vreg_l3b_3p0>;
-		VDDIO-supply = <&vreg_l11a_1p8>;
-
-		interrupts-extended = <&tlmm 67 IRQ_TYPE_LEVEL_LOW>;
-
-		pinctrl-names = "default", "int-output-low", "int-output-high", "int-input";
-		pinctrl-0 = <&ts_int_default>;
-		pinctrl-1 = <&ts_int_output_low>;
-		pinctrl-2 = <&ts_int_output_high>;
-		pinctrl-3 = <&ts_int_input>;
-
-		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+	touchscreen@38 {
+		compatible = "edt,edt-ft5406";
+		reg = <0x38>;
+                interrupt-parent = <0xa3>;
+                interrupts = <0x43 0x2800>;
+                reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
 
 		touchscreen-size-x = <1600>;
 		touchscreen-size-y = <2176>;
@@ -202,7 +192,7 @@
 		pinctrl-1 = <&mdss_dsi_suspend>;
 
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
-		mode-gpios = <&tlmm 53 GPIO_ACTIVE_HIGH>;
+		mode-gpios = <&tlmm 59 GPIO_ACTIVE_HIGH>;
 		ports {
                     #address-cells = <1>;
                     #size-cells = <0>;
@@ -617,38 +607,11 @@
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
 	
-    	ts_int_default: ts-int-default-state {
-		pins = "gpio67";
-		function = "gpio";
-		drive-strength = <16>;
-		output-disable;
-		bias-disable;
-	};
-
-	ts_int_output_high: ts-int-output-high-state {
-		pins = "gpio67";
-		function = "gpio";
-		output-high;
-	};
-
-	ts_int_output_low: ts-int-output-low-state {
-		pins = "gpio67";
-		function = "gpio";
-		output-low;
-	};
-
-	ts_int_input: ts-int-input-state {
-		pins = "gpio67";
-		function = "gpio";
-		output-disable;
-		bias-disable;
-	};
-
-	mdp_vsync_n: mdp-vsync-n-state {
-		pins = "gpio59";
-		function = "mdp_vsync";
-		drive-strength = <2>;
-		bias-pull-down;
+	ts_active: ts-active-state {
+		pins = "gpio66";
+	    function = "gpio";
+		drive-strength = <10>;
+		bias-pull-up;
 	};
 	
 	mdss_dsi_active: mdss-dsi-active-state {
