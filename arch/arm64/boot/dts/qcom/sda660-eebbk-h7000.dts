@@ -185,8 +185,6 @@
 		compatible = "truly,nt35597-2K-display";
 		reg = <0>;
 		vdda-supply = <&vreg_l1a_1p225>;
-		vdispp-supply = <&lcd_pwr>;
-		vdispn-supply = <&lcd_pwr>;
 		pinctrl-names = "default", "suspend";
 		pinctrl-0 = <&mdss_dsi_active>;
 		pinctrl-1 = <&mdss_dsi_suspend>;
