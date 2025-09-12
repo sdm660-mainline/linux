@@ -617,9 +617,9 @@ patternProperties:
     description: Grinn
   "^grmn,.*":
     description: Garmin Limited
-  "^gumstix,.*":
-    description: Guangdong Genius Technology Co.,Ltd.I
   "^eebbk,.*":
+    description: Guangdong Genius Technology Co.,Ltd.I
+  "^gumstix,.*":
     description: Gumstix, Inc.
   "^gw,.*":
     description: Gateworks Corporation
