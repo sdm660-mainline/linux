@@ -881,6 +881,7 @@ properties:
 
       - items:
           - enum:
+              - eebbk,h7000
               - inforce,ifc6560
               - xiaomi,clover
           - const: qcom,sda660
