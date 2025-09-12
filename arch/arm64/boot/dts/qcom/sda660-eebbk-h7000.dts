@@ -160,8 +160,7 @@
 	touchscreen@38 {
 		compatible = "edt,edt-ft5406";
 		reg = <0x38>;
-                interrupt-parent = <0xa3>;
-                interrupts = <0x43 0x2800>;
+                interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
                 reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
 
 		touchscreen-size-x = <1600>;
