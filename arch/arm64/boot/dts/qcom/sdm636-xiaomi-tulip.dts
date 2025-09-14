@@ -131,6 +131,16 @@
 		pinctrl-0 = <&ts_pins_active>;
 		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
 		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+    
+	touchscreen@1 {
+		compatible = "novatek,nt36672a-ts";
+		reg = <0x1>;
+		iovcc-supply = <&vreg_l11a_1p8>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&ts_pins_active>;
+		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <2280>;
 	};
@@ -184,6 +194,11 @@
 
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
+		compatible = "tianma,tl063fvmc43-02", "novatek,nt36672a";
+		reg = <0>;
+
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		vddio-supply = <&vreg_l11a_1p8>;
 		backlight = <&pm660l_wled>;
 
 		pinctrl-names = "default";

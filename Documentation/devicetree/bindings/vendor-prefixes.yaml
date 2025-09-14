@@ -210,6 +210,8 @@ patternProperties:
     description: BAIKAL ELECTRONICS, JSC
   "^bananapi,.*":
     description: BIPAI KEJI LIMITED
+  "^bbry,.*":
+    description: BlackBerry Limited
   "^beacon,.*":
     description: Compass Electronics Group, LLC
   "^beagle,.*":
@@ -1348,6 +1350,8 @@ patternProperties:
     description: SGX Sensortech
   "^sharp,.*":
     description: Sharp Corporation
+  "^shenchao,.*":
+    description: Shenzhen Zhuohong Electronic Technology Co., Ltd.
   "^shift,.*":
     description: SHIFT GmbH
   "^shimafuji,.*":
@@ -1593,6 +1597,8 @@ patternProperties:
     description: Theobroma Systems Design und Consulting GmbH
   "^turing,.*":
     description: Turing Machines, Inc.
+  "^txd,.*":
+    description: Shenzhen TXD Technology Co., Ltd.
   "^tyan,.*":
     description: Tyan Computer Corporation
   "^tyhx,.*":
