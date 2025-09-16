@@ -108,7 +108,7 @@
 	vdda-supply = <&vreg_l1a_1p225>;
 
 	panel: panel@0 {
-		compatible = "boe,nt51021-10wu";
+		compatible = "boe,tv101wum-nx0", "novatek,nt51021";
 		reg = <0>;
 
 		backlight = <&i2c_backlight>;
