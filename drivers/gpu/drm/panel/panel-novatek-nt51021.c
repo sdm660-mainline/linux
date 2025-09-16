@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (c) 2024, Nickolay Goppen <killubuntoid@yandex.ru>
+// Copyright (c) 2025, Nickolay Goppen <setotau@mainlining.org>
 // Copyright (c) 2024, Alexey Minnekhanov <alexeymin@postmarketos.org>
 
 #include <linux/delay.h>
@@ -621,7 +621,9 @@ static int nt51021_boe_get_modes(struct drm_panel *panel,
 				 struct drm_connector *connector)
 {
 	struct boe_nt51021_desc *ctx = to_boe_panel(panel);
-	return drm_connector_helper_get_modes_fixed(connector, ctx->variant->display_mode);
+
+	return drm_connector_helper_get_modes_fixed(connector,
+						    ctx->variant->display_mode);
 }
 
 static const struct drm_panel_funcs nt51021_boe_panel_funcs = {
@@ -675,7 +677,8 @@ static int nt51021_boe_probe(struct mipi_dsi_device *dsi)
 	ret = mipi_dsi_attach(dsi);
 	if (ret < 0) {
 		drm_panel_remove(&ctx->panel);
-		return dev_err_probe(dev, ret, "Failed to attach to DSI host\n");
+		return dev_err_probe(dev, ret,
+				     "Failed to attach to DSI host\n");
 	}
 
 	return 0;
@@ -734,8 +737,8 @@ static const struct boe_nt51021_variant nt51021_10wu_data = {
 };
 
 static const struct of_device_id nt51021_boe_of_match[] = {
-	{ .compatible = "boe,nt51021", .data = &nt51021_8inch_data },
-	{ .compatible = "boe,nt51021-10wu", .data = &nt51021_10wu_data },
+	{ .compatible = "boe,tv080wum-nx2", .data = &nt51021_8inch_data },
+	{ .compatible = "boe,tv101wum-nx0", .data = &nt51021_10wu_data },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, nt51021_boe_of_match);
@@ -744,13 +747,13 @@ static struct mipi_dsi_driver nt51021_boe_driver = {
 	.probe = nt51021_boe_probe,
 	.remove = nt51021_boe_remove,
 	.driver = {
-		.name = "panel-boe-nt51021",
+		.name = "panel-novatek-nt51021",
 		.of_match_table = nt51021_boe_of_match,
 	},
 };
 module_mipi_dsi_driver(nt51021_boe_driver);
 
-MODULE_AUTHOR("Nickolay Goppen <killubuntoid@yandex.ru>");
+MODULE_AUTHOR("Nickolay Goppen <setotau@mainlining.org>");
 MODULE_AUTHOR("Alexey Minnekhanov <alexeymin@postmarketos.org>");
-MODULE_DESCRIPTION("DRM driver for BOE NT51021-based DSI panels");
+MODULE_DESCRIPTION("DRM driver for Novatek NT51021-based DSI panels");
 MODULE_LICENSE("GPL");
