@@ -14,7 +14,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 100
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62
+        with:
+          files: |
+            **.yaml
       - name: Install dependencies
         run: |
           sudo apt install -yqq bison build-essential device-tree-compiler flex gcc-aarch64-linux-gnu python3 python3-dev python3-venv swig
@@ -27,15 +33,36 @@ jobs:
       - name: Compile DTBs
         run: |
           make O=build-dtbs-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- dtbs
-      - name: Check DTBs
+      - name: Create venv
         run: |
           python3 -m venv venv_dtschema
           . venv_dtschema/bin/activate
-          pip3 install dtschema
+          pip3 install dtschema yamllint
+          deactivate
+      - name: Check DTBs
+        run: |
+          . venv_dtschema/bin/activate
           make O=build-dtbs-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j1 CHECK_DTBS=y \
               qcom/sdm630-*.dtb qcom/sdm636-*.dtb qcom/sdm660-*.dtb qcom/sda660-*.dtb 2>&1 | \
               tee build-dtbs-check/results.txt
           deactivate
+      - name: Check bindings
+        if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          CHANGED_YAMLS: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          . venv_dtschema/bin/activate
+          # echo "CHANGED_YAMLS: ${CHANGED_YAMLS}"
+          if [ ! -z "${CHANGED_YAMLS}" ]; then
+              for f in ${CHANGED_YAMLS}; do
+                  bf=$( basename $f )
+                  echo "==> Checking binding: $bf"
+                  make dt_binding_check O=build-dtbs-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j1 "DT_SCHEMA_FILES=$bf"
+              done
+          fi
+          deactivate
+      - name: Cleanup venv
+        run: |
           rm -r venv_dtschema
       - name: Analyze results
         continue-on-error: true
