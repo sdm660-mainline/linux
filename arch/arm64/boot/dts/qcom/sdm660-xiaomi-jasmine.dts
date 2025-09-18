@@ -218,9 +218,7 @@
 
 &pm660_fg {
 	monitored-battery = <&battery>;
-	qcom,battery-capacity-ua = <4000000>;
-	qcom,min-voltage-uv= <3400000>;
-	qcom,max-voltage-uv= <4400000>;
+	power-supplies = <&pm660_charger>;
 
 	status = "okay";
 };
