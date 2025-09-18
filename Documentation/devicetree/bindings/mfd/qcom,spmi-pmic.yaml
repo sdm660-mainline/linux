@@ -143,6 +143,7 @@ patternProperties:
     type: object
     oneOf:
       - $ref: /schemas/power/supply/qcom,pm8916-bms-vm.yaml#
+      - $ref: /schemas/power/supply/qcom,pmi8998-fg.yaml#
 
   "^charger@[0-9a-f]+$":
     type: object
