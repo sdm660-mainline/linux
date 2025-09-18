@@ -559,7 +559,7 @@ config DRM_PANEL_NOVATEK_NT39016
 	  around the Novatek NT39016 display controller.
 
 config DRM_PANEL_NOVATEK_NT51021
-	tristate "NOVATEK NT51021 DSI panel"
+	tristate "Novatek NT51021 DSI panel"
 	depends on OF
 	depends on DRM_MIPI_DSI
 	depends on BACKLIGHT_CLASS_DEVICE
