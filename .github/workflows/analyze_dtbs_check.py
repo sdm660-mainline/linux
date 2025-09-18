@@ -6,8 +6,6 @@ import sys
 IGNORE_ERRORS = [
     '\'fb-panel\' does not match any of the regexes',
     '\'framebuffer-panel\' does not match any of the regexes',
-    '\'fuel-gauge@4000\' does not match any of the regexes',
-    'failed to match any schema with compatible: [\'qcom,pmi8998-fg\']',
 ]
 
 def is_error_ignored(line: str) -> bool:
