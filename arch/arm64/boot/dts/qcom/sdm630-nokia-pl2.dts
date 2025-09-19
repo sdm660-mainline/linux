@@ -301,11 +301,10 @@
 };
 
 &pm660_fg {
-	status = "okay";
 	monitored-battery = <&battery>;
-	qcom,battery-capacity-ua = <4000000>;
-	qcom,min-voltage-uv= <3400000>;
-	qcom,max-voltage-uv= <4408000>;
+	power-supplies = <&pm660_charger>;
+
+	status = "okay";
 };
 
 &pm660_rradc {

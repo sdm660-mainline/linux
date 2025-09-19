@@ -236,9 +236,7 @@
 
 &pm660_fg {
 	monitored-battery = <&battery>;
-	qcom,battery-capacity-ua = <4000000>;
-	qcom,min-voltage-uv= <3400000>;
-	qcom,max-voltage-uv= <4400000>;
+	power-supplies = <&pm660_charger>;
 
 	status = "okay";
 };
@@ -281,6 +279,7 @@
 
 &qusb2phy0 {
 	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-pll-supply = <&vreg_l10a_1p8>;
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 
 	status = "okay";

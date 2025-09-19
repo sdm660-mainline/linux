@@ -39,7 +39,7 @@
 	status = "okay";
 
 	panel: panel@0 {
-		compatible = "boe,nt51021";
+		compatible = "boe,tv080wum-nx2", "novatek,nt51021";
 		reg = <0>;
 
 		backlight = <&pm660l_wled>;
