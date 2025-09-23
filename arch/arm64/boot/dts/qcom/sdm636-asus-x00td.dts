@@ -161,6 +161,23 @@
 		regulator-boot-on;
 	};
 
+	/*
+	 * This is here until we have a driver for QPNP LCDB regulator.
+	 * It can emulate both positive LDO and negative NCP supplies for panel.
+	 */
+	lcdb_fixed: lcdb-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "lcdb";
+		/*
+		 * Actual range for LCDB is 4.0 - 6.0V, but
+		 * stock bootloader sets voltage to 5.4 V
+		 */
+		regulator-min-microvolt = <5400000>;
+		regulator-max-microvolt = <5400000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
 	battery: battery {
 			compatible = "simple-battery";
 
@@ -253,12 +270,16 @@
 		compatible = "txd,txdi600yanpa-43v3", "novatek,nt36672a";
 
 		vddio-supply = <&vreg_l11a_1p8>;
+		vddneg-supply = <&lcdb_fixed>;
+		vddpos-supply = <&lcdb_fixed>;
+
 		backlight = <&pm660l_wled>;
 
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+
 		port {
 			panel_in: endpoint {
 				remote-endpoint = <&mdss_dsi0_out>;
