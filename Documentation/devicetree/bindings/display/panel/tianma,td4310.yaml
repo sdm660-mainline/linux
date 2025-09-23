@@ -26,6 +26,15 @@ properties:
   backlight:
     description: phandle of the backlight device attached to the panel
 
+  vddio-supply:
+    description: phandle of the regulator that provides the supply for IO lines
+
+  vsp-supply:
+    description: phandle of the positive boost supply regulator
+
+  vsn-supply:
+    description: phandle of the negative boost supply regulator
+
   port: true
   rotation: true
   width-mm: true
@@ -35,6 +44,7 @@ required:
   - compatible
   - reg
   - reset-gpios
+  - vddio-supply
 
 unevaluatedProperties: false
 
@@ -48,6 +58,7 @@ examples:
             compatible = "tianma,td4310-xiaomi-whyred";
             reg = <0>;
             reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+            vddio-supply = <&vreg_l11a_1p8>;
             backlight = <&pm660l_wled>;
             port {
                 panel_in: endpoint {
