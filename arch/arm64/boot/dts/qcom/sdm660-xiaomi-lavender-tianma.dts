@@ -38,6 +38,8 @@
 &panel {
 	compatible = "tianma,tl063fvmca01-00", "novatek,nt36672a";
 	vddio-supply = <&vreg_l11a_1p8>;
+	vddneg-supply = <&lcdb_fixed>;
+	vddpos-supply = <&lcdb_fixed>;
 };
 
 &tlmm {
