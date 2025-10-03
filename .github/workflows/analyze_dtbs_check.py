@@ -6,7 +6,6 @@ import sys
 IGNORE_ERRORS = [
     '\'fb-panel\' does not match any of the regexes',
     '\'framebuffer-panel\' does not match any of the regexes',
-    'audio-codec@152c0000',
 ]
 
 def is_error_ignored(line: str) -> bool:
