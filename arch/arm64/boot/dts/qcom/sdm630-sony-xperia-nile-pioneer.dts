@@ -91,8 +91,13 @@
 /* Identifies itself as Synaptics TD4322Test */
 &touchscreen {
 	/*
-	 * Due to how fw_devlink works, abuse follower API to make touch probe
-	 * after panel, so that panel resets the gpio first, otherwise it fails
+	 * Because synaptics driver doesn't support reset-gpio,
+	 * we need to delay initialization of rmi_i2c driver
+	 * long enough until display subsystem probes and flips
+	 * gpio53.
 	 */
-	panel = <&panel>;
+	syna,startup-delay-ms = <500>;
+
+	/* This might be common for all nile devices, not only pioneer */
+	vio-supply = <&vreg_l11a_1p8>;
 };
