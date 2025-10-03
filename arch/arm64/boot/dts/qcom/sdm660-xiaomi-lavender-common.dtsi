@@ -229,13 +229,6 @@
 };
 
 &lpass_codec {
-	clocks = <&int_cdc_bclk>,
-		 <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
-	clock-names = "ahbix-clk", "mclk";
-
-	assigned-clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
-	assigned-clock-rates = <9600000>;
-
 	status = "okay";
 };
 
