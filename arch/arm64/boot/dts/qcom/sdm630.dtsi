@@ -2010,7 +2010,7 @@
 			clocks = <&gcc GCC_BLSP2_QUP3_SPI_APPS_CLK>,
 				 <&gcc GCC_BLSP2_AHB_CLK>;
 			clock-names = "core", "iface";
-			clock-frequency = <400000>;
+
 			dmas = <&blsp2_dma 8>, <&blsp2_dma 9>;
 			dma-names = "tx", "rx";
 
