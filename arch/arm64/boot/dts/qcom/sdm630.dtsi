@@ -2418,9 +2418,12 @@
 			compatible = "qcom,msm8916-wcd-digital-codec";
 			reg = <0x152c0000 0x400>;
 
-			clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
-			clock-names = "mclk";
+			clocks = <&int_cdc_bclk>,
+				<&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+			clock-names = "ahbix-clk", "mclk";
 
+			assigned-clocks = <&q6afecc LPASS_CLK_ID_INT_MCLK_0 LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+			assigned-clock-rates = <9600000>;
 			// Resolve naming conflicts with digital and analog PDM_RX*
 			sound-name-prefix = "Digital";
 			#sound-dai-cells = <1>;
