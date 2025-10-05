@@ -65,15 +65,6 @@
 				<&mmcc MDSS_ESC0_CLK>;
 
 			power-domains = <&rpmpd SDM660_VDDCX>, <&mmcc MDSS_GDSC>;
-
-			/* In order to allow simpledrm framebuffer to know
-			 * physical dimensions */
-			panel = <&fb_panel>;
-
-			fb_panel: fb-panel {
-				width-mm = <63>;
-				height-mm = <95>;
-			};
 		};
 	};
 
