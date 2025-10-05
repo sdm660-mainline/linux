@@ -33,13 +33,37 @@
 
 		stdout-path = "serial0:115200n8";
 
-		simplefb: framebuffer@9d400000 {
+		framebuffer@9d400000 {
 			compatible = "simple-framebuffer";
 			reg = <0x0 0x9d400000 0x0 (1200 * 1920 * 4)>;
 			width = <1200>;
 			height = <1920>;
 			stride = <(1200 * 4)>;
 			format = "a8r8g8b8";
+
+			/*
+			* Prevent unused clocks and power domains from being disabled. It's
+			* needed to keep bootloader-enabled display stack (and therefore
+			* framebuffer) working.
+			*/
+			assigned-clocks = <&mmcc MDSS_MDP_CLK>,   /* from mdp */
+					<&mmcc MDSS_VSYNC_CLK>;
+			assigned-clock-rates = <300000000>,
+						<19200000>;
+			clocks = <&mmcc MDSS_AHB_CLK>, /* from mdss & mdp */
+				<&mmcc MDSS_AXI_CLK>,
+				<&mmcc MDSS_VSYNC_CLK>,
+				<&mmcc MDSS_MDP_CLK>,
+				<&mmcc BYTE0_CLK_SRC>, /* from mdss_dsi0 */
+				<&mmcc PCLK0_CLK_SRC>,
+				<&mmcc MDSS_BYTE0_CLK>,
+				<&mmcc MDSS_BYTE0_INTF_CLK>,
+				<&mmcc MNOC_AHB_CLK>,
+				<&mmcc MISC_AHB_CLK>,
+				<&mmcc MDSS_PCLK0_CLK>,
+				<&mmcc MDSS_ESC0_CLK>;
+
+			power-domains = <&rpmpd SDM660_VDDCX>, <&mmcc MDSS_GDSC>;
 		};
 	};
 
