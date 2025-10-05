@@ -42,15 +42,6 @@
 			height = <2160>;
 			stride = <(1080 * 4)>;
 			format = "a8r8g8b8";
-
-			/* In order to allow simpledrm framebuffer to know
-			 * physical dimensions */
-			panel = <&fb_panel>;
-
-			fb_panel: fb-panel {
-				width-mm = <68>;
-				height-mm = <136>;
-			};
 		};
 	};
 
