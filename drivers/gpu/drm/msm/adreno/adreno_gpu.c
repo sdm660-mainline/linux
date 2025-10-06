@@ -332,7 +332,7 @@ int adreno_fault_handler(struct msm_gpu *gpu, unsigned long iova, int flags,
 			scratch[0], scratch[1], scratch[2], scratch[3]);
 
 	if (do_devcoredump) {
-		struct msm_gpu_fault_info fault_info = {};
+		/* struct msm_gpu_fault_info fault_info = {}; */
 
 		/* Turn off the hangcheck timer to keep it from bothering us */
 		timer_delete(&gpu->hangcheck_timer);
@@ -342,13 +342,14 @@ int adreno_fault_handler(struct msm_gpu *gpu, unsigned long iova, int flags,
 		 */
 		reinit_completion(&adreno_gpu->fault_coredump_done);
 
-		fault_info.ttbr0 = info->ttbr0;
+		/* fault_info.ttbr0 = info->ttbr0;
+
 		fault_info.iova  = iova;
 		fault_info.flags = flags;
 		fault_info.type  = type;
 		fault_info.block = block;
 
-		msm_gpu_fault_crashstate_capture(gpu, &fault_info);
+		msm_gpu_fault_crashstate_capture(gpu, &fault_info); */
 
 		complete_all(&adreno_gpu->fault_coredump_done);
 	}
