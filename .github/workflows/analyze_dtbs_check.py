@@ -45,6 +45,9 @@ def main() -> int:
                     continue
                 if line.startswith('SCHEMA ') or line.startswith('DTC [C]'):
                     continue
+                # skip "make[x]: Leaving directory ..." / "make[x]: Entering directory ..."
+                if ('make' in line) and (' directory ' in line):
+                    continue
                 errors_count = errors_count + 1
                 if is_error_ignored(line):
                     errors_ignored = errors_ignored + 1
