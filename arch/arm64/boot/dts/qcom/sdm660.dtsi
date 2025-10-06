@@ -74,20 +74,20 @@
 		}; */
 
 		/* bins 157,146 -> bits 6,5 */
-		opp-700000000 {
+		/*opp-700000000 {
 			opp-hz = /bits/ 64 <700000000>;
 			opp-level = <RPM_SMD_LEVEL_TURBO>;
 			opp-peak-kBps = <5184000>;
 			opp-supported-hw = <0x60>;
-		};
+		};*/
 
 		/* bins 157,146,135 -> bits 6,5,4 */
-		opp-647000000 {
+		/*opp-647000000 {
 			opp-hz = /bits/ 64 <647000000>;
 			opp-level = <RPM_SMD_LEVEL_NOM_PLUS>;
 			opp-peak-kBps = <4068000>;
 			opp-supported-hw = <0x70>;
-		};
+		};*/
 
 		/* bins 157,146,135 -> bits 6,5,4 */
 		opp-588000000 {
