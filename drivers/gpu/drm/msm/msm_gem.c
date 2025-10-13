@@ -62,6 +62,8 @@ static void msm_gem_close(struct drm_gem_object *obj, struct drm_file *file)
 	 */
 	if (!ctx->vm)
 		return;
+	if (!to_msm_vm(ctx->vm)->pid)
+		return;
 
 	/*
 	 * VM_BIND does not depend on implicit teardown of VMAs on handle
