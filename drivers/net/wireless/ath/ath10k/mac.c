@@ -2959,6 +2959,15 @@ static int ath10k_mac_txpower_setup(struct ath10k *ar, int txpower)
 
 	connected = ath10k_mac_is_connected(ar);
 
+	ath10k_warn(ar, "ath10k_mac_txpower_setup: called for txpower=%d, connected=%s\n",
+		txpower, connected ? "true" : "false");
+	//dump_stack();
+	// HACK: skip setting txpower if not connected (spoiler: doesn't help)
+	if (!connected) {
+		ath10k_info(ar, "ath10k_mac_txpower_setup: skip setting txpower when not connected");
+		return 0;
+	}
+
 	if (connected && ar->tx_power_2g_limit)
 		if (tx_power_2g > ar->tx_power_2g_limit)
 			tx_power_2g = ar->tx_power_2g_limit;
@@ -6662,6 +6671,7 @@ static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		WARN_ON(ret > 0);
 		ath10k_warn(ar, "failed to install key for vdev %i peer %pM: %d\n",
 			    arvif->vdev_id, peer_addr, ret);
+		dump_stack();
 		goto exit;
 	}
 
