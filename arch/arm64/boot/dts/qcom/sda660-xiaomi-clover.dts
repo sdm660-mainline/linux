@@ -73,6 +73,7 @@
 	qcom,switching-freq = <800>;
 	qcom,current-limit-microamp = <20000>;
 	qcom,num-strings = <3>;
+	qcom,cabc;
 
 	status = "okay";
 };
