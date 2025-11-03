@@ -41,6 +41,36 @@ static void nt51021_boe_reset(struct boe_nt51021_desc *ctx)
 	usleep_range(10000, 11000);
 }
 
+static void nt51021_cabc_on(struct mipi_dsi_multi_context *dsi_ctx)
+{
+	if (dsi_ctx->accum_err)
+		return;
+
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x8f, 0x00);
+	mipi_dsi_usleep_range(dsi_ctx, 1000, 2000);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x8f, 0xa5);
+	mipi_dsi_usleep_range(dsi_ctx, 1000, 2000);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x83, 0xbb);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x84, 0x22);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x90, 0x40);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x8f, 0x00);
+	mipi_dsi_usleep_range(dsi_ctx, 1000, 2000);
+}
+
+static void nt51021_cabc_off(struct mipi_dsi_multi_context *dsi_ctx)
+{
+	if (dsi_ctx->accum_err)
+		return;
+
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x8f, 0xa5);
+	mipi_dsi_usleep_range(dsi_ctx, 1000, 2000);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x83, 0xbb);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x84, 0x22);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x90, 0xc0);
+	mipi_dsi_generic_write_seq_multi(dsi_ctx, 0x8f, 0x00);
+	mipi_dsi_usleep_range(dsi_ctx, 1000, 2000);
+}
+
 static int nt51021_boe_8_init(struct boe_nt51021_desc *ctx)
 {
 	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi };
@@ -298,6 +328,8 @@ static int nt51021_boe_8_init(struct boe_nt51021_desc *ctx)
 	mipi_dsi_usleep_range(&dsi_ctx, 5000, 6000);
 	mipi_dsi_generic_write_seq_multi(&dsi_ctx, 0x8f, 0x00);
 	mipi_dsi_usleep_range(&dsi_ctx, 1000, 2000);
+
+	nt51021_cabc_on(&dsi_ctx);
 
 	return dsi_ctx.accum_err;
 }
@@ -557,12 +589,17 @@ static int nt51021_boe_10wu_init(struct boe_nt51021_desc *ctx)
 	mipi_dsi_generic_write_seq_multi(&dsi_ctx, 0x8f, 0x00);
 	mipi_dsi_usleep_range(&dsi_ctx, 1000, 2000);
 
+	nt51021_cabc_on(&dsi_ctx);
+	mipi_dsi_usleep_range(&dsi_ctx, 1000, 2000);
+
 	return dsi_ctx.accum_err;
 }
 
 static int nt51021_boe_off(struct boe_nt51021_desc *ctx)
 {
 	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi };
+
+	nt51021_cabc_off(&dsi_ctx);
 
 	mipi_dsi_generic_write_seq_multi(&dsi_ctx, 0x8f, 0xa5);
 	mipi_dsi_msleep(&dsi_ctx, 20);
