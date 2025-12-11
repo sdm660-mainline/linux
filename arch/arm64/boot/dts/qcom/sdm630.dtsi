@@ -1037,6 +1037,23 @@
 			};
 		};
 
+		ipa: ipa@14780000 {
+			compatible = "qcom,ipa-lite-v2.6";
+			reg = <0x14780000 0x47000>;
+			clocks = <&rpmcc RPM_SMD_IPA_CLK>;
+			interrupts = <GIC_SPI 333 IRQ_TYPE_EDGE_RISING>,
+			<GIC_SPI 432 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "ipa", "dma";
+			interconnects =  <&a2noc MASTER_IPA &bimc SLAVE_EBI>,
+			<&a2noc MASTER_IPA &snoc SLAVE_IMEM>,
+			<&gnoc MASTER_APSS_PROC &snoc SLAVE_IPA>;
+			interconnect-names = "ipa-mem", "ipa-imem", "cpu-cfg";
+			iommus =  <&anoc2_smmu 0x19C0>,
+					  <&anoc2_smmu 0x19C2>;
+			modem-remoteproc = <&remoteproc_mss>;
+			status = "okay";
+		};
+
 		remoteproc_mss: remoteproc@4080000 {
 			compatible = "qcom,sdm660-mss-pil";
 			reg = <0x04080000 0x100>, <0x04180000 0x40>;
