@@ -14,7 +14,7 @@ clk-qcom-y += clk-regmap-mux-div.o
 clk-qcom-y += clk-regmap-phy-mux.o
 clk-qcom-$(CONFIG_KRAIT_CLOCKS) += clk-krait.o
 clk-qcom-y += clk-hfpll.o
-clk-qcom-y += reset.o
+clk-qcom-y += reset.o clk-voter.o
 clk-qcom-$(CONFIG_QCOM_GDSC) += gdsc.o
 
 # Keep alphabetically sorted by config

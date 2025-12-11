@@ -16,6 +16,8 @@
 #include <linux/platform_device.h>
 #include <linux/soc/qcom/smd-rpm.h>
 
+#include "clk-voter.h"
+
 #include <dt-bindings/clock/qcom,rpmcc.h>
 
 #define __DEFINE_CLK_SMD_RPM_PREFIX(_prefix, _name, _active,		      \
