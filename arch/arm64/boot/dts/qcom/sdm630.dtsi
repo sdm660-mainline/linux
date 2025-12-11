@@ -503,8 +503,9 @@
 		};
 
 		adsp_mem: adsp-region@f6000000 {
+			compatible = "shared-dma-pool";
 			reg = <0x0 0xf6000000 0x0 0x800000>;
-			no-map;
+			reusable;
 		};
 
 		qseecom_mem: qseecom-region@f6800000 {
@@ -2522,6 +2523,8 @@
 					compatible = "qcom,fastrpc";
 					qcom,glink-channels = "fastrpcglink-apps-dsp";
 					label = "adsp";
+					memory-region = <&adsp_mem>;
+					qcom,vmids = <33>;
 					qcom,non-secure-domain;
 					#address-cells = <1>;
 					#size-cells = <0>;
