@@ -185,7 +185,7 @@
 		 * long enough until display subsystem probes and flips
 		 * gpio53.
 		 */
-		syna,startup-delay-ms = <500>;
+		syna,startup-delay-ms = <600>;
 
 		rmi4-f01@1 {
 			reg = <0x01>;
