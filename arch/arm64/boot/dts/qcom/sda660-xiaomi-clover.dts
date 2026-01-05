@@ -9,6 +9,16 @@
 / {
 	model = "Xiaomi Mi Pad 4";
 	compatible = "xiaomi,clover", "qcom,sda660";
+
+	battery: battery {
+		compatible = "simple-battery";
+
+		device-chemistry = "lithium-ion";
+
+		charge-full-design-microamp-hours = <6010000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
+	};
 };
 
 &blsp_i2c3 {

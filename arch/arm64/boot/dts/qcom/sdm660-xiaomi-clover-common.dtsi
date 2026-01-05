@@ -67,14 +67,6 @@
 		};
 	};
 
-	battery: battery {
-		compatible = "simple-battery";
-
-		charge-full-design-microamp-hours = <4000000>;
-		voltage-min-design-microvolt = <3400000>;
-		voltage-max-design-microvolt = <4408000>;
-	};
-
 	lcd_pwr: lcd-power-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "lcd_pwr";
