@@ -410,9 +410,15 @@ static const struct nvt_ts_i2c_chip_data nvt_nt36672a_ts_data = {
 	.chip_id = 0x08,
 };
 
+static const struct nvt_ts_i2c_chip_data nvt_nt36672a_e7t_ts_data = {
+	.wake_type = 0x02,
+	.chip_id = 0x08,
+};
+
 static const struct of_device_id nvt_ts_of_match[] = {
 	{ .compatible = "novatek,nt11205-ts", .data = &nvt_nt11205_ts_data },
 	{ .compatible = "novatek,nt36672a-ts", .data = &nvt_nt36672a_ts_data },
+	{ .compatible = "novatek,nt36672a-e7t-ts", .data = &nvt_nt36672a_e7t_ts_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, nvt_ts_of_match);
@@ -420,6 +426,7 @@ MODULE_DEVICE_TABLE(of, nvt_ts_of_match);
 static const struct i2c_device_id nvt_ts_i2c_id[] = {
 	{ "nt11205-ts", (unsigned long) &nvt_nt11205_ts_data },
 	{ "nt36672a-ts", (unsigned long) &nvt_nt36672a_ts_data },
+	{ "nt36672a-e7t-ts", (unsigned long) &nvt_nt36672a_e7t_ts_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, nvt_ts_i2c_id);
