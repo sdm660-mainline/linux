@@ -17,6 +17,7 @@ properties:
     enum:
       - novatek,nt11205-ts
       - novatek,nt36672a-ts
+      - novatek,nt36672a-e7t-ts
 
   reg:
     maxItems: 1
