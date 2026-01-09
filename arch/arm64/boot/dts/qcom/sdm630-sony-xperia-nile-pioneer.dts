@@ -96,7 +96,7 @@
 	 * long enough until display subsystem probes and flips
 	 * gpio53.
 	 */
-	syna,startup-delay-ms = <500>;
+	syna,startup-delay-ms = <600>;
 
 	/* This might be common for all nile devices, not only pioneer */
 	vio-supply = <&vreg_l11a_1p8>;
