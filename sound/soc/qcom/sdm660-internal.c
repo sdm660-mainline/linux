@@ -118,6 +118,20 @@ static int snd_sdm660_int_startup(struct snd_pcm_substream *stream)
 		return -ENOSYS;
 	}
 
+	/*
+	 * SDM630/SDM636/SDM660 ADSP firmware has a buffer size limit of ~256KB.
+	 * Constrain buffer size to avoid DSP GENERAL_FAILURE errors.
+	 * Only apply this constraint for playback on these SoCs.
+	 */
+	if (stream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+	    (of_machine_is_compatible("qcom,sdm630") ||
+	     of_machine_is_compatible("qcom,sdm636") ||
+	     of_machine_is_compatible("qcom,sdm660"))) {
+		snd_pcm_hw_constraint_minmax(stream->runtime,
+					     SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
+					     0, 256 * 1024);
+	}
+
 	return 0;
 }
 
