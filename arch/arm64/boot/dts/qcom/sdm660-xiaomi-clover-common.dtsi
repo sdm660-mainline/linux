@@ -649,7 +649,7 @@
 
 &sound {
 	compatible = "qcom,sdm660-internal-sndcard";
-	model = "Xiaomi Mi Pad 4 (Plus)";
+	model = "Xiaomi Mi Pad 4";
 	pinctrl-0 = <&cdc_pdm_default>,
 			<&cdc_dmic_default>;
 	pinctrl-names = "default";
