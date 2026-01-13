@@ -22,6 +22,15 @@
 			no-map;
 		};
 	};
+
+	/* Either tdk_4380mv or send_4380mv, both similar */
+	battery: battery {
+		compatible = "simple-battery";
+
+		charge-full-design-microamp-hours = <3300000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4380000>;
+	};
 };
 
 &adreno_gpu {
@@ -78,6 +87,23 @@
 };
 
 &mmss_smmu {
+	status = "okay";
+};
+
+&pm660_charger {
+	monitored-battery = <&battery>;
+
+	status = "okay";
+};
+
+&pm660_fg {
+	monitored-battery = <&battery>;
+	power-supplies = <&pm660_charger>;
+
+	status = "okay";
+};
+
+&pm660_rradc {
 	status = "okay";
 };
 
