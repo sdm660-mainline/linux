@@ -1,0 +1,232 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2021, AngeloGioacchino Del Regno
+ *                     <angelogioacchino.delregno@somainline.org>
+ * Copyright (c) 2022, Molly Sophia <mollysophia379@gmail.com>
+ */
+
+/dts-v1/;
+
+#include "sdm660.dtsi"
+#include "sdm660-xiaomi-common.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	model = "Xiaomi Mi 8 Lite";
+	compatible = "xiaomi,platina", "qcom,sdm660";
+	chassis-type = "handset";
+
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <3350000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
+	};
+
+	reserved-memory {
+		/* Delete common ramoops - platina uses different address and settings */
+		/delete-node/ ramoops@a0000000;
+
+		ramoops@ffc00000 {
+			compatible = "ramoops";
+			reg = <0x0 0xffc00000 0x0 0x100000>;
+			record-size = <0x10000>;
+			console-size = <0x60000>;
+			ftrace-size = <0x10000>;
+			pmsg-size = <0x20000>;
+			ecc-size = <16>;
+		};
+	};
+};
+
+&blsp2_uart1 {
+	status = "disabled";
+};
+
+&blsp_i2c4 {
+	status = "okay";
+
+	touchscreen@1 {
+		compatible = "novatek,nt36672a-ts";
+		reg = <0x1>;
+		iovcc-supply = <&vreg_l11a_1p8>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
+		pinctrl-0 = <&ts_int_active &ts_rst_n>;
+		pinctrl-names = "default";
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2280>;
+	};
+};
+
+&framebuffer_mem {
+	reg = <0x0 0x9d400000 0x0 0x964b00>;
+};
+
+&framebuffer0 {
+	width = <1080>;
+	height = <2280>;
+	stride = <(1080 * 4)>;
+
+	status = "okay";
+};
+
+&pm660_charger {
+	status = "disabled";
+	monitored-battery = <&battery>;
+};
+
+&pm660l_wled {
+	status = "disabled";
+};
+
+/*
+ * Override sdhc_1 from common: platina uses mmc-ddr-1_8v instead of mmc-hs200-1_8v
+ */
+&sdhc_1 {
+	/delete-property/ mmc-hs200-1_8v;
+	mmc-ddr-1_8v;
+};
+
+&tlmm {
+	gpio-reserved-ranges = <8 4>; /* Fingerprint SPI */
+
+	/* Override common pinctrl for platina-specific settings */
+	gpio_hall_sensor_default: gpio-hall-sensor-default-state {
+		pins = "gpio75";
+		function = "gpio";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-up;
+		bias-disable;
+		output-disable;
+	};
+
+	ts_rst_n: ts-rst-n-state {
+		pins = "gpio66";
+		function = "gpio";
+		bias-disable;
+		drive-strength = <8>;
+	};
+
+	ts_int_active: ts-int-active-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <16>;
+		bias-pull-up;
+	};
+};
+
+&vreg_bob {
+	regulator-min-microvolt = <3304000>;
+	regulator-max-microvolt = <3624000>;
+};
+
+&vreg_l10a_1p8 {
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <1944000>;
+};
+
+&vreg_l11a_1p8 {
+	regulator-min-microvolt = <1784000>;
+	regulator-max-microvolt = <1944000>;
+};
+
+&vreg_l12a_1p8 {
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <1944000>;
+};
+
+&vreg_l13a_1p8 {
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <1944000>;
+};
+
+&vreg_l14a_1p8 {
+	regulator-max-microvolt = <1952000>;
+};
+
+&vreg_l15a_1p8 {
+	regulator-min-microvolt = <1648000>;
+	regulator-max-microvolt = <2952000>;
+};
+
+&vreg_l16a_2p7 {
+	regulator-min-microvolt = <2704000>;
+	regulator-max-microvolt = <2712000>;
+};
+
+&vreg_l19a_3p3 {
+	regulator-max-microvolt = <3328000>;
+};
+
+&vreg_l1a_1p225 {
+	regulator-min-microvolt = <1226000>;
+};
+
+&vreg_l1b_0p925 {
+	regulator-min-microvolt = <920000>;
+	regulator-max-microvolt = <928000>;
+};
+
+&vreg_l2a_1p0 {
+	regulator-min-microvolt = <944000>;
+	regulator-max-microvolt = <1008000>;
+};
+
+&vreg_l2b_2p95 {
+	/* Keep the maximum below 2.7V to disable unsupported 3.3V signaling. */
+	regulator-max-microvolt = <2696000>;
+};
+
+&vreg_l3a_1p0 {
+	regulator-min-microvolt = <944000>;
+	regulator-max-microvolt = <1008000>;
+};
+
+&vreg_l3b_3p3 {
+	regulator-min-microvolt = <3296000>;
+	regulator-max-microvolt = <3312000>;
+	regulator-min-microamp = <200>;
+	regulator-max-microamp = <600000>;
+	regulator-system-load = <100000>;
+};
+
+&vreg_l5a_0p848 {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <952000>;
+};
+
+&vreg_l5b_2p95 {
+	regulator-system-load = <800000>;
+};
+
+&vreg_l6a_1p3 {
+	regulator-min-microvolt = <1304000>;
+	regulator-max-microvolt = <1368000>;
+};
+
+&vreg_l7b_3p125 {
+	regulator-min-microvolt = <2704000>;
+	regulator-max-microvolt = <3128000>;
+};
+
+&vreg_l8a_1p8 {
+	regulator-min-microvolt = <1800000>;
+};
+
+&vreg_l8b_3p3 {
+	regulator-min-microvolt = <2800000>;
+};
+
+&vreg_l9a_1p8 {
+	regulator-min-microvolt = <1804000>;
+	regulator-max-microvolt = <1896000>;
+};
+
+&vreg_s4a_2p04 {
+	regulator-min-microvolt = <2040000>;
+};
+
+&wifi {
+	status = "disabled";
+};
