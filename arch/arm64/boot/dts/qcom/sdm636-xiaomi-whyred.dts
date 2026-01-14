@@ -152,7 +152,7 @@
 };
 
 &adreno_gpu_zap {
-	firmware-name = "a512_zap.mbn";
+	firmware-name = "qcom/sdm636/xiaomi/whyred/a512_zap.mdt";
 	memory-region = <&zap_shader_region>;
 };
 

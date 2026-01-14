@@ -132,7 +132,7 @@
 };
 
 &adreno_gpu_zap {
-	firmware-name = "a512_zap.mbn";
+	firmware-name = "qcom/sdm636/xiaomi/tulip/a512_zap.mdt";
 };
 
 &blsp_i2c1 {

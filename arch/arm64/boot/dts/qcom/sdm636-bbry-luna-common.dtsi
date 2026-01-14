@@ -20,7 +20,7 @@
 };
 
 &adreno_gpu_zap {
-	firmware-name = "qcom/sdm636/luna/a512_zap.mbn";
+	firmware-name = "qcom/sdm636/luna/a512_zap.mdt";
 };
 
 &adsp_pil {
