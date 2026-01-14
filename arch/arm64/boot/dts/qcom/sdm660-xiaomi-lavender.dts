@@ -7,26 +7,17 @@
 /dts-v1/;
 
 #include "sdm660.dtsi"
-#include "pm660.dtsi"
-#include "pm660l.dtsi"
-#include <dt-bindings/input/input.h>
-#include <dt-bindings/input/gpio-keys.h>
+#include "sdm660-xiaomi-common.dtsi"
 
 / {
 	model = "Xiaomi Redmi Note 7";
 	compatible = "xiaomi,lavender", "qcom,sdm660";
 	chassis-type = "handset";
 
-	aliases {
-		serial0 = &blsp1_uart2;
-	};
-
 	chosen {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
-
-		stdout-path = "serial0:115200n8";
 
 		framebuffer0: framebuffer@9d400000 {
 			compatible = "simple-framebuffer";
@@ -35,27 +26,6 @@
 			height = <2340>;
 			stride = <(1080 * 4)>;
 			format = "a8r8g8b8";
-		};
-	};
-
-	vph_pwr: vph-pwr-regulator {
-		compatible = "regulator-fixed";
-		regulator-name = "vph_pwr";
-		regulator-min-microvolt = <3700000>;
-		regulator-max-microvolt = <3700000>;
-
-		regulator-always-on;
-		regulator-boot-on;
-	};
-
-	gpio-keys {
-		compatible = "gpio-keys";
-
-		key-volup {
-			label = "Volume Up";
-			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
-			linux,code = <KEY_VOLUMEUP>;
-			debounce-interval = <15>;
 		};
 	};
 
@@ -78,37 +48,6 @@
 			no-map;
 		};
 	};
-
-	/*
-	 * Until we hook up type-c detection, we
-	 * have to stick with this. But it works.
-	 */
-	extcon_usb: extcon-usb {
-		compatible = "linux,extcon-usb-gpio";
-		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
-	};
-};
-
-&blsp1_uart2 {
-	status = "okay";
-};
-
-&pon_pwrkey {
-	status = "okay";
-};
-
-&pon_resin {
-	status = "okay";
-
-	linux,code = <KEY_VOLUMEDOWN>;
-};
-
-&qusb2phy0 {
-	status = "okay";
-
-	vdd-supply = <&vreg_l1b_0p925>;
-	vdda-pll-supply = <&vreg_l10a_1p8>;
-	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
 &rpm_requests {
@@ -362,70 +301,4 @@
 			regulator-allow-set-load;
 		};
 	};
-};
-
-&pm660l_wled {
-	status = "okay";
-
-	qcom,switching-freq = <800>;
-	qcom,current-limit-microamp = <20000>;
-	qcom,num-strings = <2>;
-};
-
-&sdc2_state_on {
-	sd-cd-pins {
-		pins = "gpio54";
-		function = "gpio";
-		bias-pull-up;
-		drive-strength = <2>;
-	};
-};
-
-&sdc2_state_off {
-	sd-cd-pins {
-		pins = "gpio54";
-		function = "gpio";
-		bias-disable;
-		drive-strength = <2>;
-	};
-};
-
-&sdhc_1 {
-	status = "okay";
-	supports-cqe;
-
-	mmc-hs200-1_8v;
-	mmc-hs400-1_8v;
-	mmc-hs400-enhanced-strobe;
-
-	vmmc-supply = <&vreg_l4b_2p95>;
-	vqmmc-supply = <&vreg_l8a_1p8>;
-};
-
-&sdhc_2 {
-	status = "okay";
-
-	cd-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
-
-	vmmc-supply = <&vreg_l5b_2p95>;
-	vqmmc-supply = <&vreg_l2b_2p95>;
-};
-
-&tlmm {
-	gpio-reserved-ranges = <8 4>;
-};
-
-&usb3 {
-	qcom,select-utmi-as-pipe-clk;
-
-	status = "okay";
-};
-
-&usb3_dwc3 {
-	maximum-speed = "high-speed";
-	phys = <&qusb2phy0>;
-	phy-names = "usb2-phy";
-
-	dr_mode = "peripheral";
-	extcon = <&extcon_usb>;
 };
