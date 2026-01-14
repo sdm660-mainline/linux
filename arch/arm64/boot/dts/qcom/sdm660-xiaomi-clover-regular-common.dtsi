@@ -7,9 +7,6 @@
 #include "sdm660-xiaomi-clover-common.dtsi"
 
 / {
-	model = "Xiaomi Mi Pad 4";
-	compatible = "xiaomi,clover", "qcom,sda660";
-
 	battery: battery {
 		compatible = "simple-battery";
 
@@ -84,12 +81,6 @@
 	qcom,current-limit-microamp = <20000>;
 	qcom,num-strings = <3>;
 	qcom,cabc;
-
-	status = "okay";
-};
-
-&remoteproc_mss {
-	firmware-name = "mba.mbn", "modemnm.mdt";
 
 	status = "okay";
 };
