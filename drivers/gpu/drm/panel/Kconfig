@@ -1149,6 +1149,15 @@ config DRM_PANEL_SYNAPTICS_TDDI
 	  namesake, with varying resolutions and data lanes. They also have a
 	  built-in LED backlight and a touch controller.
 
+config DRM_PANEL_SYNAPTICS_TD4310
+	tristate "Synaptics TD4310-based panels"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y if you want to enable support for panels based on the
+	  Synaptics TD4310 controller.
+
 config DRM_PANEL_TDO_TL070WSH30
 	tristate "TDO TL070WSH30 DSI panel"
 	depends on OF
