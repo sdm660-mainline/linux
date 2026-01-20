@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2020, Alexey Minnekhanov <alexeymin@minlexx.ru>
  * Copyright (c) 2021, Dang Huynh <danct12@riseup.net>
+ * Copyright (c) 2026, Gianluca Boiano <morf3089@gmail.com>
  */
 
 #include "pm660.dtsi"
@@ -15,6 +16,7 @@
 / {
 	aliases {
 		serial0 = &blsp1_uart2;
+		serial1 = &blsp2_uart1;
 	};
 
 	chosen {
@@ -26,23 +28,46 @@
 
 		framebuffer0: framebuffer@9d400000 {
 			compatible = "simple-framebuffer";
+			memory-region = <&framebuffer_mem>;
 			/*
 			 * width/height/stride to be overridden
 			 * by individual device dts
 			 */
 			format = "a8r8g8b8";
 
+			status = "disabled";
 		};
 	};
 
 	gpio-keys {
 		compatible = "gpio-keys";
 
+		pinctrl-0 = <&vol_up_default>;
+		pinctrl-names = "default";
+
 		key-volup {
 			label = "Volume Up";
 			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_VOLUMEUP>;
 			debounce-interval = <15>;
+		};
+	};
+
+	gpio_hall_sensor: gpio-hall-sensor {
+		compatible = "gpio-keys";
+
+		pinctrl-0 = <&gpio_hall_sensor_default>;
+		pinctrl-names = "default";
+
+		status = "okay";
+
+		event-hall {
+			label = "Hall Effect Sensor";
+			gpios = <&tlmm 75 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_LID>;
+			linux,can-disable;
+			wakeup-source;
 		};
 	};
 
@@ -79,6 +104,33 @@
 };
 
 &blsp1_uart2 {
+	status = "okay";
+};
+
+&blsp2_uart1 {
+	status = "okay";
+
+	bluetooth {
+		compatible = "qcom,wcn3990-bt";
+		vddxo-supply = <&vreg_l9a_1p8>;
+		vddrf-supply = <&vreg_l6a_1p3>;
+		vddch0-supply = <&vreg_l19a_3p3>;
+		vddio-supply = <&vreg_l13a_1p8>;
+		max-speed = <3200000>;
+	};
+};
+
+&pm660l_gpios {
+	vol_up_default: vol-up-default-state {
+		pins = "gpio7";
+		function = PMIC_GPIO_FUNC_NORMAL;
+		bias-pull-up;
+		input-enable;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
+	};
+};
+
+&pm660_charger {
 	status = "okay";
 };
 
@@ -399,6 +451,15 @@
 	vqmmc-supply = <&vreg_l2b_2p95>;
 };
 
+&tlmm {
+	gpio_hall_sensor_default: gpio-hall-sensor-default-state {
+		pins = "gpio75";
+		function = "gpio";
+		drive-strength = <6>;
+		bias-pull-up;
+	};
+};
+
 &usb3 {
 	qcom,select-utmi-as-pipe-clk;
 
@@ -410,4 +471,13 @@
 	phys = <&qusb2phy0>;
 	phy-names = "usb2-phy";
 	dr_mode = "peripheral";
+};
+
+&wifi {
+	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p848>;
+	vdd-1.8-xo-supply = <&vreg_l9a_1p8>;
+	vdd-1.3-rfa-supply = <&vreg_l6a_1p3>;
+	vdd-3.3-ch0-supply = <&vreg_l19a_3p3>;
+
+	status = "okay";
 };

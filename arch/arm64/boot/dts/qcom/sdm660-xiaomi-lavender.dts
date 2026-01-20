@@ -29,11 +29,13 @@
 };
 
 &framebuffer0 {
+	/delete-property/ memory-region;
 	reg = <0 0x9d400000 0 (1080 * 2340 * 4)>;
 	width = <1080>;
 	height = <2340>;
 	stride = <(1080 * 4)>;
 
+	status = "okay";
 };
 
 &sdhc_2 {
