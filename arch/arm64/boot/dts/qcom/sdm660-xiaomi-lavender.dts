@@ -82,7 +82,7 @@
 		/* SDHCI 3.3V signal doesn't seem to be supported. */
 		vreg_l2b_2p95: l2 {
 			regulator-min-microvolt = <1648000>;
-			regulator-max-microvolt = <2696000>;
+			regulator-max-microvolt = <3100000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
@@ -92,6 +92,7 @@
 			regulator-max-microvolt = <3300000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
+			regulator-always-on;
 		};
 
 		vreg_l4b_2p95: l4 {
@@ -239,6 +240,7 @@
 			regulator-max-microvolt = <1950000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
+			regulator-system-load = <14000>;
 		};
 
 		vreg_l11a_1p8: l11 {
@@ -294,4 +296,8 @@
 			regulator-allow-set-load;
 		};
 	};
+};
+
+&sdhc_2 {
+	status = "okay";
 };
