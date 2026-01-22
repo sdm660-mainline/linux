@@ -14,3 +14,7 @@
 &panel {
 	compatible = "boe,bv045fhm-l00";
 };
+
+&focaltech_touchscreen {
+	status = "okay";
+};

@@ -235,6 +235,8 @@
 
 
 &blsp_i2c1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
 	status = "okay";
 
 	stmpe1801: port-expander@40
@@ -309,7 +311,7 @@
 	status = "okay";
 
 	/* Focaltech ft8707 */
-	touchscreen@38 {
+	focaltech_touchscreen: touchscreen@38 {
 		compatible = "focaltech,ft8719";
 		reg = <0x38>;
 		pinctrl-0 = <&ts_int_active &ts_reset_active>;
@@ -323,6 +325,32 @@
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <1620>;
 		wakeup-source;
+		status = "disabled";
+	};
+
+	synaptics_touchscreen: touchscreen@70 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "syna,rmi4-i2c";
+		reg = <0x70>;
+		pinctrl-0 = <&ts_int_active>;
+		pinctrl-1 = <&ts_int_sleep>;
+		pinctrl-names = "default", "sleep";
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
+		syna,reset-delay-ms = <220>;
+		syna,startup-delay-ms = <600>;
+		vio-supply = <&vreg_l11a_1p8>;
+		status = "disabled";
+
+		rmi4-f01@1 {
+			reg = <0x01>;
+			syna,nosleep-mode = <1>;
+		};
+
+		rmi4-f11@11 {
+			reg = <0x11>;
+			syna,sensor-type = <1>;
+		};
 	};
 };
 
@@ -339,10 +367,8 @@
 
 	status = "okay";
 
-
 	panel: panel@0 {
 		reg = <0>;
-
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 		backlight = <&pm660l_wled>;
 		width-mm = <63>;
@@ -513,6 +539,14 @@
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
+
+		vreg_l11a_1p8: l11 {
+			regulator-min-microvolt = <1780000>;
+			regulator-max-microvolt = <1950000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-allow-set-load;
+		};
+
 	};
 
 	regulators-1 {

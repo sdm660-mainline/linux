@@ -5,7 +5,6 @@
 
 /*
  * There are two variants of bbry-athena, one with synaptics panel and one with boe panel.
- * Currently only boe panel is supported
  */
 
 /dts-v1/;
