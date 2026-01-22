@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2026, Paul Sajna <hello@paulsajna.com>
+ */
+
+/dts-v1/;
+
+#include "sdm636-bbry-luna-common.dtsi"
+
+/ {
+	compatible = "bbry,luna-syna", "qcom,sdm636";
+};
+
+&panel {
+	compatible = "syna,td4310";
+};
+
+&synaptics_touchscreen {
+	status = "okay";
+};
+
