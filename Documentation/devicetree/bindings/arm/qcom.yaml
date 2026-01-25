@@ -819,11 +819,15 @@ properties:
       - items:
           - enum:
               - sony,mermaid-row
+              - xiaomi,tulip
+              - xiaomi,whyred
           - const: qcom,sdm636
 
       - items:
           - enum:
+              - xiaomi,jasmine
               - xiaomi,lavender
+              - xiaomi,platina
           - const: qcom,sdm660
 
       - items:

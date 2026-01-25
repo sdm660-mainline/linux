@@ -1,34 +1,85 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020, Alexey Minnekhanov <alexeymin@minlexx.ru>
- * Copyright (c) 2021, Dang Huynh <danct12@riseup.net>
+ * Copyright (c) 2025, Mathesh Velayudan <123v.mathesh@gmail.com>
+ * Copyright (c) 2025, Alexey Minnekhanov <alexeymin@minlexx.ru>
  */
 
 /dts-v1/;
 
-#include "sdm660.dtsi"
+#include "sdm636.dtsi"
 #include "sdm660-xiaomi-common.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
 
 / {
-	model = "Xiaomi Redmi Note 7";
-	compatible = "xiaomi,lavender", "qcom,sdm660";
+	model = "Xiaomi Redmi Note 5 Pro";
+	compatible = "xiaomi,whyred", "qcom,sdm636";
 	chassis-type = "handset";
 
-	reserved-memory {
-		/* Override framebuffer memory size for lavender's 2340px display */
-		framebuffer_mem: memory@9d400000 {
-			reg = <0x0 0x9d400000 0x0 0x23ff000>;
-			no-map;
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <4000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4408000>;
+	};
+};
+
+&blsp_i2c1 {
+	status = "okay";
+
+	/* Synaptics E753 */
+	touchscreen@20 {
+		compatible = "syna,rmi4-i2c";
+		reg = <0x20>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
+
+		pinctrl-0 = <&ts_active>;
+		pinctrl-names = "default";
+
+		vio-supply = <&vreg_l11a_1p8>;
+
+		syna,reset-delay-ms = <220>;
+		syna,startup-delay-ms = <600>;
+
+		rmi4-f01@1 {
+			reg = <0x01>;
+			syna,nosleep-mode = <1>;
+		};
+
+		rmi4-f11@11 {
+			reg = <0x11>;
+			syna,sensor-type = <1>;
 		};
 	};
 };
 
 &framebuffer0 {
 	width = <1080>;
-	height = <2340>;
+	height = <2160>;
 	stride = <(1080 * 4)>;
 
 	status = "okay";
+};
+
+&pm660_charger {
+	monitored-battery = <&battery>;
+};
+
+&pm660l_lpg {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	qcom,power-source = <1>;
+
+	status = "okay";
+
+	led@3 {
+		reg = <3>;
+		color = <LED_COLOR_ID_WHITE>;
+		function = LED_FUNCTION_STATUS;
+	};
 };
 
 &rpm_requests {
@@ -50,16 +101,16 @@
 		};
 
 		vreg_l3b_3p3: l3 {
-			regulator-min-microvolt = <1700000>;
-			regulator-max-microvolt = <3300000>;
+			regulator-min-microvolt = <1710000>;
+			regulator-max-microvolt = <3600000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 			regulator-always-on;
 		};
 
 		vreg_l4b_2p95: l4 {
-			regulator-min-microvolt = <2944000>;
-			regulator-max-microvolt = <2952000>;
+			regulator-min-microvolt = <1700000>;
+			regulator-max-microvolt = <2950000>;
 			regulator-enable-ramp-delay = <250>;
 
 			regulator-min-microamp = <200>;
@@ -138,7 +189,7 @@
 
 		vreg_l8a_1p8: l8 {
 			regulator-min-microvolt = <1750000>;
-			regulator-max-microvolt = <1800000>;
+			regulator-max-microvolt = <1900000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-system-load = <325000>;
 			regulator-allow-set-load;
@@ -200,13 +251,13 @@
 		};
 
 		vreg_l17a_1p8: l17 {
-			regulator-min-microvolt = <1648000>;
-			regulator-max-microvolt = <2952000>;
+			regulator-min-microvolt = <1650000>;
+			regulator-max-microvolt = <2950000>;
 			regulator-enable-ramp-delay = <250>;
 		};
 
 		vreg_l19a_3p3: l19 {
-			regulator-min-microvolt = <3312000>;
+			regulator-min-microvolt = <3200000>;
 			regulator-max-microvolt = <3400000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
@@ -220,4 +271,11 @@
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>; /* Fingerprint SPI */
+
+	ts_active: ts-active-state {
+		pins = "gpio66", "gpio67";
+		function = "gpio";
+		drive-strength = <10>;
+		bias-pull-up;
+	};
 };

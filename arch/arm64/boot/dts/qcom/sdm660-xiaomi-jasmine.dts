@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020, Alexey Minnekhanov <alexeymin@minlexx.ru>
- * Copyright (c) 2021, Dang Huynh <danct12@riseup.net>
+ * Copyright (c) 2022, Joe Mason <buddyjojo06@outlook.com>
  */
 
 /dts-v1/;
@@ -10,25 +9,48 @@
 #include "sdm660-xiaomi-common.dtsi"
 
 / {
-	model = "Xiaomi Redmi Note 7";
-	compatible = "xiaomi,lavender", "qcom,sdm660";
+	model = "Xiaomi Mi A2";
+	compatible = "xiaomi,jasmine", "qcom,sdm660";
 	chassis-type = "handset";
 
-	reserved-memory {
-		/* Override framebuffer memory size for lavender's 2340px display */
-		framebuffer_mem: memory@9d400000 {
-			reg = <0x0 0x9d400000 0x0 0x23ff000>;
-			no-map;
-		};
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <3000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
+	};
+};
+
+&blsp_i2c1 {
+	status = "okay";
+
+	touchscreen@1 {
+		compatible = "novatek,nt36672a-ts";
+		reg = <0x1>;
+		iovcc-supply = <&vreg_l11a_1p8>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-0 = <&ts_active>;
+		pinctrl-names = "default";
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2160>;
 	};
 };
 
 &framebuffer0 {
 	width = <1080>;
-	height = <2340>;
+	height = <2160>;
 	stride = <(1080 * 4)>;
 
 	status = "okay";
+};
+
+&gpio_hall_sensor {
+	status = "disabled";
+};
+
+&pm660_charger {
+	monitored-battery = <&battery>;
 };
 
 &rpm_requests {
@@ -44,7 +66,7 @@
 		/* SDHCI 3.3V signal doesn't seem to be supported. */
 		vreg_l2b_2p95: l2 {
 			regulator-min-microvolt = <1648000>;
-			regulator-max-microvolt = <3100000>;
+			regulator-max-microvolt = <2696000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
 		};
@@ -214,10 +236,13 @@
 	};
 };
 
-&sdhc_2 {
-	status = "okay";
-};
-
 &tlmm {
 	gpio-reserved-ranges = <8 4>; /* Fingerprint SPI */
+
+	ts_active: ts-active-state {
+		pins = "gpio66", "gpio67";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
 };
