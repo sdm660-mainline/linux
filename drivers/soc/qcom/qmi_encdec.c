@@ -368,8 +368,6 @@ static int qmi_encode(const struct qmi_elem_info *ei_array, void *out_buf,
 	const void *buf_src;
 	int encode_tlv = 0;
 	int rc;
-	u8 val8;
-	u16 val16;
 
 	if (!ei_array)
 		return 0;
@@ -406,7 +404,6 @@ static int qmi_encode(const struct qmi_elem_info *ei_array, void *out_buf,
 			break;
 
 		case QMI_DATA_LEN:
-			memcpy(&data_len_value, buf_src, sizeof(u32));
 			data_len_sz = temp_ei->elem_size == sizeof(u8) ?
 					sizeof(u8) : sizeof(u16);
 			/* Check to avoid out of range buffer access */
@@ -416,19 +413,16 @@ static int qmi_encode(const struct qmi_elem_info *ei_array, void *out_buf,
 				       __func__);
 				return -ETOOSMALL;
 			}
-			if (data_len_sz == sizeof(u8)) {
-				val8 = data_len_value;
-				rc = qmi_encode_basic_elem(buf_dst, &val8,
-							   1, data_len_sz);
-				if (rc < 0)
-					return rc;
-			} else {
-				val16 = data_len_value;
-				rc = qmi_encode_basic_elem(buf_dst, &val16,
-							   1, data_len_sz);
-				if (rc < 0)
-					return rc;
-			}
+
+			if (data_len_sz == sizeof(u8))
+				data_len_value = *(u8 *)buf_src;
+			else
+				data_len_value = *(u16 *)buf_src;
+
+			rc = qmi_encode_basic_elem(buf_dst, buf_src, 1, data_len_sz);
+			if (rc < 0)
+				return rc;
+
 			UPDATE_ENCODE_VARIABLES(temp_ei, buf_dst,
 						encoded_bytes, tlv_len,
 						encode_tlv, rc);
