@@ -712,8 +712,6 @@ static int qmi_decode(const struct qmi_elem_info *ei_array, void *out_c_struct,
 	u32 decoded_bytes = 0;
 	const void *buf_src = in_buf;
 	int rc;
-	u8 val8;
-	u16 val16;
 
 	while (decoded_bytes < in_buf_len) {
 		if (dec_level >= 2 && temp_ei->data_type == QMI_EOTI)
@@ -752,20 +750,16 @@ static int qmi_decode(const struct qmi_elem_info *ei_array, void *out_c_struct,
 		if (temp_ei->data_type == QMI_DATA_LEN) {
 			data_len_sz = temp_ei->elem_size == sizeof(u8) ?
 					sizeof(u8) : sizeof(u16);
-			if (data_len_sz == sizeof(u8)) {
-				rc = qmi_decode_basic_elem(&val8, buf_src,
-							   1, data_len_sz);
-				if (rc < 0)
-					return rc;
-				data_len_value = (u32)val8;
-			} else {
-				rc = qmi_decode_basic_elem(&val16, buf_src,
-							   1, data_len_sz);
-				if (rc < 0)
-					return rc;
-				data_len_value = (u32)val16;
-			}
-			memcpy(buf_dst, &data_len_value, sizeof(u32));
+
+			rc = qmi_decode_basic_elem(buf_dst, buf_src, 1, data_len_sz);
+			if (rc < 0)
+				return rc;
+
+			if (data_len_sz == sizeof(u8))
+				data_len_value = *(u8 *)buf_dst;
+			else
+				data_len_value = *(u16 *)buf_dst;
+
 			temp_ei = temp_ei + 1;
 			buf_dst = out_c_struct + temp_ei->offset;
 			tlv_len -= data_len_sz;
