@@ -573,6 +573,13 @@ static int qcom_sns_reg_probe(struct auxiliary_device *auxdev,
 			refcount_set(&__qcom_sns_reg_data->refcnt, 1);
 
 			ret = qcom_sns_reg_probe_once(auxdev);
+			if (ret) {
+				/* Probe failed, probably because no firmware was found */
+				__qcom_sns_reg_data = NULL;
+				kfree(data);
+				mutex_unlock(&qcom_sns_reg_mutex);
+				return dev_err_probe(&auxdev->dev, ret, "qcom_sns_reg probe failed!");
+			}
 		}
 	} else {
 		/* For 2nd, 3rd,.. init just increase reference count */
