@@ -12,9 +12,11 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
 
+/delete-node/ &adsp_region;
+/delete-node/ &wlan_msa_mem;
+/delete-node/ &wlan_msa_guard;
 /delete-node/ &qhee_code;
-/delete-node/ &tz_mem;
-/delete-node/ &zap_shader_region;
+/delete-node/ &mpss_region;
 /delete-node/ &rmtfs_mem;
 
 / {
@@ -34,7 +36,7 @@
 
 		framebuffer0: framebuffer@9d400000 {
 			compatible = "simple-framebuffer";
-			reg = <0x0 0x9d400000 0x0 (1080 * 1620 * 4)>;
+			memory-region = <&framebuffer_mem>;
 			status = "okay";
 			width = <1080>;
 			height = <1620>;
@@ -86,12 +88,20 @@
 		};
 	};
 
-	/* Dummy regulator until PM6660 has LCDB VSP/VSN support */
-	lcdb_dummy: regulator-lcdb-dummy {
+	/*
+	 * This is here until we have a driver for QPNP LCDB regulator.
+	 * It can emulate both positive LDO and negative NCP supplies for panel.
+	 */
+	lcdb_fixed: lcdb-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "lcdb_dummy";
+		regulator-name = "lcdb";
+		/*
+		 * Actual range for LCDB is 4.0 - 6.0V, but
+		 * stock bootloader sets voltage to 5.5 V
+		 */
 		regulator-min-microvolt = <5500000>;
 		regulator-max-microvolt = <5500000>;
+		regulator-boot-on;
 	};
 
 	reserved-memory {
@@ -99,23 +109,15 @@
 		#size-cells = <0x02>;
 		ranges;
 
-		framebuffer_mem: memory@9d400000 {
-			reg = <0x0 0x9d400000 0x0 (1080 * 1620 * 4)>;
+		adsp_region: memory@92a00000 {
+			reg = <0x00 0x92a00000 0x00 0x1e00000>;
 			no-map;
 		};
 
-		zap_shader_region: gpu-zap-mem@fe000000 {
-			compatible = "shared-dma-pool";
-			reg = <0x0 0xfe000000 0x0 0x2000>;
+		reset_log_mem: memory@7e3bc000 {
+			reg = <0x01 0x7e3bc000 0x00 0x4000>;
+			label = "reset_log";
 			no-map;
-		};
-
-		venus_fw_region {
-			compatible = "shared-dma-pool";
-			alloc-ranges = <0x00 0x80000000 0x00 0x20000000>;
-			reusable;
-			alignment = <0x00 0x400000>;
-			size = <0x00 0x800000>;
 		};
 
 		adsp_fw_region {
@@ -126,12 +128,23 @@
 			size = <0x00 0x800000>;
 		};
 
-		qseecom_region {
-			compatible = "shared-dma-pool";
-			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+		wlan_msa_mem: memory@85700000 {
+			reg = <0x00 0x85700000 0x00 0x100000>;
+			no-map;
+			qcom,use-guard-pages;
+		};
+
+		qhee_code: memory@85800000 {
+			reg = <0x00 0x85800000 0x00 0x5300000>;
+			no-map;
+		};
+
+		venus_fw_region {
 			reusable;
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x80000000 0x00 0x20000000>;
 			alignment = <0x00 0x400000>;
-			size = <0x00 0x1c00000>;
+			size = <0x00 0x800000>;
 		};
 
 		secure_region {
@@ -140,6 +153,18 @@
 			reusable;
 			alignment = <0x00 0x400000>;
 			size = <0x00 0x5c00000>;
+		};
+
+		framebuffer_mem: memory@9d400000 {
+			reg = <0x00 0x9d400000 0x00 0x2300000>;
+			label = "framebuffer";
+			no-map;
+		};
+
+		reset_mem: memory@7e3bb000 {
+			reg = <0x01 0x7e3bb000 0x00 0x1000>;
+			label = "reset";
+			no-map;
 		};
 
 		linux,cma {
@@ -155,9 +180,21 @@
 			compatible = "qcom,rmtfs-mem";
 			reg = <0x0 0xfdc00000 0x0 0x400000>;
 			no-map;
-
 			qcom,client-id = <1>;
 			qcom,vmid = <QCOM_SCM_VMID_MSS_MSA>;
+		};
+
+		mpss_region: memory@8ac00000 {
+			reg = <0x00 0x8ac00000 0x00 0x7e00000>;
+			no-map;
+		};
+
+		qseecom_region {
+			size = <0x00 0x1c00000>;
+			reusable;
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			alignment = <0x00 0x400000>;
 		};
 	};
 
@@ -317,8 +354,7 @@
 		pinctrl-0 = <&ts_int_active &ts_reset_active>;
 		pinctrl-1 = <&ts_int_sleep &ts_reset_sleep>;
 		pinctrl-names = "default", "sleep";
-		interrupt-parent = <&tlmm>;
-		interrupts = <67 IRQ_TYPE_EDGE_FALLING>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
 		vcc-supply = <&vreg_l3b_3p3>;
 		iovcc-supply = <&vreg_l9a_1p8>;
 		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
@@ -337,9 +373,12 @@
 		pinctrl-1 = <&ts_int_sleep>;
 		pinctrl-names = "default", "sleep";
 		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
-		syna,reset-delay-ms = <220>;
-		syna,startup-delay-ms = <600>;
 		vio-supply = <&vreg_l11a_1p8>;
+		vdd-supply = <&lcdb_fixed>;
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		syna,reset-delay-ms = <220>;
+		syna,startup-delay-ms = <2000>;
+
 		status = "disabled";
 
 		rmi4-f01@1 {
@@ -377,6 +416,10 @@
 		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 		pinctrl-1 = <&mdss_dsi_sleep &mdss_te_sleep>;
+
+		vddio-supply = <&vreg_l11a_1p8>;
+		vddneg-supply = <&lcdb_fixed>;
+		vddpos-supply = <&lcdb_fixed>;
 
 		port {
 			panel_in: endpoint {
