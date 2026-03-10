@@ -26,6 +26,15 @@ properties:
   backlight:
     description: phandle of the backlight device attached to the panel
 
+  vddio-supply:
+    description: power IC supply regulator
+
+  vddpos-supply:
+    description: positive boost supply regulator
+
+  vddneg-supply:
+    description: negative boost supply regulator
+
   port: true
   width-mm: true
   height-mm: true
@@ -34,6 +43,9 @@ required:
   - compatible
   - reg
   - reset-gpios
+  - vddio-supply
+  - vddpos-supply
+  - vddneg-supply
 
 unevaluatedProperties: false
 
@@ -47,6 +59,11 @@ examples:
         compatible = "syna,td4310";
         reg = <0>;
         reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+
+        vddio-supply = <&vreg_l11a_1p8>;
+        vddpos-supply = <&lab>;
+        vddneg-supply = <&ibb>;
+
         backlight = <&pm660l_wled>;
         width-mm = <63>;
         height-mm = <95>;
