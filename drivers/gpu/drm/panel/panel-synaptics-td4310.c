@@ -7,6 +7,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
+#include <linux/regulator/consumer.h>
 
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_modes.h>
@@ -17,6 +18,13 @@ struct synaptics_td4310 {
 	struct drm_panel panel;
 	struct mipi_dsi_device *dsi;
 	struct gpio_desc *reset_gpio;
+	struct regulator_bulk_data* supplies;
+};
+
+static const struct regulator_bulk_data synaptics_td4310_supplies[] = {
+	{ .supply = "vddio"},
+	{ .supply = "vddneg"},
+	{ .supply = "vddpos"},
 };
 
 static inline struct synaptics_td4310 *to_synaptics_td4310(struct drm_panel *panel)
@@ -71,6 +79,13 @@ static int synaptics_td4310_prepare(struct drm_panel *panel)
 	struct device *dev = &ctx->dsi->dev;
 	int ret;
 
+
+	ret = regulator_bulk_enable(ARRAY_SIZE(synaptics_td4310_supplies), ctx->supplies);
+	if (ret < 0)
+		return ret;
+
+	usleep_range(5000, 6000);
+
 	synaptics_td4310_reset(ctx);
 
 	ret = synaptics_td4310_on(ctx);
@@ -94,6 +109,8 @@ static int synaptics_td4310_unprepare(struct drm_panel *panel)
 		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
 
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+
+	regulator_bulk_disable(ARRAY_SIZE(synaptics_td4310_supplies), ctx->supplies);
 
 	return 0;
 }
@@ -136,6 +153,14 @@ static int synaptics_td4310_probe(struct mipi_dsi_device *dsi)
 				   DRM_MODE_CONNECTOR_DSI);
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
+
+	ret = devm_regulator_bulk_get_const(dev, ARRAY_SIZE(synaptics_td4310_supplies),
+		synaptics_td4310_supplies,
+		&ctx->supplies
+	);
+
+	if (ret < 0)
+		return dev_err_probe(dev, ret, "Failed to get regulators\n");
 
 	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio))
