@@ -26,6 +26,15 @@ properties:
   backlight:
     description: phandle of the backlight device attached to the panel
 
+  vddio-supply:
+    description: power IC supply regulator
+
+  vddpos-supply:
+    description: positive boost supply regulator
+
+  vddneg-supply:
+    description: negative boost supply regulator
+
   port: true
   rotation: true
   width-mm: true
@@ -35,35 +44,41 @@ required:
   - compatible
   - reg
   - reset-gpios
+  - vddio-supply
+  - vddpos-supply
+  - vddneg-supply
 
-unevalueatedProperties: false
+
+unevaluatedProperties: false
 
 examples:
   - |
-    #address-cells = <1>;
-    #size-cells = <0>;
+    #include <dt-bindings/gpio/gpio.h>
+    dsi {
+      #address-cells = <1>;
+      #size-cells = <0>;
+        panel: panel@0 {
+          compatible = "boe,bv045fhm-l00";
+          reg = <0>;
 
-    vdd-supply = <&vreg_l1b_0p925>;
-    vdda-supply = <&vreg_l1a_1p225>;
+          backlight = <&pm660l_wled>;
+          reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
-    panel: panel@0 {
-      compatible = "boe,bv045fhm-l00";
-      reg = <0>;
+          vddio-supply = <&vreg_l11a_1p8>;
+          vddpos-supply = <&lab>;
+          vddneg-supply = <&ibb>;
 
-      backlight = <&pm660l_wled>;
-      reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+          pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+          pinctrl-1 = <&mdss_dsi_sleep &mdss_te_sleep>;
+          pinctrl-names = "default", "sleep";
 
-      pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
-      pinctrl-1 = <&mdss_dsi_sleep &mdss_te_sleep>;
-      pinctrl-names = "default", "sleep";
+          width-mm = <63>;
+          height-mm = <95>;
 
-      width-mm = <63>;
-      height-mm = <95>;
-
-      port {
-        panel_in: endpoint {
-          remote-endpoint = <&mdss_dsi0_out>;
+          port {
+            panel_in: endpoint {
+              remote-endpoint = <&mdss_dsi0_out>;
+            };
+          };
         };
       };
-    };
-...
