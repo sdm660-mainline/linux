@@ -2053,7 +2053,7 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			ranges = <0 0x146bf000 0x1000>;
+			ranges = <0 0x146bf000 0 0x1000>;
 
 			pil-reloc@94c {
 				compatible = "qcom,pil-reloc-info";
