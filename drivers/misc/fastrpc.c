@@ -441,6 +441,8 @@ static int fastrpc_buf_alloc(struct fastrpc_user *fl, struct device *dev,
 	if (fl->sctx && fl->sctx->sid)
 		buf->phys += ((u64)fl->sctx->sid << 32);
 
+	dev_info(dev, "buf phys_addr = 0x%llx\n", buf->phys);
+
 	return 0;
 }
 
