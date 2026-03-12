@@ -1329,8 +1329,8 @@
 			compatible = "qcom,sdm660-dwc3", "qcom,dwc3";
 			reg = <0 0x0a8f8800 0 0x400>;
 			status = "disabled";
-			#address-cells = <1>;
-			#size-cells = <1>;
+			#address-cells = <2>;
+			#size-cells = <2>;
 			ranges;
 
 			clocks = <&gcc GCC_CFG_NOC_USB3_AXI_CLK>,
@@ -1363,7 +1363,7 @@
 
 			usb3_dwc3: usb@a800000 {
 				compatible = "snps,dwc3";
-				reg = <0x0a800000 0xc8d0>;
+				reg = <0 0x0a800000 0 0xc8d0>;
 				interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
 				snps,dis_u2_susphy_quirk;
 				snps,dis_enblslpm_quirk;
@@ -1546,8 +1546,8 @@
 			compatible = "qcom,sdm660-dwc3", "qcom,dwc3";
 			reg = <0 0x0c2f8800 0 0x400>;
 			status = "disabled";
-			#address-cells = <1>;
-			#size-cells = <1>;
+			#address-cells = <2>;
+			#size-cells = <2>;
 			ranges;
 
 			clocks = <&gcc GCC_CFG_NOC_USB2_AXI_CLK>,
@@ -1574,7 +1574,7 @@
 
 			usb2_dwc3: usb@c200000 {
 				compatible = "snps,dwc3";
-				reg = <0x0c200000 0xc8d0>;
+				reg = <0 0x0c200000 0 0xc8d0>;
 				interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
 				snps,dis_u2_susphy_quirk;
 				snps,dis_enblslpm_quirk;
@@ -1640,14 +1640,14 @@
 			interrupt-controller;
 			#interrupt-cells = <1>;
 
-			#address-cells = <1>;
-			#size-cells = <1>;
+			#address-cells = <2>;
+			#size-cells = <2>;
 			ranges;
 			status = "disabled";
 
 			mdp: display-controller@c901000 {
 				compatible = "qcom,sdm630-mdp5", "qcom,mdp5";
-				reg = <0x0c901000 0x89000>;
+				reg = <0 0x0c901000 0 0x89000>;
 				reg-names = "mdp_phys";
 
 				interrupt-parent = <&mdss>;
@@ -1722,7 +1722,7 @@
 			mdss_dsi0: dsi@c994000 {
 				compatible = "qcom,sdm660-dsi-ctrl",
 					     "qcom,mdss-dsi-ctrl";
-				reg = <0x0c994000 0x400>;
+				reg = <0 0x0c994000 0 0x400>;
 				reg-names = "dsi_ctrl";
 
 				operating-points-v2 = <&dsi_opp_table>;
@@ -1780,9 +1780,9 @@
 
 			mdss_dsi0_phy: phy@c994400 {
 				compatible = "qcom,dsi-phy-14nm-660";
-				reg = <0x0c994400 0x100>,
-				      <0x0c994500 0x300>,
-				      <0x0c994800 0x188>;
+				reg = <0 0x0c994400 0 0x100>,
+				      <0 0x0c994500 0 0x300>,
+				      <0 0x0c994800 0 0x188>;
 				reg-names = "dsi_phy",
 					    "dsi_phy_lane",
 					    "dsi_pll";
@@ -2572,8 +2572,8 @@
 		};
 
 		timer@17920000 {
-			#address-cells = <1>;
-			#size-cells = <1>;
+			#address-cells = <2>;
+			#size-cells = <2>;
 			ranges;
 			compatible = "arm,armv7-timer-mem";
 			reg = <0 0x17920000 0 0x1000>;
@@ -2583,49 +2583,49 @@
 				frame-number = <0>;
 				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
 					     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-				reg = <0x17921000 0x1000>,
-					<0x17922000 0x1000>;
+				reg = <0 0x17921000 0 0x1000>,
+					<0 0x17922000 0 0x1000>;
 			};
 
 			frame@17923000 {
 				frame-number = <1>;
 				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-				reg = <0x17923000 0x1000>;
+				reg = <0 0x17923000 0 0x1000>;
 				status = "disabled";
 			};
 
 			frame@17924000 {
 				frame-number = <2>;
 				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-				reg = <0x17924000 0x1000>;
+				reg = <0 0x17924000 0 0x1000>;
 				status = "disabled";
 			};
 
 			frame@17925000 {
 				frame-number = <3>;
 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-				reg = <0x17925000 0x1000>;
+				reg = <0 0x17925000 0 0x1000>;
 				status = "disabled";
 			};
 
 			frame@17926000 {
 				frame-number = <4>;
 				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-				reg = <0x17926000 0x1000>;
+				reg = <0 0x17926000 0 0x1000>;
 				status = "disabled";
 			};
 
 			frame@17927000 {
 				frame-number = <5>;
 				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-				reg = <0x17927000 0x1000>;
+				reg = <0 0x17927000 0 0x1000>;
 				status = "disabled";
 			};
 
 			frame@17928000 {
 				frame-number = <6>;
 				interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-				reg = <0x17928000 0x1000>;
+				reg = <0 0x17928000 0 0x1000>;
 				status = "disabled";
 			};
 		};
@@ -2635,8 +2635,8 @@
 			reg = <0 0x17a00000 0 0x10000>,	   /* GICD */
 				  <0 0x17b00000 0 0x100000>;	  /* GICR * 8 */
 			#interrupt-cells = <3>;
-			#address-cells = <1>;
-			#size-cells = <1>;
+			#address-cells = <2>;
+			#size-cells = <2>;
 			ranges;
 			interrupt-controller;
 			#redistributor-regions = <1>;

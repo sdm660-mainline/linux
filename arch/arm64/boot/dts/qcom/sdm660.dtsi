@@ -223,7 +223,7 @@
 	mdss_dsi1: dsi@c996000 {
 		compatible = "qcom,sdm660-dsi-ctrl",
 			     "qcom,mdss-dsi-ctrl";
-		reg = <0x0c996000 0x400>;
+		reg = <0 0x0c996000 0 0x400>;
 		reg-names = "dsi_ctrl";
 
 		/* DSI1 shares the OPP table with DSI0 */
@@ -282,9 +282,9 @@
 
 	mdss_dsi1_phy: phy@c996400 {
 		compatible = "qcom,dsi-phy-14nm-660";
-		reg = <0x0c996400 0x100>,
-				<0x0c996500 0x300>,
-				<0x0c996800 0x188>;
+		reg = <0 0x0c996400 0 0x100>,
+				<0 0x0c996500 0 0x300>,
+				<0 0x0c996800 0 0x188>;
 		reg-names = "dsi_phy",
 				"dsi_phy_lane",
 				"dsi_pll";
