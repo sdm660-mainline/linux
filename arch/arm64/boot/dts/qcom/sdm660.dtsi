@@ -37,6 +37,11 @@
 			reg = <0x00 0x94a00000 0x00 0x600000>;
 			no-map;
 		};
+		/*cdsp_mem: cdsp-region@f6000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xf6400000 0x0 0x400000>;
+			reusable;
+		};*/
 	};
 };
 
@@ -310,7 +315,7 @@
 &soc {
 	cdsp_smmu: iommu@5180000 {
 		compatible = "qcom,sdm630-smmu-v2", "qcom,smmu-v2";
-		reg = <0x5180000 0x40000>;
+		reg = <0 0x05180000 0 0x40000>;
 		#iommu-cells = <1>;
 
 		clocks = <&gcc GCC_HLOS1_VOTE_TURING_ADSP_SMMU_CLK>;
@@ -343,7 +348,7 @@
 
 	cdsp_pil: remoteproc@1a300000 {
 		compatible = "qcom,sdm660-cdsp-pas";
-		reg = <0x1a300000 0x00100>;
+		reg = <0 0x1a300000 0 0x00100>;
 		interrupts-extended =
 			<&intc GIC_SPI 518 IRQ_TYPE_EDGE_RISING>,
 			<&cdsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
@@ -374,6 +379,7 @@
 				compatible = "qcom,fastrpc";
 				qcom,glink-channels = "fastrpcglink-apps-dsp";
 				label = "cdsp";
+				memory-region = <&adsp_mem>;
 				qcom,non-secure-domain;
 				#address-cells = <1>;
 				#size-cells = <0>;
