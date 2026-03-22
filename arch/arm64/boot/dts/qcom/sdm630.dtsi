@@ -717,6 +717,28 @@
 			#thermal-sensor-cells = <1>;
 		};
 
+		cryptobam: dma-controller@1dc4000 {
+			compatible = "qcom,bam-v1.7.0";
+			reg = <0x01dc4000 0x24000>;
+			interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rpmcc RPM_SMD_CE1_CLK>;
+			clock-names = "bam_clk";
+			#dma-cells = <1>;
+			qcom,ee = <0>;
+			qcom,controlled-remotely;
+		};
+
+		crypto: crypto@1de0000 {
+			compatible = "qcom,crypto-v5.4";
+			reg = <0x01de0000 0x20000>;
+			clocks = <&rpmcc RPM_SMD_CE1_CLK>,
+				 <&rpmcc RPM_SMD_CE1_CLK>,
+				 <&rpmcc RPM_SMD_CE1_CLK>;
+			clock-names = "iface", "bus", "core";
+			dmas = <&cryptobam 6>, <&cryptobam 7>;
+			dma-names = "rx", "tx";
+		};
+
 		tcsr_mutex: hwlock@1f40000 {
 			compatible = "qcom,tcsr-mutex";
 			reg = <0x01f40000 0x20000>;
