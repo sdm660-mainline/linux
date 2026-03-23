@@ -184,7 +184,7 @@
 
 &adreno_gpu_zap {
 	memory-region = <&zap_shader_region>;
-	firmware-name = "a512_zap.mbn";
+	firmware-name = "qcom/sdm636/asus/x00td/a512_zap.mdt";
 };
 
 &adsp_pil {
