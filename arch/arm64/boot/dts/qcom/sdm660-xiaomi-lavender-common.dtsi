@@ -4,17 +4,8 @@
  * Copyright (c) 2021, Dang Huynh <danct12@riseup.net>
  */
 
-/dts-v1/;
-
 #include "sdm660.dtsi"
-#include "pm660.dtsi"
-#include "pm660l.dtsi"
-#include <dt-bindings/input/input.h>
-#include <dt-bindings/input/gpio-keys.h>
-#include <dt-bindings/leds/common.h>
-#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
-#include <dt-bindings/sound/qcom,q6afe.h>
-#include <dt-bindings/sound/qcom,q6asm.h>
+#include "sdm660-xiaomi-common.dtsi"
 
 /delete-node/ &zap_shader_region;
 
@@ -23,17 +14,10 @@
 	compatible = "xiaomi,lavender", "qcom,sdm660";
 	chassis-type = "handset";
 
-	aliases {
-		serial0 = &blsp1_uart2; /* Debug UART */
-		serial1 = &blsp2_uart1; /* Bluetooth UART */
-	};
-
 	chosen {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
-
-		stdout-path = "serial0:115200n8";
 
 		framebuffer0: framebuffer@9d400000 {
 			compatible = "simple-framebuffer";
@@ -53,16 +37,6 @@
 		voltage-max-design-microvolt = <4400000>;
 	};
 
-	vph_pwr: vph-pwr-regulator {
-		compatible = "regulator-fixed";
-		regulator-name = "vph_pwr";
-		regulator-min-microvolt = <3700000>;
-		regulator-max-microvolt = <3700000>;
-
-		regulator-always-on;
-		regulator-boot-on;
-	};
-
 	/*
 	 * This is here until we have a driver for QPNP LCDB regulator.
 	 * It can emulate both positive LDO and negative NCP supplies for panel.
@@ -78,20 +52,6 @@
 		regulator-max-microvolt = <5400000>;
 		regulator-always-on;
 		regulator-boot-on;
-	};
-
-	gpio-keys {
-		compatible = "gpio-keys";
-
-		pinctrl-0 = <&vol_up_default>;
-		pinctrl-names = "default";
-
-		key-volup {
-			label = "Volume Up";
-			gpios = <&pm660l_gpios 7 GPIO_ACTIVE_LOW>;
-			linux,code = <KEY_VOLUMEUP>;
-			debounce-interval = <15>;
-		};
 	};
 
 	reserved-memory {
@@ -122,6 +82,7 @@
 			no-map;
 		};
 	};
+
 	/*
 	 * Until we hook up type-c detection, we
 	 * have to stick with this. But it works.
@@ -132,35 +93,12 @@
 	};
 };
 
-&adreno_gpu {
-	status = "okay";
-};
-
 &adreno_gpu_zap {
-	firmware-name = "a512_zap.mbn";
+	firmware-name = "qcom/sdm660/xiaomi/lavender/a512_zap.mdt";
 	memory-region = <&zap_shader_region>;
 };
 
-&blsp1_uart2 {
-	status = "okay";
-};
-
-&blsp2_uart1 {
-	status = "okay";
-
-	bluetooth {
-		compatible = "qcom,wcn3990-bt";
-		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
-		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
-		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
-		vddio-supply = <&vreg_l13a_1p8>; // chip-pwd-supply ? // TODO: check
-		max-speed = <3200000>;
-		/* Path is relative to the qca/ subdir in lib/firmware. */
-		/* firmware-name = "crnv21.bin"; */ // default
-	};
-};
-
-&mdss {
+&lpass_codec {
 	status = "okay";
 };
 
@@ -201,20 +139,11 @@
 	status = "okay";
 };
 
-&mmss_smmu {
-	status = "okay";
-};
-
 &pm660_charger {
 	monitored-battery = <&battery>;
 
 	status = "okay";
 };
-
-&lpass_codec {
-	status = "okay";
-};
-
 
 &pm660_fg {
 	monitored-battery = <&battery>;
@@ -223,102 +152,102 @@
 	status = "okay";
 };
 
-&pm660_haptics {
-	status = "okay";
-};
-
-&pm660_rradc {
-	status = "okay";
-};
-
-&pm660l_gpios {
-	vol_up_default: vol-up-default-state {
-		pins = "gpio7";
-		function = PMIC_GPIO_FUNC_NORMAL;
-		bias-pull-up;
-		input-enable;
-		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
-	};
-};
-
 &pm660l_lpg {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	qcom,power-source = <1>;
-
 	status = "okay";
-
-	/* White LED is connected to red channel */
-	led@3 {
-		reg = <3>;
-		color = <LED_COLOR_ID_WHITE>;
-		function = LED_FUNCTION_STATUS;
-	};
 };
 
 &pm660l_wled {
-	qcom,switching-freq = <800>;
-	qcom,current-limit-microamp = <20000>;
-	qcom,num-strings = <2>;
-
 	status = "okay";
 };
 
 &pm660l_codec {
-	vdd-cdc-io-supply = <&vreg_s4a_2p04>;
-	vdd-cdc-tx-rx-cx-supply = <&vreg_s4a_2p04>;
-	vdd-micbias-supply = <&vreg_l7b_3p125>;
-
-	qcom,micbias-lvl = <2600>;
-	qcom,micbias1-ext-cap;
-
 	status = "okay";
 };
 
-&pon_pwrkey {
+&sdhc_2 {
 	status = "okay";
 };
 
-&pon_resin {
-	linux,code = <KEY_VOLUMEDOWN>;
+&sound {
+	compatible = "qcom,sdm660-internal-sndcard";
+	model = "Xiaomi Redmi Note 7";
 
-	status = "okay";
-};
+	pinctrl-0 = <&cdc_pdm_default>,
+			<&cdc_dmic_default>;
+	pinctrl-names = "default";
 
-&q6afedai {
-	dai@81 {
-		reg = <INT0_MI2S_RX>;
-		qcom,sd-lines = <0 1>;
+	audio-routing = "PDM_RX1", "Digital PDM_RX1",
+			"PDM_RX2", "Digital PDM_RX2",
+			"PDM_RX3", "Digital PDM_RX3",
+			"Digital LPASS_PDM_TX", "PDM_TX",
+			"AMIC1", "MIC BIAS External1",
+			"AMIC2", "MIC BIAS External2";
+
+	mm1-dai-link {
+		link-name = "MultiMedia1";
+
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+		};
 	};
 
-	dai@88 {
-		reg = <INT3_MI2S_TX>;
-		qcom,sd-lines = <0 1>;
+	mm2-dai-link {
+		link-name = "MultiMedia2";
+
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
+		};
+	};
+
+	int0-mi2s-dai-link {
+		link-name = "Internal MI2S Playback";
+
+		cpu {
+			sound-dai = <&q6afedai INT0_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&pm660l_codec 0>,
+					<&lpass_codec 0>;
+		};
+	};
+
+	int3-mi2s-dai-link {
+		link-name = "Internal MI2S Capture";
+
+		cpu {
+			sound-dai = <&q6afedai INT3_MI2S_TX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&pm660l_codec 1>,
+					<&lpass_codec 1>;
+		};
 	};
 };
 
-&q6asmdai {
-	dai@0 {
-		reg = <0>;
+&tlmm {
+	mdss_dsi_active: mdss-dsi-active-state {
+		function = "gpio";
+		pins = "gpio53";
+		drive-strength = <8>;
+		bias-disable;
 	};
 
-	dai@1 {
-		reg = <1>;
+	mdss_te_active: mdss-te-active-state {
+		pins = "gpio59";
+		function = "mdp_vsync";
+		drive-strength = <2>;
+		bias-pull-down;
 	};
-};
-
-&qusb2phy0 {
-	vdd-supply = <&vreg_l1b_0p925>;
-	vdda-pll-supply = <&vreg_l10a_1p8>;
-	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
-
-	status = "okay";
-};
-
-&remoteproc_mss {
-	firmware-name = "mba.mbn", "modem.mdt";
-
-	status = "okay";
 };
 
 &rpm_requests {
@@ -575,153 +504,6 @@
 	};
 };
 
-&sdc2_state_on {
-	sd-cd-pins {
-		pins = "gpio54";
-		function = "gpio";
-		bias-pull-up;
-		drive-strength = <2>;
-	};
-};
-
-&sdc2_state_off {
-	sd-cd-pins {
-		pins = "gpio54";
-		function = "gpio";
-		bias-disable;
-		drive-strength = <2>;
-	};
-};
-
-&sdhc_1 {
-	status = "okay";
-	supports-cqe;
-
-	mmc-hs200-1_8v;
-	mmc-hs400-1_8v;
-	mmc-hs400-enhanced-strobe;
-
-	vmmc-supply = <&vreg_l4b_2p95>;
-	vqmmc-supply = <&vreg_l8a_1p8>;
-};
-
-&sdhc_2 {
-	status = "okay";
-
-	cd-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
-
-	vmmc-supply = <&vreg_l5b_2p95>;
-	vqmmc-supply = <&vreg_l2b_2p95>;
-};
-
-&sound {
-	compatible = "qcom,sdm660-internal-sndcard";
-	model = "Xiaomi Redmi Note 7";
-
-	pinctrl-0 = <&cdc_pdm_default>,
-			<&cdc_dmic_default>;
-	pinctrl-names = "default";
-
-	audio-routing = "PDM_RX1", "Digital PDM_RX1",
-			"PDM_RX2", "Digital PDM_RX2",
-			"PDM_RX3", "Digital PDM_RX3",
-			"Digital LPASS_PDM_TX", "PDM_TX",
-			"AMIC1", "MIC BIAS External1",
-			"AMIC2", "MIC BIAS External2";
-
-	mm1-dai-link {
-		link-name = "MultiMedia1";
-
-		cpu {
-			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
-		};
-	};
-
-	mm2-dai-link {
-		link-name = "MultiMedia2";
-
-		cpu {
-			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
-		};
-	};
-
-	int0-mi2s-dai-link {
-		link-name = "Internal MI2S Playback";
-
-		cpu {
-			sound-dai = <&q6afedai INT0_MI2S_RX>;
-		};
-
-		platform {
-			sound-dai = <&q6routing>;
-		};
-
-		codec {
-			sound-dai = <&pm660l_codec 0>,
-					<&lpass_codec 0>;
-		};
-	};
-
-	int3-mi2s-dai-link {
-		link-name = "Internal MI2S Capture";
-
-		cpu {
-			sound-dai = <&q6afedai INT3_MI2S_TX>;
-		};
-
-		platform {
-			sound-dai = <&q6routing>;
-		};
-
-		codec {
-			sound-dai = <&pm660l_codec 1>,
-					<&lpass_codec 1>;
-		};
-	};
-};
-
-&tlmm {
-	gpio-reserved-ranges = <8 4>;
-
-	mdss_dsi_active: mdss-dsi-active-state {
-		function = "gpio";
-		pins = "gpio53";
-		drive-strength = <8>;
-		bias-disable;
-	};
-
-	mdss_te_active: mdss-te-active-state {
-		pins = "gpio59";
-		function = "mdp_vsync";
-		drive-strength = <2>;
-		bias-pull-down;
-	};
-};
-
-&usb3 {
-	qcom,select-utmi-as-pipe-clk;
-
-	status = "okay";
-};
-
 &usb3_dwc3 {
-	maximum-speed = "high-speed";
-	phys = <&qusb2phy0>;
-	phy-names = "usb2-phy";
-
-	dr_mode = "peripheral";
 	extcon = <&extcon_usb>;
-};
-
-&venus {
-	status = "okay";
-};
-
-&wifi {
-	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p848>;
-	vdd-1.8-xo-supply = <&vreg_l9a_1p8>;
-	vdd-1.3-rfa-supply = <&vreg_l6a_1p3>;
-	vdd-3.3-ch0-supply = <&vreg_l19a_3p3>;
-
-	status = "okay";
 };
