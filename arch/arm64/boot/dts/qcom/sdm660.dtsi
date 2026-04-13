@@ -376,6 +376,7 @@
 				compatible = "qcom,fastrpc";
 				qcom,glink-channels = "fastrpcglink-apps-dsp";
 				label = "cdsp";
+				memory-region = <&adsp_mem>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 

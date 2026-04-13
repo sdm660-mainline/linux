@@ -503,8 +503,9 @@
 		};
 
 		adsp_mem: adsp-region@f6000000 {
+			compatible = "shared-dma-pool";
 			reg = <0x0 0xf6000000 0x0 0x800000>;
-			no-map;
+			reusable;
 		};
 
 		qseecom_mem: qseecom-region@f6800000 {
@@ -2522,31 +2523,32 @@
 					compatible = "qcom,fastrpc";
 					qcom,glink-channels = "fastrpcglink-apps-dsp";
 					label = "adsp";
+					memory-region = <&adsp_mem>;
 					qcom,non-secure-domain;
 					#address-cells = <1>;
 					#size-cells = <0>;
 
-					compute-cb@1 {
-						compatible = "qcom,fastrpc-compute-cb";
-						reg = <1>;
-						iommus = <&lpass_smmu 3>;
-					};
-
-					compute-cb@2 {
-						compatible = "qcom,fastrpc-compute-cb";
-						reg = <2>;
-						iommus = <&lpass_smmu 7>;
-					};
-
 					compute-cb@3 {
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <3>;
+						iommus = <&lpass_smmu 3>;
+					};
+
+					compute-cb@7 {
+						compatible = "qcom,fastrpc-compute-cb";
+						reg = <7>;
+						iommus = <&lpass_smmu 7>;
+					};
+
+					compute-cb@8 {
+						compatible = "qcom,fastrpc-compute-cb";
+						reg = <8>;
 						iommus = <&lpass_smmu 8>;
 					};
 
-					compute-cb@4 {
+					compute-cb@9 {
 						compatible = "qcom,fastrpc-compute-cb";
-						reg = <4>;
+						reg = <9>;
 						iommus = <&lpass_smmu 9>;
 					};
 				};
