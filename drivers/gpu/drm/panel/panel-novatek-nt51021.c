@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (c) 2025, Nickolay Goppen <setotau@mainlining.org>
-// Copyright (c) 2024, Alexey Minnekhanov <alexeymin@postmarketos.org>
+// Copyright (c) 2024, Alexey Minnekhanov <alexeymin@minlexx.ru>
 
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
@@ -32,7 +32,7 @@ struct boe_nt51021_desc {
 
 static inline struct boe_nt51021_desc *to_boe_panel(struct drm_panel *panel)
 {
-	return container_of(panel, struct boe_nt51021_desc, panel);
+	return container_of_const(panel, struct boe_nt51021_desc, panel);
 }
 
 static void nt51021_boe_reset(struct boe_nt51021_desc *ctx)
