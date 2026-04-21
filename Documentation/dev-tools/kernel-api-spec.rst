@@ -31,7 +31,8 @@ The framework aims to:
    common programming errors during development and testing.
 
 3. **Support Tooling**: Export API specifications in machine-readable formats for
-   use by static analyzers, documentation generators, and development tools.
+   use by static analyzers, documentation generators, and development tools. See
+   `The kapi Tool`_.
 
 4. **Formalize Contracts**: Explicitly document API contracts including parameter
    constraints, execution contexts, locking requirements, and side effects.
@@ -572,77 +573,6 @@ The tool supports all KAPI specification types:
 
 - System calls (kerneldoc annotations)
 - Kernel functions (kerneldoc annotations with KAPI tags)
-
-IDE Integration
----------------
-
-Modern IDEs can use the specification data for:
-
-- Parameter hints
-- Type checking
-- Context validation
-- Error code documentation
-
-Best Practices
-==============
-
-Writing Specifications
-----------------------
-
-1. **Be Comprehensive**: Document all parameters, errors, and side effects
-2. **Keep Updated**: Update specs when API behavior changes
-3. **Use Examples**: Include usage examples in descriptions
-4. **Validate Constraints**: Define realistic constraints for parameters
-5. **Document Context**: Clearly specify allowed execution contexts
-
-Maintenance
------------
-
-1. **Version Specifications**: Increment version when API changes
-2. **Deprecation**: Mark deprecated APIs and suggest replacements
-3. **Cross-reference**: Link related APIs in descriptions
-4. **Test Specifications**: Verify specs match implementation
-
-Common Patterns
----------------
-
-**Optional Parameters**:
-
-.. code-block:: c
-
-    /**
-     * @optional_arg: Optional argument (may be NULL)
-     *
-     * param: optional_arg
-     *   type: KAPI_TYPE_PTR
-     *   flags: KAPI_PARAM_IN | KAPI_PARAM_OPTIONAL
-     */
-
-**Buffer with Size Parameter**:
-
-.. code-block:: c
-
-    /**
-     * @buf: User-space buffer
-     *
-     * param: buf
-     *   type: KAPI_TYPE_USER_PTR
-     *   flags: KAPI_PARAM_OUT | KAPI_PARAM_USER
-     *   constraint-type: KAPI_CONSTRAINT_BUFFER
-     *   size-param: 2
-     */
-
-**Callback Functions**:
-
-.. code-block:: c
-
-    /**
-     * @callback: Callback function
-     *
-     * param: callback
-     *   type: KAPI_TYPE_FUNC_PTR
-     *   flags: KAPI_PARAM_IN
-     */
 
 Troubleshooting
 ===============
