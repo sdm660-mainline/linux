@@ -3004,6 +3004,14 @@ int snd_soc_of_parse_card_name(struct snd_soc_card *card,
 		return ret;
 	}
 
+	/*
+	 * When setting the OF property in a device tree, the expectation is
+	 * that the UCM config matching the value would be loaded. However if
+	 * a long_name is set, it would be used in the config path instead, and
+	 * snd_soc_set_dmi_name sets long_name to the DMI name if it's unset.
+	 */
+	card->long_name = card->name;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_of_parse_card_name);
