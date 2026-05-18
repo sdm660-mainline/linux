@@ -13,7 +13,7 @@ jobs:
   build-linux:
     runs-on: [self-hosted, Linux, aarch64]
     steps:
-      - name: Pring debug info and do some pre-run checks
+      - name: Print debug info and do some pre-run checks
         run: |
           echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
           echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
@@ -28,7 +28,7 @@ jobs:
           doas -n apt update
           doas -n apt -y upgrade
       - name: Checkout linux source from git
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           clean: false
       - name: Prepare linux kernel .config using sdm660_defconfig
@@ -68,7 +68,7 @@ jobs:
       - name: Update pmaports
         run: |
           git -C $(pmbootstrap config aports) fetch origin
-          git -C $(pmbootstrap config aports) reset --hard origin/master
+          git -C $(pmbootstrap config aports) reset --hard origin/main
           pmbootstrap status
       - name: Clean pmbootstrap chroots (pmbootstrap zap)
         run: |
@@ -87,7 +87,7 @@ jobs:
       - name: Cleanup pmbootstrap chroots
         run: |
           pmbootstrap shutdown
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Artifacts
           compression-level: 1
