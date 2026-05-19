@@ -14,6 +14,8 @@
 #include <dt-bindings/sound/qcom,q6afe.h>
 #include <dt-bindings/sound/qcom,q6asm.h>
 
+/delete-node/ &zap_shader_region;
+
 / {
 	model = "Xiaomi Redmi Note 6 Pro";
 	compatible = "xiaomi,tulip", "qcom,sdm636";
@@ -97,6 +99,17 @@
 			reg = <0x0 0x9d400000 0x0 (1080 * 2280 * 4)>;
 			no-map;
 		};
+
+		/*
+		 * From downstream Android dmesg:
+		 * subsys-pil-tz soc:qcom,kgsl-hyp: a512_zap: loading from
+		 *     0x00000000fbc00000 to 0x00000000fbc02000
+		 */
+		zap_shader_region: gpu-zap-mem@fbc00000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xfbc00000 0x0 0x2000>;
+			no-map;
+		};
 	};
 
 	vph_pwr: vph-pwr-regulator {
@@ -133,6 +146,7 @@
 
 &adreno_gpu_zap {
 	firmware-name = "a512_zap.mbn";
+	memory-region = <&zap_shader_region>;
 };
 
 &blsp_i2c1 {
