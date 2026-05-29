@@ -14125,6 +14125,7 @@ S:	Maintained
 F:	Documentation/dev-tools/kernel-api-spec.rst
 F:	include/linux/kapi_syscall.h
 F:	include/linux/kernel_api_spec.h
+F:	include/trace/events/kapi.h
 F:	kernel/api/
 F:	tools/kapi/
 F:	tools/lib/python/kdoc/kdoc_apispec.py

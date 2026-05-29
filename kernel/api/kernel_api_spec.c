@@ -751,6 +751,45 @@ EXPORT_SYMBOL_GPL(kapi_export_json);
 
 #ifdef CONFIG_KAPI_RUNTIME_CHECKS
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/kapi.h>
+
+/*
+ * Render a syscall's parameters as a "name=value, ..." string for the
+ * kapi_syscall_enter tracepoint.  Names come from the spec; pointer-like
+ * values are shown in hex, integers and file descriptors in decimal.
+ */
+static void kapi_trace_format_params(const struct kernel_api_spec *spec,
+				     const s64 *args, int nargs,
+				     char *buf, size_t size)
+{
+	int i, used = 0;
+
+	buf[0] = '\0';
+	/* Bound by the caller-supplied arg count; the spec arity may differ. */
+	for (i = 0; args && i < nargs && i < 6; i++) {
+		const char *name = "arg";
+		bool dec = false;
+
+		if (i < spec->param_count) {
+			const struct kapi_param_spec *ps = &spec->params[i];
+
+			if (ps->name)
+				name = ps->name;
+			dec = ps->type == KAPI_TYPE_INT || ps->type == KAPI_TYPE_FD;
+		}
+
+		used += scnprintf(buf + used, size - used, "%s%s=",
+				  i ? ", " : "", name);
+		if (dec)
+			used += scnprintf(buf + used, size - used, "%lld",
+					  (long long)args[i]);
+		else
+			used += scnprintf(buf + used, size - used, "0x%llx",
+					  (unsigned long long)args[i]);
+	}
+}
+
 /**
  * kapi_validate_fd - Validate that a file descriptor value is in valid range
  * @fd: File descriptor to validate
@@ -1211,16 +1250,24 @@ EXPORT_SYMBOL_GPL(kapi_validate_param_with_context);
 int kapi_validate_syscall_params(const struct kernel_api_spec *spec,
 				 const s64 *params, int param_count)
 {
-	int i;
+	int i, ret = 0;
 
 	if (!spec || !params)
 		return 0;
+
+	if (trace_kapi_syscall_enter_enabled()) {
+		char pbuf[KAPI_TP_PARAMS_LEN];
+
+		kapi_trace_format_params(spec, params, param_count, pbuf, sizeof(pbuf));
+		trace_kapi_syscall_enter(spec->name, param_count, params, pbuf);
+	}
 
 	/* Validate that we have the expected number of parameters */
 	if (param_count != spec->param_count) {
 		pr_warn_ratelimited("API %s: parameter count mismatch (expected %u, got %d)\n",
 			spec->name, spec->param_count, param_count);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	/* Validate each parameter with context */
@@ -1230,12 +1277,22 @@ int kapi_validate_syscall_params(const struct kernel_api_spec *spec,
 		if (!kapi_validate_param_with_context(param_spec, params[i], params, param_count)) {
 			if (strncmp(spec->name, "sys_", 4) == 0) {
 				/* For syscalls, we can return EINVAL to userspace */
-				return -EINVAL;
+				ret = -EINVAL;
+				goto out;
 			}
 		}
 	}
 
-	return 0;
+out:
+	/*
+	 * Emit the exit event on the rejection path too (the wrapper
+	 * short-circuits the handler on a non-zero return), so every
+	 * kapi_syscall_enter has a matching kapi_syscall_exit.
+	 */
+	if (ret)
+		trace_kapi_syscall_exit(spec->name, ret, false);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(kapi_validate_syscall_params);
 
@@ -1353,18 +1410,16 @@ EXPORT_SYMBOL_GPL(kapi_validate_return_value);
  */
 int kapi_validate_syscall_return(const struct kernel_api_spec *spec, s64 retval)
 {
+	bool valid = true;
+
 	if (!spec)
 		return 0;
 
-	/* Skip return validation if return spec was not defined */
-	if (spec->return_magic != KAPI_MAGIC_RETURN)
-		return 0;
+	/* Validate against the return spec when one was defined */
+	if (spec->return_magic == KAPI_MAGIC_RETURN)
+		valid = kapi_validate_return_value(spec, retval);
 
-	if (!kapi_validate_return_value(spec, retval)) {
-		/* Log the violation but don't change the return value */
-		pr_warn_ratelimited("KAPI: Syscall %s returned unspecified value %lld\n",
-				    spec->name, retval);
-	}
+	trace_kapi_syscall_exit(spec->name, retval, valid);
 
 	return 0;
 }

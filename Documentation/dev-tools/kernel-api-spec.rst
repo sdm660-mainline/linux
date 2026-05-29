@@ -312,6 +312,37 @@ specification. Kerneldoc annotations cannot set it, so it is only available to a
     .constraint_type = KAPI_CONSTRAINT_CUSTOM,
     .validate = validate_buffer_size,
 
+Tracepoints
+-----------
+
+When ``CONFIG_KAPI_RUNTIME_CHECKS`` is enabled, the syscall validation path emits
+two ftrace tracepoints (in the ``kapi`` trace system) for every syscall that has a
+specification:
+
+- ``kapi_syscall_enter`` -- fired before parameter validation, recording the spec
+  name, the raw syscall argument values, and -- when the spec provides parameter
+  metadata -- a rendered ``name=value`` list: signed integer and file descriptor
+  values are shown in decimal, all other values in hex, and an unnamed parameter
+  as ``arg``.
+- ``kapi_syscall_exit`` -- fired after the handler returns, or in place of the
+  handler when parameter validation rejects the call (the handler is skipped and
+  ``-EINVAL`` is returned). Records the spec name, the return value, and
+  ``spec_match``: 0 when the parameters were rejected or a successful ``fd`` return
+  was not a valid file descriptor, and 1 otherwise. Error codes missing from the
+  spec do not clear it.
+
+Unlike the ``pr_warn_ratelimited`` violation reports, the tracepoints capture every
+spec'd call rather than only violations, and can be filtered with the usual ftrace
+facilities. They require ``CONFIG_TRACEPOINTS`` and stay dormant
+until enabled::
+
+    # echo 1 > /sys/kernel/tracing/events/kapi/enable
+    # cat /sys/kernel/tracing/trace
+     ...  kapi_syscall_enter: sys_read(fd=3, buf=0x7ffd46780b58, count=0x340)
+     ...  kapi_syscall_exit: sys_read = 832 spec_match=1
+     ...  kapi_syscall_enter: sys_open(filename=0x480300, flags=268435456, mode=0x0)
+     ...  kapi_syscall_exit: sys_open = -22 spec_match=0
+
 DebugFS Interface
 =================
 
