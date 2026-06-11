@@ -195,12 +195,12 @@
 
 &q6afedai {
 	dai@81 {
-		reg = <INT0_MI2S_RX>;
+		reg = <LPI_MI2S_RX_0>;
 		qcom,sd-lines = <0 1>;
 	};
 
 	dai@88 {
-		reg = <INT3_MI2S_TX>;
+		reg = <LPI_MI2S_TX_3>;
 		qcom,sd-lines = <0 1>;
 	};
 };
@@ -648,7 +648,7 @@
 };
 
 &sound {
-	compatible = "qcom,sdm660-internal-sndcard";
+	compatible = "qcom,sdm660-sndcard";
 	model = "Xiaomi Mi Pad 4";
 	pinctrl-0 = <&cdc_pdm_default>,
 			<&cdc_dmic_default>;
@@ -681,7 +681,7 @@
 	int0-mi2s-dai-link {
 		link-name = "Internal MI2S Playback";
 		cpu {
-			sound-dai = <&q6afedai INT0_MI2S_RX>;
+			sound-dai = <&q6afedai LPI_MI2S_RX_0>;
 		};
 		platform {
 			sound-dai = <&q6routing>;
@@ -695,7 +695,7 @@
 	int3-mi2s-dai-link {
 		link-name = "Internal MI2S Capture";
 		cpu {
-			sound-dai = <&q6afedai INT3_MI2S_TX>;
+			sound-dai = <&q6afedai LPI_MI2S_TX_3>;
 		};
 		platform {
 			sound-dai = <&q6routing>;
