@@ -18,8 +18,11 @@ allOf:
 
 properties:
   compatible:
-    contains:
-      const: djn,9a-3r063-1102b
+    enum:
+      # Fairphone 3 (DJN), 1080x2340
+      - djn,9a-3r063-1102b
+      # Vsmart Active 1 (DJN), 1080x2160
+      - djn,a1-hx83112a
 
   reg:
     maxItems: 1
