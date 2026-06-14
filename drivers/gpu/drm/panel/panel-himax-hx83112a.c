@@ -2,6 +2,13 @@
 /*
  * Generated with linux-mdss-dsi-panel-driver-generator from vendor device tree.
  * Copyright (c) 2024 Luca Weiss <luca.weiss@fairphone.com>
+ *
+ * Extended to a multi-variant driver:
+ *  - djn,9a-3r063-1102b: Fairphone 3, 1080x2340, full DCS init.
+ *  - djn,a1-hx83112a:    Vsmart Active 1, 1080x2160. A TDDI panel whose full
+ *                        register init is done by the bootloader, so this
+ *                        variant only issues exit-sleep + display-on and does
+ *                        not pulse reset (see djn_a1_hx83112a_init).
  */
 
 #include <linux/delay.h>
@@ -34,9 +41,27 @@
 #define HX83112A_SETTP1		0xe7
 #define HX83112A_UNKNOWN1	0xe9
 
+struct hx83112a_panel;
+
+struct hx83112a_panel_desc {
+	const struct drm_display_mode *mode;
+	unsigned long mode_flags;
+	enum mipi_dsi_pixel_format format;
+	unsigned int lanes;
+	int (*init_sequence)(struct hx83112a_panel *ctx);
+
+	/*
+	 * Whether prepare() should pulse the reset GPIO. When false the panel
+	 * relies on the bootloader having already initialised the IC, and the
+	 * reset line is left deasserted so that init is preserved.
+	 */
+	bool soft_reset;
+};
+
 struct hx83112a_panel {
 	struct drm_panel panel;
 	struct mipi_dsi_device *dsi;
+	const struct hx83112a_panel_desc *desc;
 	struct regulator_bulk_data supplies[3];
 	struct gpio_desc *reset_gpio;
 };
@@ -56,11 +81,11 @@ static void hx83112a_reset(struct hx83112a_panel *ctx)
 	msleep(50);
 }
 
-static int hx83112a_on(struct mipi_dsi_device *dsi)
+static int djn_9a_3r063_1102b_init(struct hx83112a_panel *ctx)
 {
-	struct mipi_dsi_multi_context dsi_ctx = { .dsi = dsi };
+	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi };
 
-	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
+	ctx->dsi->mode_flags |= MIPI_DSI_MODE_LPM;
 
 	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, HX83112A_SETEXTC, 0x83, 0x11, 0x2a);
 	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, HX83112A_SETPOWER1,
@@ -189,6 +214,32 @@ static int hx83112a_on(struct mipi_dsi_device *dsi)
 	return dsi_ctx.accum_err;
 }
 
+/*
+ * Vsmart Active 1 (DJN 1080x2160). This is a TDDI panel whose full HX83112A
+ * register init is performed by the bootloader, not by the OS. The downstream
+ * vendor kernel device tree confirms this is by design: it ships the same
+ * minimal mdss-dsi-on-command (exit-sleep + display-on only) for this panel and
+ * its HX83112A siblings (the DJN, Truly and DJN11 variants), with no register
+ * programming in DT at all. So this variant deliberately sends only those two
+ * commands and leaves reset deasserted (soft_reset = false) -- pulsing reset
+ * would require the full init sequence, which the vendor never exposes in any
+ * device tree.
+ */
+static int djn_a1_hx83112a_init(struct hx83112a_panel *ctx)
+{
+	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi };
+
+	ctx->dsi->mode_flags |= MIPI_DSI_MODE_LPM;
+
+	mipi_dsi_dcs_exit_sleep_mode_multi(&dsi_ctx);
+	mipi_dsi_msleep(&dsi_ctx, 120);
+
+	mipi_dsi_dcs_set_display_on_multi(&dsi_ctx);
+	mipi_dsi_msleep(&dsi_ctx, 20);
+
+	return dsi_ctx.accum_err;
+}
+
 static int hx83112a_disable(struct drm_panel *panel)
 {
 	struct hx83112a_panel *ctx = to_hx83112a_panel(panel);
@@ -214,11 +265,13 @@ static int hx83112a_prepare(struct drm_panel *panel)
 	if (ret < 0)
 		return ret;
 
-	hx83112a_reset(ctx);
+	if (ctx->desc->soft_reset)
+		hx83112a_reset(ctx);
 
-	ret = hx83112a_on(ctx->dsi);
+	ret = ctx->desc->init_sequence(ctx);
 	if (ret < 0) {
-		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+		if (ctx->desc->soft_reset)
+			gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 		regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
 	}
 
@@ -229,13 +282,14 @@ static int hx83112a_unprepare(struct drm_panel *panel)
 {
 	struct hx83112a_panel *ctx = to_hx83112a_panel(panel);
 
-	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+	if (ctx->desc->soft_reset)
+		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 	regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
 
 	return 0;
 }
 
-static const struct drm_display_mode hx83112a_mode = {
+static const struct drm_display_mode djn_9a_3r063_1102b_mode = {
 	.clock = (1080 + 28 + 8 + 8) * (2340 + 27 + 5 + 5) * 60 / 1000,
 	.hdisplay = 1080,
 	.hsync_start = 1080 + 28,
@@ -250,10 +304,48 @@ static const struct drm_display_mode hx83112a_mode = {
 	.type = DRM_MODE_TYPE_DRIVER,
 };
 
+static const struct hx83112a_panel_desc djn_9a_3r063_1102b_desc = {
+	.mode = &djn_9a_3r063_1102b_mode,
+	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+		      MIPI_DSI_MODE_VIDEO_HSE |
+		      MIPI_DSI_CLOCK_NON_CONTINUOUS,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+	.init_sequence = djn_9a_3r063_1102b_init,
+	.soft_reset = true,
+};
+
+static const struct drm_display_mode djn_a1_hx83112a_mode = {
+	.clock = (1080 + 40 + 4 + 12) * (2160 + 32 + 2 + 2) * 60 / 1000,
+	.hdisplay = 1080,
+	.hsync_start = 1080 + 40,
+	.hsync_end = 1080 + 40 + 4,
+	.htotal = 1080 + 40 + 4 + 12,
+	.vdisplay = 2160,
+	.vsync_start = 2160 + 32,
+	.vsync_end = 2160 + 32 + 2,
+	.vtotal = 2160 + 32 + 2 + 2,
+	.width_mm = 65,
+	.height_mm = 129,
+	.type = DRM_MODE_TYPE_DRIVER,
+};
+
+static const struct hx83112a_panel_desc djn_a1_hx83112a_desc = {
+	.mode = &djn_a1_hx83112a_mode,
+	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+		      MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_LPM,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+	.init_sequence = djn_a1_hx83112a_init,
+	.soft_reset = false,
+};
+
 static int hx83112a_get_modes(struct drm_panel *panel,
 				  struct drm_connector *connector)
 {
-	return drm_connector_helper_get_modes_fixed(connector, &hx83112a_mode);
+	struct hx83112a_panel *ctx = to_hx83112a_panel(panel);
+
+	return drm_connector_helper_get_modes_fixed(connector, ctx->desc->mode);
 }
 
 static const struct drm_panel_funcs hx83112a_panel_funcs = {
@@ -275,6 +367,10 @@ static int hx83112a_probe(struct mipi_dsi_device *dsi)
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
 
+	ctx->desc = of_device_get_match_data(dev);
+	if (!ctx->desc)
+		return -ENODEV;
+
 	ctx->supplies[0].supply = "vdd1";
 	ctx->supplies[1].supply = "vsn";
 	ctx->supplies[2].supply = "vsp";
@@ -283,7 +379,14 @@ static int hx83112a_probe(struct mipi_dsi_device *dsi)
 	if (ret < 0)
 		return dev_err_probe(dev, ret, "Failed to get regulators\n");
 
-	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	/*
+	 * For variants that rely on the bootloader's IC init (soft_reset =
+	 * false) leave the reset line deasserted so the init is preserved;
+	 * otherwise request it asserted and pulse it in prepare().
+	 */
+	ctx->reset_gpio = devm_gpiod_get(dev, "reset",
+					 ctx->desc->soft_reset ? GPIOD_OUT_HIGH
+							       : GPIOD_OUT_LOW);
 	if (IS_ERR(ctx->reset_gpio))
 		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
 				     "Failed to get reset-gpios\n");
@@ -291,11 +394,9 @@ static int hx83112a_probe(struct mipi_dsi_device *dsi)
 	ctx->dsi = dsi;
 	mipi_dsi_set_drvdata(dsi, ctx);
 
-	dsi->lanes = 4;
-	dsi->format = MIPI_DSI_FMT_RGB888;
-	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
-			  MIPI_DSI_MODE_VIDEO_HSE |
-			  MIPI_DSI_CLOCK_NON_CONTINUOUS;
+	dsi->lanes = ctx->desc->lanes;
+	dsi->format = ctx->desc->format;
+	dsi->mode_flags = ctx->desc->mode_flags;
 
 	ctx->panel.prepare_prev_first = true;
 
@@ -328,7 +429,8 @@ static void hx83112a_remove(struct mipi_dsi_device *dsi)
 }
 
 static const struct of_device_id hx83112a_of_match[] = {
-	{ .compatible = "djn,9a-3r063-1102b" },
+	{ .compatible = "djn,9a-3r063-1102b", .data = &djn_9a_3r063_1102b_desc },
+	{ .compatible = "djn,a1-hx83112a", .data = &djn_a1_hx83112a_desc },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, hx83112a_of_match);
