@@ -273,6 +273,7 @@ dtb-$(CONFIG_ARCH_QCOM)	+= sdm636-xiaomi-tulip.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm636-xiaomi-whyred.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-bbry-athena-boe.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-bbry-athena-syna.dtb
+dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-vsmart-zangyapro.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-clover.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-clover-plus.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= sdm660-xiaomi-jasmine.dtb
