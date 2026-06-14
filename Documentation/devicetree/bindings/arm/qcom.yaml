@@ -903,6 +903,7 @@ properties:
               - xiaomi,platina
               - bbry,athena-boe
               - bbry,athena-syna
+              - vsmart,active1
           - const: qcom,sdm660
 
       - items:
