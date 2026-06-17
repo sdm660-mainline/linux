@@ -3450,6 +3450,15 @@ static int ath10k_update_channel_list(struct ath10k *ar)
 			passive = channel->flags & IEEE80211_CHAN_NO_IR;
 			ch->passive = passive;
 
+			/* WCN3990 firmware does not tune the radio during active
+			 * scan on 5 GHz non-DFS channels, so 5 GHz networks are
+			 * never discovered. Force passive scan on 5 GHz so the
+			 * radio tunes correctly.
+			 */
+			if (QCA_REV_WCN3990(ar) &&
+			    channel->band == NL80211_BAND_5GHZ)
+				ch->passive = true;
+
 			/* the firmware is ignoring the "radar" flag of the
 			 * channel and is scanning actively using Probe Requests
 			 * on "Radar detection"/DFS channels which are not
