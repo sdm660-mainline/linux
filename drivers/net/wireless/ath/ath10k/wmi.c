@@ -5559,6 +5559,22 @@ static void ath10k_wmi_event_service_ready_work(struct work_struct *work)
 	ar->hw_max_tx_power = __le32_to_cpu(arg.max_tx_power);
 	ar->ht_cap_info = __le32_to_cpu(arg.ht_cap);
 	ar->vht_cap_info = __le32_to_cpu(arg.vht_cap);
+
+	/* WCN3990 firmware crashes when handling VHT MU-MIMO transmit-
+	 * beamforming Group ID Management frames: the beamformee handler
+	 * wlan_txbf.c:wlan_txbfee_parse_gid dereferences an uninitialised
+	 * per-peer TxBF context (PC=0xb00c87e0) and brings down the modem.
+	 * Observed on both c2-00538 and c2-00811 firmware, so disable VHT
+	 * beamforming unconditionally for WCN3990: clear the beamformer and
+	 * beamformee capability bits so we never advertise beamformee support,
+	 * the AP never sends a Group ID Management frame, and the buggy path is
+	 * never entered. VHT data rates are unaffected.
+	 */
+	if (QCA_REV_WCN3990(ar))
+		ar->vht_cap_info &= ~(IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
+				      IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE |
+				      IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
+				      IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE);
 	ar->vht_supp_mcs = __le32_to_cpu(arg.vht_supp_mcs);
 	ar->fw_version_major =
 		(__le32_to_cpu(arg.sw_ver0) & 0xff000000) >> 24;
