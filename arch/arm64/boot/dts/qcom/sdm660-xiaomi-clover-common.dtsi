@@ -185,6 +185,38 @@
 	};
 };
 
+&blsp_i2c6 {
+	status = "okay";
+
+	tas2557_l: codec@4c {         /* left  */
+		compatible = "ti,tas2557";
+		reg = <0x4c>;
+		#sound-dai-cells = <0>;
+		sound-name-prefix = "Left";
+
+		reset-gpios = <&tlmm 80 GPIO_ACTIVE_HIGH>;
+		irq-gpios = <&tlmm 28 GPIO_ACTIVE_LOW>;
+
+		ti,i2s-bit-width = <16>;
+		ti,channel = <0>;      /* DEV_A */
+		firmware-name = "tas2557s_uCDSP.bin";
+      };
+
+	tas2557_r: codec@4e {         /* right */
+		compatible = "ti,tas2557";
+		reg = <0x4e>;
+		#sound-dai-cells = <0>;
+		sound-name-prefix = "Right";
+
+		reset-gpios = <&tlmm 48 GPIO_ACTIVE_HIGH>;
+		irq-gpios = <&tlmm 55 GPIO_ACTIVE_LOW>;
+
+		ti,i2s-bit-width = <16>;
+		ti,channel = <1>;      /* DEV_B */
+		firmware-name = "tas2557s_uCDSP.bin";
+      };
+};
+
 &mdss {
 	status = "okay";
 };
@@ -194,6 +226,11 @@
 };
 
 &q6afedai {
+	dai@16 {
+		reg = <PRIMARY_MI2S_RX>;
+		qcom,sd-lines = <0>;
+	};
+
 	dai@81 {
 		reg = <LPI_MI2S_RX_0>;
 		qcom,sd-lines = <0 1>;
@@ -651,7 +688,8 @@
 	compatible = "qcom,sdm660-sndcard";
 	model = "Xiaomi Mi Pad 4";
 	pinctrl-0 = <&cdc_pdm_default>,
-			<&cdc_dmic_default>;
+			<&cdc_dmic_default>,
+			<&pri_mi2s_active>;
 	pinctrl-names = "default";
 	audio-routing = "RX_BIAS", "Digital MCLK",
 			"INT_LDO_H", "Digital MCLK",
@@ -665,7 +703,9 @@
 			"PDM_RX3", "Digital PDM_RX3",
 			"Digital LPASS_PDM_TX", "PDM_TX",
 			"AMIC1", "MIC BIAS External1",
-			"AMIC2", "MIC BIAS External2";
+			"AMIC2", "MIC BIAS External2",
+			"Left ASI2",  "Primary MI2S Playback",
+			"Right ASI2", "Primary MI2S Playback";
 	mm1-dai-link {
 		link-name = "MultiMedia1";
 		cpu {
@@ -678,7 +718,21 @@
 			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
 		};
 	};
-	int0-mi2s-dai-link {
+
+	pri-mi2s-dai-link {
+		link-name = "Primary MI2S Playback";
+		cpu {
+			sound-dai = <&q6afedai PRIMARY_MI2S_RX>;
+		};
+		platform {
+			sound-dai = <&q6routing>;
+		};
+		codec {
+			sound-dai = <&tas2557_l>, <&tas2557_r>;   /* multicodec */
+		};
+	};
+
+	 int0-mi2s-dai-link {
 		link-name = "Internal MI2S Playback";
 		cpu {
 			sound-dai = <&q6afedai LPI_MI2S_RX_0>;
@@ -730,6 +784,48 @@
 		drive-strength = <6>;
 		bias-pull-up;
 	};
+
+	pri_mi2s_active: pri-mi2s-active-state {
+		sck-pins  {
+			pins = "gpio12";
+			function = "pri_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
+		ws-pins   {
+			pins = "gpio13";
+			function = "pri_mi2s_ws";
+			drive-strength = <8>;
+			bias-disable;
+		};
+		data-pins {
+			pins = "gpio14", "gpio15";
+			function = "pri_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
+      };
+
+      pri_mi2s_sleep: pri-mi2s-sleep-state {
+		sck-pins  {
+			pins = "gpio12";
+			function = "pri_mi2s";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+		ws-pins   {
+			pins = "gpio13";
+			function = "pri_mi2s_ws";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+		data-pins {
+			pins = "gpio14", "gpio15";
+			function = "pri_mi2s";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+      };
 };
 
 &usb3 {
