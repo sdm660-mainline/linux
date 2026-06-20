@@ -76,9 +76,11 @@ enum fan53555_vendor {
 
 enum {
 	FAN53526_CHIP_ID_01 = 1,
+	FAN53526_CHIP_ID_08 = 8,
 };
 
 enum {
+	FAN53526_CHIP_REV_01 = 1,
 	FAN53526_CHIP_REV_08 = 8,
 };
 
@@ -263,6 +265,19 @@ static int fan53526_voltages_setup_fairchild(struct fan53555_device_info *di)
 	case FAN53526_CHIP_ID_01:
 		switch (di->chip_rev) {
 		case FAN53526_CHIP_REV_08:
+			di->vsel_min = 600000;
+			di->vsel_step = 6250;
+			break;
+		default:
+			dev_err(di->dev,
+				"Chip ID %d with rev %d not supported!\n",
+				di->chip_id, di->chip_rev);
+			return -EINVAL;
+		}
+		break;
+	case FAN53526_CHIP_ID_08:
+		switch (di->chip_rev) {
+		case FAN53526_CHIP_REV_01:
 			di->vsel_min = 600000;
 			di->vsel_step = 6250;
 			break;
