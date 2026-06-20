@@ -160,6 +160,26 @@
 	};
 };
 
+&blsp_i2c2 {
+	status = "okay";
+
+	/*
+	 * External FAN53526 buck powering the LPDDR4X VDDQ rail
+	 * (schematic net VREG_LP4X_0P6, nominal 0.6 V). The bootloader
+	 * configures it; keep it always-on and pinned at 0.6 V so the
+	 * regulator core never raises the live DDR rail.
+	 */
+	regulator@60 {
+		compatible = "fcs,fan53526";
+		reg = <0x60>;
+		regulator-min-microvolt = <600000>;
+		regulator-max-microvolt = <600000>;
+		vin-supply = <&vph_pwr>;
+		fcs,suspend-voltage-selector = <1>;
+		regulator-always-on;
+	};
+};
+
 &mdss {
 	status = "okay";
 };
