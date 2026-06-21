@@ -32,6 +32,7 @@ struct sdm660_int_snd_data {
 	uint32_t sec_tdm_clk_count;
 	uint32_t int0_mi2s_clk_count;
 	uint32_t int3_mi2s_clk_count;
+	u32 pri_mi2s_clk_count;
 };
 
 static int snd_sdm660_int_startup(struct snd_pcm_substream *stream)
@@ -113,6 +114,18 @@ static int snd_sdm660_int_startup(struct snd_pcm_substream *stream)
 		snd_soc_dai_set_fmt(cpu, SND_SOC_DAIFMT_CBP_CFP);
 
 		break;
+	case PRIMARY_MI2S_RX:
+		data->pri_mi2s_clk_count++;
+		if (data->pri_mi2s_clk_count == 1)
+			snd_soc_dai_set_sysclk(cpu,
+					       Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT,
+					       MI2S_BCLK_RATE,
+					       SNDRV_PCM_STREAM_PLAYBACK);
+
+		/* AFE drives the I2S bit/frame clock for the external amp. */
+		snd_soc_dai_set_fmt(cpu, SND_SOC_DAIFMT_CBP_CFP);
+
+		break;
 	default:
 		dev_err(cpu->dev, "unimplemented afe dai\n");
 		return -ENOSYS;
@@ -172,6 +185,14 @@ static void snd_sdm660_int_shutdown(struct snd_pcm_substream *stream)
 			snd_soc_dai_set_sysclk(cpu,
 				Q6AFE_LPASS_CLK_ID_INT3_MI2S_IBIT,
 				0, SNDRV_PCM_STREAM_PLAYBACK);
+
+		break;
+	case PRIMARY_MI2S_RX:
+		data->pri_mi2s_clk_count--;
+		if (data->pri_mi2s_clk_count == 0)
+			snd_soc_dai_set_sysclk(cpu,
+					       Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT,
+					       0, SNDRV_PCM_STREAM_PLAYBACK);
 
 		break;
 	default:
@@ -273,6 +294,7 @@ static int sdm660_int_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	struct snd_soc_dai *cpu = snd_soc_rtd_to_cpu(rtd, 0);
 
 	rate->min = rate->max = DEFAULT_SAMPLE_RATE_48K;
+	snd_mask_none(fmt);
 	snd_mask_set_format(fmt, SNDRV_PCM_FORMAT_S16_LE);
 
 	if (cpu->id == PRIMARY_TDM_TX_0)
