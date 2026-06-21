@@ -88,6 +88,13 @@
 		};
 	};
 
+	irled {
+		compatible = "gpio-ir-tx";
+		gpios = <&tlmm 24 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&ir_led_default>;
+		pinctrl-names = "default";
+	};
+
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -565,6 +572,13 @@
 
 &tlmm {
 	gpio-reserved-ranges = <8 4>;
+
+	ir_led_default: ir-led-default-state {
+		pins = "gpio24";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
 
 	ts_pins_active: ts-pins-active-state {
 		pins = "gpio66", "gpio67";
