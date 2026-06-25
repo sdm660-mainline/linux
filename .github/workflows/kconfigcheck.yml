@@ -1,0 +1,73 @@
+name: Run pmOS kconfigcheck
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - qcom-sdm660-6.*.y
+      - qcom-sdm660-7.*.y
+    tags:
+      - v*-sdm660
+  workflow_dispatch:
+jobs:
+  check-config:
+    runs-on: [self-hosted, Linux, X64, linuxbuilder]
+    steps:
+      - name: Print debug info and do some pre-run checks
+        run: |
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
+          echo "GITHUB_HEAD_REF: $GITHUB_HEAD_REF"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo -n "whoami: " ; whoami
+          echo -n "groups: " ; groups
+          echo -n "gcc version: "; gcc --version
+          echo -n "clang version: "; clang --version
+          echo -n "lld version: "; ld.lld --version
+      - name: Update ubuntu packages
+        run: |
+          sudo apt update
+          sudo apt -y upgrade
+          sudo apt -y autoremove
+      - name: Checkout linux source from git
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          clean: false
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v47.0.6
+        with:
+          files: |
+            arch/arm64/configs/sdm660_defconfig
+      - name: List all changed files
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          for file in ${ALL_CHANGED_FILES}; do
+            echo "  $file was changed"
+          done
+      - name: Prepare linux kernel config for LLVM using sdm660_defconfig
+        run: |
+          mkdir -p .output
+          rm -f .output/.config .output/defconfig
+          make O=.output ARCH=arm64 LLVM=1 LOCALVERSION= defconfig sdm660_defconfig
+          make O=.output ARCH=arm64 LLVM=1 LOCALVERSION= savedefconfig
+          cat .output/defconfig
+      - name: Update pmbootstrap and pmaports
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          git -C /opt/pmbootstrap pull
+          git -C $(pmbootstrap config aports) fetch origin
+          git -C $(pmbootstrap config aports) reset --hard origin/main
+          pmbootstrap status
+      - name: Run kconfigcheck
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          cd $GITHUB_WORKSPACE && pwd
+          pmbootstrap kconfig check --arch aarch64 --keep-going --categories=default,community --file .output/.config
+      - name: Cleanup pmbootstrap chroots
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          pmbootstrap shutdown
