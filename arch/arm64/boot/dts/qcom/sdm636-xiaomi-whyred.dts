@@ -178,13 +178,9 @@
 
 		vio-supply = <&vreg_l11a_1p8>;
 
-		syna,reset-delay-ms = <220>;
-		/*
-		 * Because synaptics driver doesn't support reset-gpio,
-		 * we need to delay initialization of rmi_i2c driver
-		 * long enough until display subsystem probes and flips
-		 * gpio53.
-		 */
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>; /* TP_RESET_N */
+
+		syna,reset-delay-ms = <300>;
 		syna,startup-delay-ms = <600>;
 
 		rmi4-f01@1 {
