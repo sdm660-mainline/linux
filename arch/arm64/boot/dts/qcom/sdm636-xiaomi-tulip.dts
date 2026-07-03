@@ -173,12 +173,24 @@
 	};
 };
 
-&blsp_i2c2 {
-	status = "okay";
-};
-
 &blsp_i2c6 {
 	status = "okay";
+
+	tas2557: codec@4c {
+		compatible = "ti,tas2557";
+		reg = <0x4c>;
+		#sound-dai-cells = <0>;
+
+		reset-gpios = <&tlmm 77 GPIO_ACTIVE_LOW>;
+		interrupts-extended = <&tlmm 73 IRQ_TYPE_LEVEL_HIGH>;
+
+		vbat-supply = <&vph_pwr>;
+		iovdd-supply = <&vreg_l6b_1p8>;
+		avdd-supply = <&vreg_l6b_1p8>;
+		dvdd-supply = <&vreg_l6b_1p8>;
+
+		ti,channel = <0>;
+	};
 };
 
 &blsp1_uart2 {
@@ -328,6 +340,11 @@
 };
 
 &q6afedai {
+	dai@16 {
+		reg = <PRIMARY_MI2S_RX>;
+		qcom,sd-lines = <0>;
+	};
+
 	dai@81 {
 		reg = <INT0_MI2S_RX>;
 		qcom,sd-lines = <0 1>;
@@ -444,6 +461,12 @@
 			regulator-max-microvolt = <3328000>;
 			regulator-enable-ramp-delay = <250>;
 			regulator-allow-set-load;
+		};
+
+		vreg_l6b_1p8: l6 {
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-enable-ramp-delay = <250>;
 		};
 
 		vreg_l7b_3p125: l7 {
@@ -661,7 +684,8 @@
 	model = "Xiaomi Redmi Note 6 Pro";
 
 	pinctrl-0 = <&cdc_pdm_default>,
-			<&cdc_dmic_default>;
+			<&cdc_dmic_default>,
+			<&pri_mi2s_active>;
 	pinctrl-names = "default";
 
 	audio-routing = "RX_BIAS", "Digital MCLK",
@@ -676,7 +700,8 @@
 			"PDM_RX3", "Digital PDM_RX3",
 			"Digital LPASS_PDM_TX", "PDM_TX",
 			"AMIC1", "MIC BIAS External1",
-			"AMIC2", "MIC BIAS External2";
+			"AMIC2", "MIC BIAS External2",
+			"ASI2", "Primary MI2S Playback";
 
 	mm1-dai-link {
 		link-name = "MultiMedia1";
@@ -708,6 +733,22 @@
 		codec {
 			sound-dai = <&pm660l_codec 0>,
 					<&lpass_codec 0>;
+		};
+	};
+
+	pri-mi2s-dai-link {
+		link-name = "Primary MI2S Playback";
+
+		cpu {
+			sound-dai = <&q6afedai PRIMARY_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&tas2557>;
 		};
 	};
 
@@ -779,6 +820,52 @@
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
+	};
+
+	pri_mi2s_active: pri-mi2s-active-state {
+		sck-pins {
+			pins = "gpio12";
+			function = "pri_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		ws-pins {
+			pins = "gpio13";
+			function = "pri_mi2s_ws";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio14", "gpio15";
+			function = "pri_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
+	};
+
+	pri_mi2s_sleep: pri-mi2s-sleep-state {
+		sck-pins {
+			pins = "gpio12";
+			function = "pri_mi2s";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+
+		ws-pins {
+			pins = "gpio13";
+			function = "pri_mi2s_ws";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+
+		data-pins {
+			pins = "gpio14", "gpio15";
+			function = "pri_mi2s";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
 	};
 };
 
