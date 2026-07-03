@@ -117,12 +117,12 @@
 /* Identifies itself as Synaptics TD4322Test */
 &touchscreen {
 	/*
-	 * Because synaptics driver doesn't support reset-gpio,
-	 * we need to delay initialization of rmi_i2c driver
-	 * long enough until display subsystem probes and flips
-	 * gpio53.
+	 * No reset GPIO for touch anywhere, neither in downstream DTB node,
+	 * nor in Xperia XA2 schematics. Use the same GPIO_53 as panel.
+	 * This makes it go through kernel's shared GPIO facility and probe
+	 * fine every time in predictable order.
 	 */
-	syna,startup-delay-ms = <600>;
+	reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
 	/* This might be common for all nile devices, not only pioneer */
 	vio-supply = <&vreg_l11a_1p8>;
