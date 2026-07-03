@@ -847,6 +847,7 @@ properties:
               - xiaomi,clover-lte
               - xiaomi,clover-plus
               - xiaomi,jasmine
+              - xiaomi,jason
               - xiaomi,lavender
               - xiaomi,lavender-boe
               - xiaomi,lavender-shenchao
