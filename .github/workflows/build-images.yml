@@ -21,12 +21,14 @@ jobs:
           echo "GITHUB_REF: $GITHUB_REF"
           echo -n "whoami: " ; whoami
           echo -n "groups: " ; groups
-          echo "doas permissions check:"
-          doas -C /etc/doas.conf apt update
+          echo -n "gcc version: "; gcc --version
+          echo -n "clang version: "; clang --version
+          echo -n "lld version: "; ld.lld --version
       - name: Update ubuntu packages
         run: |
-          doas -n apt update
-          doas -n apt -y upgrade
+          sudo apt update
+          sudo apt -y upgrade
+          sudo apt -y autoremove
       - name: Checkout linux source from git
         uses: actions/checkout@v6
         with:
@@ -75,7 +77,7 @@ jobs:
           pmbootstrap -y zap || tail -n200 /home/runner/_pmbwork/log.txt
       - name: Clean previously built kernel packages
         run: |
-          doas rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+          sudo rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
       - name: Package linux-postmarketos-qcom-sdm660 using build --envkernel
         run: |
           cd $GITHUB_WORKSPACE

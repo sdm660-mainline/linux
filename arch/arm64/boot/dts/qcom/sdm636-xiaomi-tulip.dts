@@ -81,6 +81,13 @@
 		};
 	};
 
+	irled {
+		compatible = "gpio-ir-tx";
+		gpios = <&tlmm 24 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&ir_led_default>;
+		pinctrl-names = "default";
+	};
+
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -171,10 +178,6 @@
 };
 
 &blsp_i2c6 {
-	status = "okay";
-};
-
-&blsp_spi7 {
 	status = "okay";
 };
 
@@ -734,6 +737,13 @@
 		function = "gpio";
 		drive-strength = <6>;
 		bias-pull-up;
+	};
+
+	ir_led_default: ir-led-default-state {
+		pins = "gpio24";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
 	};
 
 	mdss_dsi_active: mdss-dsi-active-state {

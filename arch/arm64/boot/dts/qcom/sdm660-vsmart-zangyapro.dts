@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
 /*
+ * Copyright (c) 2026, Adrian Nguyen <thenguyen1024@gmail.com>
+ *
+ * Derived from sdm660-xiaomi-jasmine.dts
  * Copyright (c) 2022, Joe Mason <buddyjojo06@outlook.com>
  */
 
@@ -13,8 +16,8 @@
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
 / {
-	model = "Xiaomi Mi A2";
-	compatible = "xiaomi,jasmine", "qcom,sdm660";
+	model = "Vsmart Active 1 (zangyapro)";
+	compatible = "vsmart,active1", "qcom,sdm660";
 	chassis-type = "handset";
 
 	aliases {
@@ -23,20 +26,7 @@
 	};
 
 	chosen {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-
 		stdout-path = "serial0:115200n8";
-
-		framebuffer0: framebuffer@9d400000 {
-			compatible = "simple-framebuffer";
-			reg = <0 0x9d400000 0 (1080 * 2160 * 4)>;
-			width = <1080>;
-			height = <2160>;
-			stride = <(1080 * 4)>;
-			format = "a8r8g8b8";
-		};
 	};
 
 	battery: battery {
@@ -58,18 +48,16 @@
 	};
 
 	/*
-	 * This is here until we have a driver for QPNP LCDB regulator.
-	 * It can emulate both positive LDO and negative NCP supplies for panel.
+	 * This is here until we have a driver for the QPNP LCDB regulator.
+	 * It emulates both the positive (LAB) and negative (IBB) panel supplies.
+	 * The stock bootloader sets the LCDB to 5.4 V.
 	 */
 	lcdb_fixed: lcdb-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "lcdb";
-		/*
-		 * Actual range for LCDB is 4.0 - 6.0V, but
-		 * stock bootloader sets voltage to 5.4 V
-		 */
 		regulator-min-microvolt = <5400000>;
 		regulator-max-microvolt = <5400000>;
+
 		regulator-always-on;
 		regulator-boot-on;
 	};
@@ -88,13 +76,6 @@
 		};
 	};
 
-	irled {
-		compatible = "gpio-ir-tx";
-		gpios = <&tlmm 24 GPIO_ACTIVE_HIGH>;
-		pinctrl-0 = <&ir_led_default>;
-		pinctrl-names = "default";
-	};
-
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -107,11 +88,6 @@
 			record-size = <0x20000>;
 			ftrace-size = <0x0>;
 			pmsg-size = <0x20000>;
-		};
-
-		framebuffer_mem: memory@9d400000 {
-			reg = <0x0 0x9d400000 0x0 0x23ff000>;
-			no-map;
 		};
 	};
 
@@ -142,31 +118,11 @@
 
 	bluetooth {
 		compatible = "qcom,wcn3990-bt";
-		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
-		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
-		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
-		vddio-supply = <&vreg_l13a_1p8>; // chip-pwd-supply ? // TODO: check
+		vddxo-supply = <&vreg_l9a_1p8>;
+		vddrf-supply = <&vreg_l6a_1p3>;
+		vddch0-supply = <&vreg_l19a_3p3>;
+		vddio-supply = <&vreg_l13a_1p8>;
 		max-speed = <3200000>;
-		/* Path is relative to the qca/ subdir in lib/firmware. */
-		/* firmware-name = "crnv21.bin"; */ // default
-	};
-};
-
-&blsp_i2c1 {
-	status = "okay";
-
-	touchscreen@1 {
-		compatible = "novatek,nt36672a-ts";
-		reg = <0x1>;
-		iovcc-supply = <&vreg_l11a_1p8>;
-		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_RISING>;
-		panel = <&panel>;
-		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&ts_pins_active>;
-		pinctrl-1 = <&ts_int_sleep &ts_rst_sleep>;
-		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
-		touchscreen-size-x = <1080>;
-		touchscreen-size-y = <2160>;
 	};
 };
 
@@ -183,15 +139,15 @@
 	vdd-supply = <&vreg_l1b_0p925>;
 	vdda-supply = <&vreg_l1a_1p225>;
 
-	panel: panel@0 {
-		compatible = "tianma,tl060fvxs16-00", "novatek,nt36672a";
+	panel@0 {
+		compatible = "djn,a1-hx83112a";
 		reg = <0>;
 
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 
-		vddio-supply = <&vreg_l11a_1p8>;
-		vddneg-supply = <&lcdb_fixed>;
-		vddpos-supply = <&lcdb_fixed>;
+		vdd1-supply = <&vreg_l11a_1p8>;
+		vsp-supply = <&lcdb_fixed>;
+		vsn-supply = <&lcdb_fixed>;
 
 		backlight = <&pm660l_wled>;
 
@@ -539,20 +495,20 @@
 	};
 };
 
-&sdc2_state_on {
-	sd-cd-pins {
-		pins = "gpio54";
-		function = "gpio";
-		bias-pull-up;
-		drive-strength = <2>;
-	};
-};
-
 &sdc2_state_off {
 	sd-cd-pins {
 		pins = "gpio54";
 		function = "gpio";
 		bias-disable;
+		drive-strength = <2>;
+	};
+};
+
+&sdc2_state_on {
+	sd-cd-pins {
+		pins = "gpio54";
+		function = "gpio";
+		bias-pull-up;
 		drive-strength = <2>;
 	};
 };
@@ -570,36 +526,21 @@
 	status = "okay";
 };
 
+&sdhc_2 {
+	cd-gpios = <&tlmm 54 GPIO_ACTIVE_LOW>;
+
+	vmmc-supply = <&vreg_l5b_2p95>;
+	vqmmc-supply = <&vreg_l2b_2p95>;
+
+	no-sdio;
+	no-mmc;
+
+	status = "okay";
+};
+
 &tlmm {
+	/* GPIOs 8-11 are reserved for the fingerprint sensor's SPI bus. */
 	gpio-reserved-ranges = <8 4>;
-
-	ir_led_default: ir-led-default-state {
-		pins = "gpio24";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-disable;
-	};
-
-	ts_pins_active: ts-pins-active-state {
-		pins = "gpio66", "gpio67";
-		function = "gpio";
-		drive-strength = <16>;
-		bias-pull-up;
-	};
-
-	ts_rst_sleep: ts-rst-sleep-state {
-		pins = "gpio66";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-pull-down;
-	};
-
-	ts_int_sleep: ts-int-sleep-state {
-		pins = "gpio67";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-disable;
-	};
 
 	panel_reset_n: panel-rst-n-state {
 		pins = "gpio53";
