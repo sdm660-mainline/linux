@@ -49,49 +49,49 @@ jobs:
       - name: Install modules into fake install prefix
         run: |
           make O=.output LOCALVERSION= INSTALL_MOD_PATH=PREFIX INSTALL_MOD_STRIP=1 modules_install
-  build-apk-package:
-    runs-on: [self-hosted, Linux, aarch64]
-    needs: [build-linux]
-    steps:
-      - name: Update pmbootstrap
-        run: git -C /opt/pmbootstrap pull
-      - name: Prepare common pmbootstrap config
-        run: |
-          echo -n "pmbootstrap version: "
-          pmbootstrap --version
-          pmbootstrap config work /home/runner/_pmbwork
-          pmbootstrap config aports /home/runner/_pmbwork/cache_git/pmaports
-          pmbootstrap config ccache_size 20G
-          pmbootstrap config extra_space 256
-          pmbootstrap config jobs 4
-          pmbootstrap config ui console
-      - name: Dump pmbootstrap config
-        run: pmbootstrap config
-      - name: Update pmaports
-        run: |
-          git -C $(pmbootstrap config aports) fetch origin
-          git -C $(pmbootstrap config aports) reset --hard origin/main
-          pmbootstrap status
-      - name: Clean pmbootstrap chroots (pmbootstrap zap)
-        run: |
-          pmbootstrap -y zap || tail -n200 /home/runner/_pmbwork/log.txt
-      - name: Clean previously built kernel packages
-        run: |
-          sudo rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
-      - name: Package linux-postmarketos-qcom-sdm660 using build --envkernel
-        run: |
-          cd $GITHUB_WORKSPACE
-          pwd
-          pmbootstrap --details-to-stdout build --arch aarch64 --envkernel linux-postmarketos-qcom-sdm660
-      - name: Make small rootfs image with console ui (pmbootstrap install)
-        run: |
-          pmbootstrap install --no-fde --zap --no-firewall --password=147147 || tail -n200 /home/runner/_pmbwork/log.txt
-      - name: Cleanup pmbootstrap chroots
-        run: |
-          pmbootstrap shutdown
-      - uses: actions/upload-artifact@v7
-        with:
-          name: Artifacts
-          compression-level: 1
-          path: |
-            /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+#  build-apk-package:
+#    runs-on: [self-hosted, Linux, aarch64]
+#    needs: [build-linux]
+#    steps:
+#      - name: Update pmbootstrap
+#        run: git -C /opt/pmbootstrap pull
+#      - name: Prepare common pmbootstrap config
+#        run: |
+#          echo -n "pmbootstrap version: "
+#          pmbootstrap --version
+#          pmbootstrap config work /home/runner/_pmbwork
+#          pmbootstrap config aports /home/runner/_pmbwork/cache_git/pmaports
+#          pmbootstrap config ccache_size 20G
+#          pmbootstrap config extra_space 256
+#          pmbootstrap config jobs 4
+#          pmbootstrap config ui console
+#      - name: Dump pmbootstrap config
+#        run: pmbootstrap config
+#      - name: Update pmaports
+#        run: |
+#          git -C $(pmbootstrap config aports) fetch origin
+#          git -C $(pmbootstrap config aports) reset --hard origin/main
+#          pmbootstrap status
+#      - name: Clean pmbootstrap chroots (pmbootstrap zap)
+#        run: |
+#          pmbootstrap -y zap || tail -n200 /home/runner/_pmbwork/log.txt
+#      - name: Clean previously built kernel packages
+#        run: |
+#          sudo rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+#      - name: Package linux-postmarketos-qcom-sdm660 using build --envkernel
+#        run: |
+#          cd $GITHUB_WORKSPACE
+#          pwd
+#          pmbootstrap --details-to-stdout build --arch aarch64 --envkernel linux-postmarketos-qcom-sdm660
+#      - name: Make small rootfs image with console ui (pmbootstrap install)
+#        run: |
+#          pmbootstrap install --no-fde --zap --no-firewall --password=147147 || tail -n200 /home/runner/_pmbwork/log.txt
+#      - name: Cleanup pmbootstrap chroots
+#        run: |
+#          pmbootstrap shutdown
+#      - uses: actions/upload-artifact@v7
+#        with:
+#          name: Artifacts
+#          compression-level: 1
+#          path: |
+#            /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
