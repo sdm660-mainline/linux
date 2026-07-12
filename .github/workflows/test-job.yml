@@ -1,0 +1,88 @@
+name: Test container job
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - qcom-sdm660-6.*.y
+      - qcom-sdm660-7.*.y
+    tags:
+      - v*-sdm660
+  workflow_dispatch:
+jobs:
+  test-docker:
+    runs-on: [self-hosted, Linux, aarch64]
+    container:
+      image: minlexx/alpine-kbuilder:3.24
+      #env:
+      #  TEST_VAR: hello
+    steps:
+      - name: Print runner debug info
+        run: |
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
+          echo "GITHUB_HEAD_REF: $GITHUB_HEAD_REF"
+          echo "GITHUB_REF: $GITHUB_REF"
+          (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
+          echo -n "whoami: " ; whoami
+          echo -n "groups: " ; groups
+      # GITHUB_BASE_REF: qcom-sdm660-7.2.y
+      # GITHUB_HEAD_REF: alexeymin/test-container-jobs
+      # GITHUB_REF: refs/pull/198/merge
+      - name: Update Alpine packages
+        run: |
+          sudo rm -f /etc/apk/interactive
+          sudo apk update && sudo apk upgrade -a
+      - name: Print tools/OS versions
+        run: |
+          echo -n "git version: "; git --version
+          echo -n "make version: "; make --version
+          echo -n "gcc version: "; gcc --version
+          echo -n "clang version: "; clang --version
+          echo -n "lld version: "; ld.lld --version
+          echo -n "pahole version: "; pahole --version
+          fastfetch
+      - name: Show env
+        run: env
+      - name: Check workspace
+        run: ls -la --color "${GITHUB_WORKSPACE}"
+      # Impossible to use actions:
+      #  Error: JavaScript Actions in Alpine containers are only supported on x64 Linux runners. Detected Linux Arm64
+      #  Fuck Github, fuck github actions
+      #- name: Checkout linux source from git
+      #  uses: actions/checkout@v7
+      #  with:
+      #    fetch-depth: 0
+      #    fetch-tags: true
+      #    clean: false
+      - name: Prepare source branches
+        run: |
+          cd "${GITHUB_WORKSPACE}"
+          pwd
+          echo "git remotes:"
+          git remote -vv
+          git reset --hard
+          git checkout "${GITHUB_BASE_REF}"
+          git reset --hard
+          git status
+          git checkout "${GITHUB_HEAD_REF}"
+          git status
+      - name: Clean build files (remove me)
+        run: |
+          make O=.output LLVM=1 LOCALVERSION= clean
+      - name: Prepare linux kernel .config with LLVM using sdm660_defconfig
+        run: |
+          mkdir -p .output
+          make O=.output LLVM=1 LOCALVERSION= -j$(nproc) defconfig sdm660_defconfig
+      - name: Build linux kernel (vmlinuz, vmlinuz.efi, dtbs, modules + Image.gz)
+        run: |
+          make O=.output LLVM=1 LOCALVERSION= -j$(nproc) all Image.gz
+      - name: Restore default branch
+        run: |
+          cd "${GITHUB_WORKSPACE}"
+          git reset --hard
+          git checkout "${GITHUB_BASE_REF}"
+          git branch -D "${GITHUB_HEAD_REF}"
+          git status
+
+
