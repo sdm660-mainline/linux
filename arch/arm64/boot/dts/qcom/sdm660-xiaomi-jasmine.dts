@@ -187,8 +187,6 @@
 		iovdd-supply = <&vreg_l6b_1p8>;
 		avdd-supply = <&vreg_l6b_1p8>;
 		dvdd-supply = <&vreg_l6b_1p8>;
-
-		ti,channel = <0>;
 	};
 };
 
