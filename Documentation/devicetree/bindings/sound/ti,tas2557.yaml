@@ -17,10 +17,23 @@ description: |
   for a specific speaker design using the TI PurePath Console tuning
   tools.
 
-  Stereo playback is built from two devices, each reproducing one audio
-  slot selected through the ti,channel property and applying the
-  matching per-device tuning contained in a stereo-tuned firmware
-  image.
+  A single node describes either one physical TAS2557, or up to two of
+  them sharing one ASI bus and one reset/IRQ pair, using the same
+  reg-array convention as
+  Documentation/devicetree/bindings/sound/ti,tas2781.yaml. When two
+  devices are listed, `reg` carries both I2C addresses and the
+  physical device at each index is implicitly assigned one half of a
+  stereo-tuned firmware image: the device at index 0 is DEV_A and the
+  device at index 1 is DEV_B. No explicit channel-selection property
+  exists or is needed -- the order of addresses in `reg` is the only
+  configuration required. `ti,imon-slot-nos` and `ti,vmon-slot-nos`
+  follow the same indexing: the item at array index N sets the TDM TX
+  slot used by the device at the Nth `reg` entry.
+
+  The uCDSP firmware format defines only the DEV_A and DEV_B device
+  types, so `reg` (and the two TDM slot properties) cannot list more
+  than two entries, regardless of how many physical speakers the board
+  has.
 
   Datasheet: https://www.ti.com/lit/gpn/tas2557
 
@@ -32,7 +45,13 @@ properties:
     const: ti,tas2557
 
   reg:
-    maxItems: 1
+    minItems: 1
+    maxItems: 2
+    description:
+      I2C address of each physical device sharing this node. One
+      entry configures a single mono TAS2557. Two entries configure a
+      device pair; the device at index 0 is DEV_A and the device at
+      index 1 is DEV_B.
 
   '#sound-dai-cells':
     const: 0
@@ -57,40 +76,46 @@ properties:
   dvdd-supply:
     description: Digital core supply, 1.65 V to 1.95 V.
 
-  ti,imon-slot-no:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: TDM TX time slot for current-sense data.
-    default: 0
-    minimum: 0
-    maximum: 7
+  ti,imon-slot-nos:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    minItems: 1
+    maxItems: 2
+    items:
+      minimum: 0
+      maximum: 7
+    description:
+      TDM TX time slot(s) for current-sense data, one entry per `reg`
+      entry. The item at array index N configures the device at the
+      Nth `reg` entry.
 
-  ti,vmon-slot-no:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: TDM TX time slot for voltage-sense data.
-    default: 2
-    minimum: 0
-    maximum: 7
-
-  ti,channel:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: |
-      Audio slot of the stereo stream reproduced by this device (0 =
-      left, 1 = right). With stereo firmware this also selects which
-      per-device tuning set is applied.
-    enum: [0, 1]
-    default: 0
+  ti,vmon-slot-nos:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    minItems: 1
+    maxItems: 2
+    items:
+      minimum: 0
+      maximum: 7
+    description:
+      TDM TX time slot(s) for voltage-sense data, one entry per `reg`
+      entry. The item at array index N configures the device at the
+      Nth `reg` entry.
 
   firmware-name:
-    $ref: /schemas/types.yaml#/definitions/string
+    maxItems: 1
     description: |
       Name of the DSP firmware image to load. Defaults to a name
-      derived from the silicon revision. Stereo systems typically use
-      a stereo-tuned image shared by both devices.
+      derived from the silicon revision. A device pair shares one
+      image; each device's half of it is selected by its `reg` index,
+      not by this property.
 
 required:
   - compatible
   - reg
   - '#sound-dai-cells'
+  - vbat-supply
+  - iovdd-supply
+  - avdd-supply
+  - dvdd-supply
 
 unevaluatedProperties: false
 
@@ -116,8 +141,34 @@ examples:
             avdd-supply = <&vreg_l6b_1p8>;
             dvdd-supply = <&vreg_l6b_1p8>;
 
-            ti,imon-slot-no = <0>;
-            ti,vmon-slot-no = <2>;
-            ti,channel = <0>;
+            ti,imon-slot-nos = <0>;
+            ti,vmon-slot-nos = <2>;
         };
     };
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        audio-codec@4c {
+            compatible = "ti,tas2557";
+            reg = <0x4c>, <0x4d>;
+            #sound-dai-cells = <0>;
+            reset-gpios = <&tlmm 77 GPIO_ACTIVE_LOW>;
+            interrupt-parent = <&tlmm>;
+            interrupts = <73 IRQ_TYPE_LEVEL_HIGH>;
+
+            vbat-supply = <&vph_pwr>;
+            iovdd-supply = <&vreg_l6b_1p8>;
+            avdd-supply = <&vreg_l6b_1p8>;
+            dvdd-supply = <&vreg_l6b_1p8>;
+
+            ti,imon-slot-nos = <0 1>;
+            ti,vmon-slot-nos = <2 3>;
+            firmware-name = "tas2557-stereo.bin";
+        };
+    };
+...
