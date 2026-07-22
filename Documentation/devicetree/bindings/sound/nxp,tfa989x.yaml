@@ -28,6 +28,10 @@ properties:
   rcv-gpios:
     description: optional GPIO to be asserted when receiver mode is enabled.
 
+  reset-gpios:
+    maxItems: 1
+    description: optional active-high hardware reset GPIO.
+
   sound-name-prefix: true
 
   vddd-supply:

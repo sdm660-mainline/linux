@@ -10,6 +10,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/workqueue.h>
 #include <sound/soc.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -305,6 +306,8 @@ struct pm8916_wcd_analog_priv {
 	struct snd_soc_jack *jack;
 	bool hphl_jack_type_normally_open;
 	bool gnd_jack_type_normally_open;
+	bool mbhc_external_micbias;
+	struct delayed_work mbhc_detect_work;
 	/* Voltage threshold when internal current source of 100uA is used */
 	u32 vref_btn_cs[MBHC_MAX_BUTTONS];
 	/* Voltage threshold when microphone bias is ON */
@@ -478,6 +481,37 @@ static int pm8916_mbhc_configure_bias(struct pm8916_wcd_analog_priv *priv,
 	}
 
 	return 0;
+}
+
+static void pm8916_mbhc_set_external_micbias(struct pm8916_wcd_analog_priv *priv,
+					     bool enable)
+{
+	struct snd_soc_dapm_context *dapm = snd_soc_component_to_dapm(priv->component);
+
+	if (enable)
+		snd_soc_dapm_force_enable_pin(dapm, "vdd-micbias");
+	else
+		snd_soc_dapm_disable_pin(dapm, "vdd-micbias");
+
+	snd_soc_dapm_sync(dapm);
+}
+
+static void pm8916_mbhc_detect_work(struct work_struct *work)
+{
+	struct pm8916_wcd_analog_priv *priv =
+		container_of(to_delayed_work(work), struct pm8916_wcd_analog_priv,
+			     mbhc_detect_work);
+	u32 result = snd_soc_component_read(priv->component, CDC_A_MBHC_RESULT_1);
+	unsigned int button = result & CDC_A_MBHC_RESULT_1_BTN_RESULT_MASK;
+
+	dev_info(priv->component->dev,
+		 "external micbias headset detection result %#x (%s)\n",
+		 button, button ? "headphone" : "headset");
+
+	if (button)
+		snd_soc_jack_report(priv->jack, SND_JACK_HEADPHONE, hs_jack_mask);
+	else
+		snd_soc_jack_report(priv->jack, SND_JACK_HEADSET, hs_jack_mask);
 }
 
 static void pm8916_wcd_setup_mbhc(struct pm8916_wcd_analog_priv *wcd)
@@ -830,6 +864,7 @@ static int pm8916_wcd_analog_probe(struct snd_soc_component *component)
 					wcd_reg_defaults_2_0[reg].def);
 
 	priv->component = component;
+	INIT_DELAYED_WORK(&priv->mbhc_detect_work, pm8916_mbhc_detect_work);
 
 	snd_soc_component_update_bits(component, CDC_D_CDC_RST_CTL,
 			    RST_CTL_DIG_SW_RST_N_MASK,
@@ -843,6 +878,10 @@ static int pm8916_wcd_analog_probe(struct snd_soc_component *component)
 static void pm8916_wcd_analog_remove(struct snd_soc_component *component)
 {
 	struct pm8916_wcd_analog_priv *priv = dev_get_drvdata(component->dev);
+
+	cancel_delayed_work_sync(&priv->mbhc_detect_work);
+	if (priv->mbhc_external_micbias)
+		pm8916_mbhc_set_external_micbias(priv, false);
 
 	snd_soc_component_update_bits(component, CDC_D_CDC_RST_CTL,
 			    RST_CTL_DIG_SW_RST_N_MASK, 0);
@@ -1150,6 +1189,12 @@ static irqreturn_t pm8916_mbhc_switch_irq_handler(int irq, void *arg)
 	if (ins) { /* hs insertion */
 		bool micbias_enabled = false;
 
+		if (priv->mbhc_external_micbias) {
+			pm8916_mbhc_set_external_micbias(priv, true);
+			mod_delayed_work(system_wq, &priv->mbhc_detect_work,
+					 msecs_to_jiffies(400));
+		}
+
 		if (snd_soc_component_read(component, CDC_A_MICB_2_EN) &
 				CDC_A_MICB_2_EN_ENABLE)
 			micbias_enabled = true;
@@ -1162,16 +1207,23 @@ static irqreturn_t pm8916_mbhc_switch_irq_handler(int irq, void *arg)
 		 * both press and release event received then its
 		 * a headset.
 		 */
-		if (priv->mbhc_btn0_released)
+		if (priv->mbhc_external_micbias) {
+			/* Type is reported after the external bias settles. */
+		} else if (priv->mbhc_btn0_released) {
 			snd_soc_jack_report(priv->jack,
 					    SND_JACK_HEADSET, hs_jack_mask);
-		else
+		} else {
 			snd_soc_jack_report(priv->jack,
 					    SND_JACK_HEADPHONE, hs_jack_mask);
+		}
 
 		priv->detect_accessory_type = false;
 
 	} else { /* removal */
+		cancel_delayed_work_sync(&priv->mbhc_detect_work);
+		if (priv->mbhc_external_micbias)
+			pm8916_mbhc_set_external_micbias(priv, false);
+
 		snd_soc_jack_report(priv->jack, 0, hs_jack_mask);
 		priv->detect_accessory_type = true;
 		priv->mbhc_btn0_released = false;
@@ -1249,6 +1301,9 @@ static int pm8916_wcd_analog_parse_dt(struct device *dev,
 		priv->gnd_jack_type_normally_open = true;
 	else
 		priv->gnd_jack_type_normally_open = false;
+
+	priv->mbhc_external_micbias = of_property_read_bool(dev->of_node,
+						       "qcom,mbhc-external-micbias");
 
 	priv->mbhc_btn_enabled = true;
 	rval = of_property_read_u32_array(dev->of_node,

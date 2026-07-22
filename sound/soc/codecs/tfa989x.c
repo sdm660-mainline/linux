@@ -7,6 +7,7 @@
  * Copyright (C) 2013 Sony Mobile Communications Inc.
  */
 
+#include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
@@ -59,6 +60,7 @@ struct tfa989x_rev {
 struct tfa989x {
 	const struct tfa989x_rev *rev;
 	struct regulator *vddd_supply;
+	struct gpio_desc *reset_gpiod;
 	struct gpio_desc *rcv_gpiod;
 };
 
@@ -347,6 +349,11 @@ static int tfa989x_i2c_probe(struct i2c_client *i2c)
 			return PTR_ERR(tfa989x->rcv_gpiod);
 	}
 
+	tfa989x->reset_gpiod = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(tfa989x->reset_gpiod))
+		return dev_err_probe(dev, PTR_ERR(tfa989x->reset_gpiod),
+				     "Failed to get reset GPIO\n");
+
 	regmap = devm_regmap_init_i2c(i2c, &tfa989x_regmap);
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
@@ -360,6 +367,12 @@ static int tfa989x_i2c_probe(struct i2c_client *i2c)
 	ret = devm_add_action_or_reset(dev, tfa989x_regulator_disable, tfa989x);
 	if (ret)
 		return ret;
+
+	if (tfa989x->reset_gpiod) {
+		usleep_range(1000, 1500);
+		gpiod_set_value_cansleep(tfa989x->reset_gpiod, 0);
+		usleep_range(1000, 1500);
+	}
 
 	/* Bypass regcache for reset and init sequence */
 	regcache_cache_bypass(regmap, true);

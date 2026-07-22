@@ -5,6 +5,7 @@
  */
 
 #include <dt-bindings/sound/qcom,q6dsp-lpass-ports.h>
+#include <linux/input-event-codes.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -33,6 +34,18 @@ struct sdm660_int_snd_data {
 	uint32_t int0_mi2s_clk_count;
 	uint32_t int3_mi2s_clk_count;
 	u32 pri_mi2s_clk_count;
+	u32 sec_mi2s_clk_count;
+};
+
+static struct snd_soc_jack_pin sdm660_int_jack_pins[] = {
+	{
+		.pin = "Mic Jack",
+		.mask = SND_JACK_MICROPHONE,
+	},
+	{
+		.pin = "Headphone Jack",
+		.mask = SND_JACK_HEADPHONE,
+	},
 };
 
 static int snd_sdm660_int_startup(struct snd_pcm_substream *stream)
@@ -126,6 +139,18 @@ static int snd_sdm660_int_startup(struct snd_pcm_substream *stream)
 		snd_soc_dai_set_fmt(cpu, SND_SOC_DAIFMT_CBP_CFP);
 
 		break;
+	case SECONDARY_MI2S_RX:
+		data->sec_mi2s_clk_count++;
+		if (data->sec_mi2s_clk_count == 1)
+			snd_soc_dai_set_sysclk(cpu,
+					       Q6AFE_LPASS_CLK_ID_SEC_MI2S_IBIT,
+					       MI2S_BCLK_RATE,
+					       SNDRV_PCM_STREAM_PLAYBACK);
+
+		/* AFE drives the I2S bit/frame clock for the external amp. */
+		snd_soc_dai_set_fmt(cpu, SND_SOC_DAIFMT_CBP_CFP);
+
+		break;
 	default:
 		dev_err(cpu->dev, "unimplemented afe dai\n");
 		return -ENOSYS;
@@ -195,6 +220,14 @@ static void snd_sdm660_int_shutdown(struct snd_pcm_substream *stream)
 					       0, SNDRV_PCM_STREAM_PLAYBACK);
 
 		break;
+	case SECONDARY_MI2S_RX:
+		data->sec_mi2s_clk_count--;
+		if (data->sec_mi2s_clk_count == 0)
+			snd_soc_dai_set_sysclk(cpu,
+					       Q6AFE_LPASS_CLK_ID_SEC_MI2S_IBIT,
+					       0, SNDRV_PCM_STREAM_PLAYBACK);
+
+		break;
 	default:
 		dev_err(cpu->dev, "unimplemented afe dai\n");
 		break;
@@ -258,6 +291,7 @@ static int snd_sdm660_int_hw_params(struct snd_pcm_substream *stream,
 		break;
 	case INT0_MI2S_RX:
 	case INT3_MI2S_TX:
+	case SECONDARY_MI2S_RX:
 	default:
 		break;
 	}
@@ -323,16 +357,22 @@ static int sdm660_int_dai_init(struct snd_soc_pcm_runtime *rtd)
 	int ret;
 
 	if (!data->jack_setup) {
-		/* headset buttons not tested */
-		ret = snd_soc_card_jack_new(card, "Headset Jack",
-					    SND_JACK_HEADSET | SND_JACK_BTN_0
-					  | SND_JACK_BTN_1 | SND_JACK_BTN_2
-					  | SND_JACK_BTN_3 | SND_JACK_BTN_4,
-					    &data->jack);
+		ret = snd_soc_card_jack_new_pins(card, "Headset Jack",
+						 SND_JACK_HEADSET | SND_JACK_BTN_0
+					       | SND_JACK_BTN_1 | SND_JACK_BTN_2
+					       | SND_JACK_BTN_3 | SND_JACK_BTN_4,
+						 &data->jack, sdm660_int_jack_pins,
+						 ARRAY_SIZE(sdm660_int_jack_pins));
 		if (ret < 0) {
 			dev_err(card->dev, "could not create headset jack\n");
 			return ret;
 		}
+
+		snd_jack_set_key(data->jack.jack, SND_JACK_BTN_0, KEY_MEDIA);
+		snd_jack_set_key(data->jack.jack, SND_JACK_BTN_1,
+				 KEY_VOICECOMMAND);
+		snd_jack_set_key(data->jack.jack, SND_JACK_BTN_2, KEY_VOLUMEUP);
+		snd_jack_set_key(data->jack.jack, SND_JACK_BTN_3, KEY_VOLUMEDOWN);
 
 		data->jack_setup = true;
 	}
@@ -376,6 +416,9 @@ static void snd_sdm660_int_add_ops(struct snd_soc_card *card)
 }
 
 static const struct snd_soc_dapm_widget snd_sdm660_int_dapm_widgets[] = {
+	SND_SOC_DAPM_HP("Headphone Jack", NULL),
+	SND_SOC_DAPM_MIC("Mic Jack", NULL),
+	SND_SOC_DAPM_SPK("Speaker", NULL),
 };
 
 static int snd_sdm660_int_probe(struct platform_device *pdev)

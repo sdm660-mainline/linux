@@ -90,6 +90,7 @@ static const char * const supply_names[] = {
 struct ak4375_drvdata {
 	struct snd_soc_dai_driver *dai_drv;
 	const struct snd_soc_component_driver *comp_drv;
+	const struct regmap_config *regmap_config;
 };
 
 struct ak4375_priv {
@@ -111,6 +112,24 @@ static const struct reg_default ak4375_reg_defaults[] = {
 	{ 0x0f, 0x00 }, { 0x10, 0x00 }, { 0x11, 0x00 },
 	{ 0x12, 0x00 }, { 0x13, 0x00 }, { 0x14, 0x00 },
 	{ 0x15, 0x00 }, { 0x24, 0x00 },
+};
+
+static const struct reg_default ak4376_reg_defaults[] = {
+	{ 0x00, 0x00 }, { 0x01, 0x00 }, { 0x02, 0x00 },
+	{ 0x03, 0x00 }, { 0x04, 0x00 }, { 0x05, 0x00 },
+	{ 0x06, 0x00 }, { 0x07, 0x00 }, { 0x08, 0x00 },
+	{ 0x09, 0x00 }, { 0x0a, 0x00 }, { 0x0b, 0x19 },
+	{ 0x0c, 0x19 }, { 0x0d, 0x0b }, { 0x0e, 0x00 },
+	{ 0x0f, 0x00 }, { 0x10, 0x00 }, { 0x11, 0x00 },
+	{ 0x12, 0x00 }, { 0x13, 0x00 }, { 0x14, 0x00 },
+	{ 0x15, 0x40 }, { 0x16, 0x00 }, { 0x17, 0x00 },
+	{ 0x18, 0x00 }, { 0x19, 0x00 }, { 0x1a, 0x00 },
+	{ 0x1b, 0x00 }, { 0x1c, 0x00 }, { 0x1d, 0x00 },
+	{ 0x1e, 0x00 }, { 0x1f, 0x00 }, { 0x20, 0x00 },
+	{ 0x21, 0x00 }, { 0x22, 0x00 }, { 0x23, 0x00 },
+	{ 0x24, 0x00 }, { 0x25, 0x00 }, { 0x26, 0x20 },
+	{ 0x27, 0x00 }, { 0x28, 0x00 }, { 0x29, 0x00 },
+	{ 0x2a, 0x07 },
 };
 
 /*
@@ -484,9 +503,25 @@ static const struct regmap_config ak4375_regmap = {
 	.cache_type		= REGCACHE_RBTREE,
 };
 
+static const struct regmap_config ak4376_regmap = {
+	.reg_bits		= 8,
+	.val_bits		= 8,
+	.max_register		= 0x2a,
+	.reg_defaults		= ak4376_reg_defaults,
+	.num_reg_defaults	= ARRAY_SIZE(ak4376_reg_defaults),
+	.cache_type		= REGCACHE_RBTREE,
+};
+
 static const struct ak4375_drvdata ak4375_drvdata = {
 	.dai_drv = &ak4375_dai,
 	.comp_drv = &soc_codec_dev_ak4375,
+	.regmap_config = &ak4375_regmap,
+};
+
+static const struct ak4375_drvdata ak4376_drvdata = {
+	.dai_drv = &ak4375_dai,
+	.comp_drv = &soc_codec_dev_ak4375,
+	.regmap_config = &ak4376_regmap,
 };
 
 static const struct dev_pm_ops ak4375_pm = {
@@ -505,14 +540,16 @@ static int ak4375_i2c_probe(struct i2c_client *i2c)
 	if (!ak4375)
 		return -ENOMEM;
 
-	ak4375->regmap = devm_regmap_init_i2c(i2c, &ak4375_regmap);
+	drvdata = of_device_get_match_data(&i2c->dev);
+	if (!drvdata)
+		return -EINVAL;
+
+	ak4375->regmap = devm_regmap_init_i2c(i2c, drvdata->regmap_config);
 	if (IS_ERR(ak4375->regmap))
 		return PTR_ERR(ak4375->regmap);
 
 	i2c_set_clientdata(i2c, ak4375);
 	ak4375->dev = &i2c->dev;
-
-	drvdata = of_device_get_match_data(&i2c->dev);
 
 	for (i = 0; i < ARRAY_SIZE(supply_names); i++)
 		ak4375->supplies[i].supply = supply_names[i];
@@ -556,8 +593,12 @@ static int ak4375_i2c_probe(struct i2c_client *i2c)
 		dev_dbg(ak4375->dev, "found AK4375A\n");
 		break;
 	case DEVICEID_AK4376A:
-		dev_err(ak4375->dev, "found unsupported AK4376/A!\n");
-		return -EINVAL;
+		if (drvdata != &ak4376_drvdata) {
+			dev_err(ak4375->dev, "found AK4376/A with incompatible match data\n");
+			return -EINVAL;
+		}
+		dev_info(ak4375->dev, "found AK4376/A\n");
+		break;
 	case DEVICEID_AK4377:
 		dev_err(ak4375->dev, "found unsupported AK4377!\n");
 		return -EINVAL;
@@ -586,6 +627,7 @@ static void ak4375_i2c_remove(struct i2c_client *i2c)
 
 static const struct of_device_id ak4375_of_match[] = {
 	{ .compatible = "asahi-kasei,ak4375", .data = &ak4375_drvdata },
+	{ .compatible = "asahi-kasei,ak4376", .data = &ak4376_drvdata },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, ak4375_of_match);

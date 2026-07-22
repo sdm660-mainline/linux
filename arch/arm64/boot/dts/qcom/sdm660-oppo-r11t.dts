@@ -9,6 +9,8 @@
 /dts-v1/;
 
 #include "sdm660-xiaomi-jason.dts"
+#include <dt-bindings/sound/qcom,q6afe.h>
+#include <dt-bindings/sound/qcom,q6asm.h>
 
 /*
  * Stock OPPO R11T PIL layout (from running.dts):
@@ -118,6 +120,171 @@
 	status = "okay";
 };
 
+&adsp_pil {
+	firmware-name = "adsp.mdt";
+};
+
+&lpass_codec {
+	status = "okay";
+};
+
+&pm660l_codec {
+	vdd-cdc-io-supply = <&vreg_s4a_2p04>;
+	vdd-cdc-tx-rx-cx-supply = <&vreg_s4a_2p04>;
+	vdd-micbias-supply = <&vreg_s4a_2p04>;
+
+	qcom,micbias-lvl = <2700>;
+	qcom,mbhc-external-micbias;
+	qcom,mbhc-vthreshold-low = <60 131 253 425 426>;
+	qcom,mbhc-vthreshold-high = <130 131 253 425 426>;
+	status = "okay";
+};
+
+&q6afedai {
+	dai@16 {
+		reg = <PRIMARY_MI2S_RX>;
+		qcom,sd-lines = <0>;
+	};
+
+	dai@18 {
+		reg = <SECONDARY_MI2S_RX>;
+		qcom,sd-lines = <0>;
+	};
+
+	dai@81 {
+		reg = <INT0_MI2S_RX>;
+		qcom,sd-lines = <0 1>;
+	};
+
+	dai@88 {
+		reg = <INT3_MI2S_TX>;
+		qcom,sd-lines = <0 1>;
+	};
+};
+
+&q6asmdai {
+	dai@0 {
+		reg = <MSM_FRONTEND_DAI_MULTIMEDIA1>;
+	};
+
+	dai@1 {
+		reg = <MSM_FRONTEND_DAI_MULTIMEDIA2>;
+	};
+};
+
+&sound {
+	compatible = "qcom,sdm660-internal-sndcard";
+	model = "OPPO R11T";
+
+	pinctrl-0 = <&cdc_pdm_default>,
+		    <&cdc_dmic_default>,
+		    <&r11t_pri_mi2s_active>,
+		    <&r11t_sec_mi2s_active>;
+	pinctrl-names = "default";
+
+	audio-routing = "RX_BIAS", "Digital MCLK",
+			"INT_LDO_H", "Digital MCLK",
+			"Digital RX_I2S_CLK", "Digital MCLK",
+			"Digital TX_I2S_CLK", "Digital MCLK",
+			"Digital ADC1", "ADC1",
+			"Digital ADC2", "ADC2",
+			"Digital ADC3", "ADC3",
+			"PDM_RX1", "Digital PDM_RX1",
+			"PDM_RX2", "Digital PDM_RX2",
+			"PDM_RX3", "Digital PDM_RX3",
+			"Digital LPASS_PDM_TX", "PDM_TX",
+			"Headphone Jack", "HPH_L",
+			"Headphone Jack", "HPH_R",
+			"Headphone Jack", "HPL",
+			"Headphone Jack", "HPR",
+			"Speaker", "OUT",
+			"AMIC1", "MIC BIAS External1",
+			"AMIC2", "MIC BIAS External2",
+			"Mic Jack", "MIC BIAS External2";
+
+	mm1-dai-link {
+		link-name = "MultiMedia1";
+
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+		};
+	};
+
+	mm2-dai-link {
+		link-name = "MultiMedia2";
+
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
+		};
+	};
+
+	pri-mi2s-dai-link {
+		link-name = "Primary MI2S Playback";
+
+		cpu {
+			sound-dai = <&q6afedai PRIMARY_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&ak4376>;
+		};
+	};
+
+	sec-mi2s-dai-link {
+		link-name = "Secondary MI2S Playback";
+
+		cpu {
+			sound-dai = <&q6afedai SECONDARY_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&tfa9890>;
+		};
+	};
+
+	int0-mi2s-dai-link {
+		link-name = "Internal MI2S Playback";
+
+		cpu {
+			sound-dai = <&q6afedai INT0_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&pm660l_codec 0>,
+				    <&lpass_codec 0>;
+		};
+	};
+
+	int3-mi2s-dai-link {
+		link-name = "Internal MI2S Capture";
+
+		cpu {
+			sound-dai = <&q6afedai INT3_MI2S_TX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&pm660l_codec 1>,
+				    <&lpass_codec 1>;
+		};
+	};
+};
+
 /* SDM660 uses the IPA 2.6-lite path for the modem/WCN startup handshake. */
 &soc {
 	ipa: ipa@14780000 {
@@ -142,6 +309,29 @@
 &blsp_i2c4 {
 	status = "disabled";
 	/delete-node/ touchscreen@20;
+};
+
+&blsp_i2c6 {
+	status = "okay";
+
+	ak4376: audio-codec@10 {
+		compatible = "asahi-kasei,ak4376";
+		reg = <0x10>;
+		#sound-dai-cells = <0>;
+
+		avdd-supply = <&vreg_l8a_1p8>;
+		tvdd-supply = <&vreg_l8a_1p8>;
+		pdn-gpios = <&tlmm 76 GPIO_ACTIVE_HIGH>;
+	};
+
+	tfa9890: audio-codec@36 {
+		compatible = "nxp,tfa9890";
+		reg = <0x36>;
+		#sound-dai-cells = <0>;
+
+		vddd-supply = <&vreg_l13a_1p8>;
+		reset-gpios = <&tlmm 80 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &blsp_i2c1 {
@@ -293,6 +483,45 @@
 		function = "gpio";
 		drive-strength = <8>;
 		bias-disable;
+	};
+
+	r11t_pri_mi2s_active: r11t-pri-mi2s-active-state {
+		clock-pins {
+			pins = "gpio12", "gpio61";
+			function = "pri_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		ws-pins {
+			pins = "gpio13";
+			function = "pri_mi2s_ws";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio14";
+			function = "pri_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
+	};
+
+	r11t_sec_mi2s_active: r11t-sec-mi2s-active-state {
+		clock-pins {
+			pins = "gpio24", "gpio25";
+			function = "sec_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio26";
+			function = "sec_mi2s";
+			drive-strength = <8>;
+			bias-disable;
+		};
 	};
 
 	mdss_dsi_active: mdss-dsi-active-state {
