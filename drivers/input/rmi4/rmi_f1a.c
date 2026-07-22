@@ -67,10 +67,10 @@ static irqreturn_t rmi_f1a_attention(int irq, void *ctx)
 			error);
 		return IRQ_RETVAL(error);
 	}
-
 	for (key = 0; key < f1a->num_keys; key++)
 		input_report_key(f1a->input, f1a->keymap[key],
 				 button_bitmask & BIT(key));
+	input_sync(f1a->input);
 
 	return IRQ_HANDLED;
 }

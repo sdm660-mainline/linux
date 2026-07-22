@@ -178,7 +178,7 @@
 
 		rmi4-f1a@1a {
 			reg = <0x1a>;
-			linux,keycodes = <KEY_BACK KEY_APPSELECT>;
+			linux,keycodes = <KEY_MENU KEY_BACK>;
 		};
 	};
 };
