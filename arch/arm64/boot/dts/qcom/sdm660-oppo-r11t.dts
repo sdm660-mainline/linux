@@ -37,6 +37,8 @@
 			0x1001b 0x2001a 0 0
 			0x1001b 0x202001a 0 0>;
 
+	/delete-node/ gpio-keys;
+
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -85,6 +87,28 @@
 
 	memshare {
 		compatible = "oppo,r11t-memshare";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&r11t_volume_keys_default>;
+		pinctrl-names = "default";
+
+		key-volume-up {
+			label = "Volume Up";
+			gpios = <&pm660l_gpios 8 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_VOLUMEUP>;
+			debounce-interval = <15>;
+			wakeup-source;
+		};
+
+		key-volume-down {
+			label = "Volume Down";
+			gpios = <&pm660l_gpios 5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_VOLUMEDOWN>;
+			debounce-interval = <15>;
+			wakeup-source;
+		};
 	};
 
 };
@@ -169,6 +193,16 @@
 		regulator-max-microvolt = <8100000>;
 		qcom,swire-control;
 		qcom,ext-pin-control;
+	};
+};
+
+&pm660l_gpios {
+	r11t_volume_keys_default: r11t-volume-keys-default-state {
+		pins = "gpio5", "gpio8";
+		function = PMIC_GPIO_FUNC_NORMAL;
+		bias-pull-up;
+		input-enable;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
 	};
 };
 
