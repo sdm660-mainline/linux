@@ -311,6 +311,15 @@
 	/delete-node/ touchscreen@20;
 };
 
+&blsp_i2c2 {
+	status = "okay";
+
+	fuel-gauge@55 {
+		compatible = "ti,bq27541";
+		reg = <0x55>;
+	};
+};
+
 &blsp_i2c6 {
 	status = "okay";
 
@@ -332,6 +341,15 @@
 		vddd-supply = <&vreg_l13a_1p8>;
 		reset-gpios = <&tlmm 80 GPIO_ACTIVE_HIGH>;
 	};
+};
+
+/* R11T uses the external BQ27541 gauge. Keep charging policy untouched. */
+&pm660_charger {
+	status = "disabled";
+};
+
+&pm660_fg {
+	status = "disabled";
 };
 
 &blsp_i2c1 {
