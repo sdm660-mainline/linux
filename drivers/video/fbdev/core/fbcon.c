@@ -608,10 +608,12 @@ static void fbcon_prepare_logo(struct vc_data *vc, struct fb_info *info,
 	unsigned short *save = NULL, *r, *q;
 	int logo_height;
 
+#ifndef CONFIG_LOGO_PERSISTENT
 	if (info->fbops->owner) {
 		logo_shown = FBCON_LOGO_DONTSHOW;
 		return;
 	}
+#endif
 
 	/*
 	 * remove underline attribute from erase character

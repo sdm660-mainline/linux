@@ -21,6 +21,43 @@
 #define Q6V5_LOAD_STATE_MSG_LEN	64
 #define Q6V5_PANIC_DELAY_MS	200
 
+static void q6v5_dump_crash_smem(struct qcom_q6v5 *q6v5, const void *reason,
+				 size_t reason_len)
+{
+	const unsigned int first = 400;
+	const unsigned int last = 620;
+	unsigned int item;
+
+	dev_err(q6v5->dev, "crash SMEM item %u length %zu\n",
+		q6v5->crash_reason, reason_len);
+	if (!IS_ERR(reason) && reason_len)
+		print_hex_dump(KERN_ERR, "q6v5 crash SMEM: ", DUMP_PREFIX_OFFSET,
+			       16, 1, reason, min_t(size_t, reason_len, 64), true);
+
+	for (item = first; item <= last; item++) {
+		const unsigned char *data;
+		size_t len, offset = 0;
+
+		data = qcom_smem_get(QCOM_SMEM_HOST_ANY, item, &len);
+		if (IS_ERR(data))
+			continue;
+
+		len = min_t(size_t, len, 256);
+		while (offset < len) {
+			size_t start;
+
+			while (offset < len && (data[offset] < ' ' || data[offset] > '~'))
+				offset++;
+			start = offset;
+			while (offset < len && data[offset] >= ' ' && data[offset] <= '~')
+				offset++;
+			if (offset - start >= 8)
+				dev_err(q6v5->dev, "SMEM %u+0x%zx: %.*s\n", item,
+					start, (int)(offset - start), data + start);
+		}
+	}
+}
+
 static int q6v5_load_state_toggle(struct qcom_q6v5 *q6v5, bool enable)
 {
 	int ret;
@@ -124,8 +161,10 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 	msg = qcom_smem_get(QCOM_SMEM_HOST_ANY, q6v5->crash_reason, &len);
 	if (!IS_ERR(msg) && len > 0 && msg[0])
 		dev_err(q6v5->dev, "fatal error received: %s\n", msg);
-	else
+	else {
 		dev_err(q6v5->dev, "fatal error without message\n");
+		q6v5_dump_crash_smem(q6v5, msg, IS_ERR(msg) ? 0 : len);
+	}
 
 	q6v5->running = false;
 	rproc_report_crash(q6v5->rproc, RPROC_FATAL_ERROR);

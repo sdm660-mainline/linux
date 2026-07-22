@@ -58,7 +58,7 @@
 		};
 	};
 
-	pmic@3 {
+	pm660l_sid3: pmic@3 {
 		compatible = "qcom,pm660l", "qcom,spmi-pmic";
 		reg = <0x3 SPMI_USID>;
 		#address-cells = <1>;

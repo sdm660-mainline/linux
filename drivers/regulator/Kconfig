@@ -1888,4 +1888,11 @@ config REGULATOR_QCOM_LABIBB
 	  boost regulator and IBB can be used as a negative boost regulator
 	  for LCD display panel.
 
+config REGULATOR_QCOM_OLEDB
+	tristate "QCOM OLEDB (AMOLED bias) regulator support"
+	depends on SPMI || COMPILE_TEST
+	help
+	  Minimal support for Qualcomm QPNP OLEDB AMOLED bias regulator,
+	  used on PM660L devices such as OPPO R11T.
+
 endif

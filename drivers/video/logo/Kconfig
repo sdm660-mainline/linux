@@ -13,6 +13,13 @@ menuconfig LOGO
 
 if LOGO
 
+config LOGO_PERSISTENT
+	bool "Keep bootup logo for late framebuffers"
+	help
+	  Keep logo image data after kernel initialization so a framebuffer
+	  registered by a module can still display it. This uses a few KiB of
+	  memory and is useful when the display stack cannot be built in.
+
 config FB_LOGO_EXTRA
 	bool
 	depends on FB=y

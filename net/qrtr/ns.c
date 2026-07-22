@@ -25,6 +25,9 @@ static struct {
 	u32 lookup_count;
 	struct workqueue_struct *workqueue;
 	struct work_struct work;
+	struct delayed_work reannounce_work;
+	struct sockaddr_qrtr reannounce_sq;
+	u8 reannounce_left;
 	void (*saved_data_ready)(struct sock *sk);
 	int local_node;
 } qrtr_ns;
@@ -237,6 +240,25 @@ static int announce_servers(struct sockaddr_qrtr *sq)
 	return 0;
 }
 
+static void qrtr_ns_reannounce_worker(struct work_struct *work)
+{
+	int ret;
+
+	if (!qrtr_ns.reannounce_left)
+		return;
+
+	pr_info("reannouncing local services to node %u (%u left)\n",
+		qrtr_ns.reannounce_sq.sq_node, qrtr_ns.reannounce_left);
+	ret = announce_servers(&qrtr_ns.reannounce_sq);
+	if (ret < 0)
+		pr_err("failed to reannounce local services: %d\n", ret);
+
+	if (--qrtr_ns.reannounce_left)
+		queue_delayed_work(qrtr_ns.workqueue,
+				   &qrtr_ns.reannounce_work,
+				   1);
+}
+
 static struct qrtr_server *server_add(unsigned int service,
 				      unsigned int instance,
 				      unsigned int node_id,
@@ -358,7 +380,17 @@ static int ctrl_cmd_hello(struct sockaddr_qrtr *sq)
 	if (ret < 0)
 		return ret;
 
-	return announce_servers(sq);
+	ret = announce_servers(sq);
+	if (ret < 0)
+		return ret;
+
+	/* OPPO's older MPSS starts its RMTFS client about 110 ms after HELLO. */
+	qrtr_ns.reannounce_sq = *sq;
+	qrtr_ns.reannounce_left = 1;
+	mod_delayed_work(qrtr_ns.workqueue, &qrtr_ns.reannounce_work,
+			 msecs_to_jiffies(110));
+
+	return 0;
 }
 
 static int ctrl_cmd_bye(struct sockaddr_qrtr *from)
@@ -740,6 +772,7 @@ int qrtr_ns_init(void)
 
 	INIT_LIST_HEAD(&qrtr_ns.lookups);
 	INIT_WORK(&qrtr_ns.work, qrtr_ns_worker);
+	INIT_DELAYED_WORK(&qrtr_ns.reannounce_work, qrtr_ns_reannounce_worker);
 
 	ret = sock_create_kern(&init_net, AF_QIPCRTR, SOCK_DGRAM,
 			       PF_QIPCRTR, &qrtr_ns.sock);
@@ -817,6 +850,7 @@ void qrtr_ns_remove(void)
 	write_unlock_bh(&qrtr_ns.sock->sk->sk_callback_lock);
 
 	cancel_work_sync(&qrtr_ns.work);
+	cancel_delayed_work_sync(&qrtr_ns.reannounce_work);
 	synchronize_net();
 	destroy_workqueue(qrtr_ns.workqueue);
 

@@ -832,6 +832,15 @@ config DRM_PANEL_SAMSUNG_LTL106HL02
 	  To compile this driver as a module, choose M here: the module
 	  will be called panel-samsung-ltl106hl02.
 
+config DRM_PANEL_SAMSUNG_S6E3FA3
+	tristate "Samsung S6E3FA3 panel driver"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for the Samsung S6E3FA3
+	  1080x1920 command-mode AMOLED panel used on OPPO R11T.
+
 config DRM_PANEL_SAMSUNG_S6E3FA7
 	tristate "Samsung S6E3FA7 panel driver"
 	depends on OF

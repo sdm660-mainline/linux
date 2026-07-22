@@ -140,6 +140,7 @@ int msm_fbdev_driver_fbdev_probe(struct drm_fb_helper *helper,
 		ret = PTR_ERR(fbi->screen_buffer);
 		goto fail;
 	}
+	fbi->flags |= FBINFO_VIRTFB;
 	fbi->screen_size = bo->size;
 	fbi->fix.smem_start = paddr;
 	fbi->fix.smem_len = bo->size;

@@ -284,9 +284,13 @@ static int fb_show_logo_line(struct fb_info *info, int rotate,
 	struct fb_image image;
 
 	/* Return if the frame buffer is not mapped or suspended */
-	if (logo == NULL || info->state != FBINFO_STATE_RUNNING ||
-	    info->fbops->owner)
+	if (logo == NULL || info->state != FBINFO_STATE_RUNNING)
 		return 0;
+
+#ifndef CONFIG_LOGO_PERSISTENT
+	if (info->fbops->owner)
+		return 0;
+#endif
 
 	image.depth = 8;
 	image.data = logo->data;
@@ -423,9 +427,13 @@ int fb_prepare_logo(struct fb_info *info, int rotate)
 
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
-	if (info->flags & FBINFO_MISC_TILEBLITTING ||
-	    info->fbops->owner || !fb_logo_count)
+	if (info->flags & FBINFO_MISC_TILEBLITTING || !fb_logo_count)
 		return 0;
+
+#ifndef CONFIG_LOGO_PERSISTENT
+	if (info->fbops->owner)
+		return 0;
+#endif
 
 	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 		depth = info->var.blue.length;

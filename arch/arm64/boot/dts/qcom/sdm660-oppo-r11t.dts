@@ -1,0 +1,297 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Initial mainline device tree for the OPPO R11T.
+ *
+ * The platform and PMIC setup is shared with the supported SDM660 boards
+ * until the board-specific power sequencing has been fully audited.
+ */
+
+/dts-v1/;
+
+#include "sdm660-xiaomi-jason.dts"
+
+/*
+ * Stock OPPO R11T PIL layout (from running.dts):
+ *  mpss  @0x8ac00000 size 0x07e00000
+ *  adsp  @0x92a00000 size 0x02000000
+ *  mba   @0x94a00000 size 0x00200000
+ *  cdsp  @0x94c00000 size 0x00600000
+ * Jason/mainline defaults place MBA at 0x94c00000 and CDSP at 0x94e00000,
+ * which collides with the stock OPPO MBA region and can crash MSS after boot.
+ */
+/delete-node/ &adsp_region;
+/delete-node/ &mba_region;
+/delete-node/ &cdsp_region;
+
+/ {
+	/delete-property/ model;
+	/delete-property/ compatible;
+
+	model = "OPPO R11T";
+	compatible = "oppo,r11t", "qcom,sdm660";
+
+	/* Legacy IDs used by the stock Qualcomm bootloader for DTB selection. */
+	qcom,msm-id = <0x13d 0>;
+	qcom,board-id = <8 0 0x3eb3>;
+	qcom,pmic-id = <0x1001b 0x1011a 0 0
+			0x1001b 0x2001a 0 0
+			0x1001b 0x202001a 0 0>;
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		adsp_region: adsp@92a00000 {
+			reg = <0x0 0x92a00000 0x0 0x2000000>;
+			no-map;
+		};
+
+		mba_region: mba@94a00000 {
+			reg = <0x0 0x94a00000 0x0 0x200000>;
+			no-map;
+		};
+
+		cdsp_region: cdsp@94c00000 {
+			reg = <0x0 0x94c00000 0x0 0x600000>;
+			no-map;
+		};
+
+		/* Complete stock's removed 0x85800000-0x8abfffff region. */
+		r11t_secure_gap: reserved@89500000 {
+			reg = <0x0 0x89500000 0x0 0x1700000>;
+			no-map;
+		};
+
+		rmtfs_oem_mem: memory@f6b00000 {
+			compatible = "qcom,rmtfs-mem";
+			reg = <0x0 0xf6b00000 0x0 0x100000>;
+			no-map;
+			qcom,client-id = <4>;
+			qcom,vmid = <QCOM_SCM_VMID_MSS_MSA>;
+		};
+	};
+
+	touch_vdd: regulator-touch-vdd {
+		compatible = "regulator-fixed";
+		regulator-name = "touchpanel_vdd";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 15 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		pinctrl-0 = <&touch_vdd_en>;
+		pinctrl-names = "default";
+	};
+
+	memshare {
+		compatible = "oppo,r11t-memshare";
+	};
+
+};
+
+&remoteproc_mss {
+	firmware-name = "mba.mbn", "modem.mdt";
+	status = "okay";
+};
+
+/* SDM660 uses the IPA 2.6-lite path for the modem/WCN startup handshake. */
+&soc {
+	ipa: ipa@14780000 {
+		compatible = "qcom,ipa-lite-v2.6";
+		reg = <0x14780000 0x47000>;
+		clocks = <&rpmcc RPM_SMD_IPA_CLK>;
+		interrupts = <GIC_SPI 333 IRQ_TYPE_EDGE_RISING>,
+				      <GIC_SPI 432 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "ipa", "dma";
+		interconnects = <&a2noc MASTER_IPA &bimc SLAVE_EBI>,
+					<&a2noc MASTER_IPA &snoc SLAVE_IMEM>,
+					<&gnoc MASTER_APSS_PROC &snoc SLAVE_IPA>;
+		interconnect-names = "ipa-mem", "ipa-imem", "cpu-cfg";
+		iommus = <&anoc2_smmu 0x19c0>,
+			 <&anoc2_smmu 0x19c2>;
+		modem-remoteproc = <&remoteproc_mss>;
+		status = "okay";
+	};
+};
+
+/* The stock board places the touch controller on QUP1/I2C1. */
+&blsp_i2c4 {
+	status = "disabled";
+	/delete-node/ touchscreen@20;
+};
+
+&blsp_i2c1 {
+	status = "okay";
+
+	touchscreen@20 {
+		compatible = "syna,rmi4-i2c";
+		reg = <0x20>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_LEVEL_LOW>;
+
+		pinctrl-0 = <&r11t_ts_int_active &r11t_ts_reset_active>;
+		pinctrl-1 = <&ts_int_sleep &ts_reset_sleep>;
+		pinctrl-names = "default", "sleep";
+
+		vdd-supply = <&touch_vdd>;
+		vio-supply = <&vreg_l14a_1p8>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+
+		syna,reset-delay-ms = <80>;
+		syna,startup-delay-ms = <10>;
+
+		rmi4-f01@1 {
+			reg = <0x01>;
+			syna,nosleep-mode = <1>;
+		};
+
+		rmi4-f12@12 {
+			reg = <0x12>;
+			syna,sensor-type = <1>;
+		};
+
+		rmi4-f1a@1a {
+			reg = <0x1a>;
+			linux,keycodes = <KEY_BACK KEY_APPSELECT>;
+		};
+	};
+};
+
+/* PM660L OLEDB AMOLED bias rail (stock: 5.0-8.1 V, SWIRE/ext-pin control). */
+&pm660l_sid3 {
+	pm660l_oledb: oledb@e000 {
+		compatible = "qcom,qpnp-oledb-regulator";
+		reg = <0xe000>;
+		regulator-name = "oledb";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <8100000>;
+		qcom,swire-control;
+		qcom,ext-pin-control;
+	};
+};
+
+&rpm_requests {
+	regulators-0 {
+		vreg_l6b_3p0: l6 {
+			regulator-min-microvolt = <3000000>;
+			regulator-max-microvolt = <3000000>;
+			regulator-enable-ramp-delay = <250>;
+			regulator-system-load = <13200>;
+			regulator-allow-set-load;
+		};
+	};
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	vdd-supply = <&vreg_l1b_0p925>;
+	vdda-supply = <&vreg_l1a_1p225>;
+	status = "okay";
+
+	/delete-node/ panel@0;
+
+	panel@0 {
+		compatible = "samsung,s6e3fa3";
+		reg = <0>;
+		rotation = <180>;
+
+		/* Physical high = panel out of reset (matches stock 1/0/1 sequence). */
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_HIGH>;
+		vddio-supply = <&vreg_l11a_1p8>;
+		vdd-supply = <&vreg_l6b_3p0>;
+		oledb-supply = <&pm660l_oledb>;
+
+		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+		pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+		pinctrl-names = "default", "sleep";
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	remote-endpoint = <&panel_in>;
+	data-lanes = <0 1 2 3>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+	status = "okay";
+};
+
+&mmss_smmu {
+	status = "okay";
+};
+
+&tlmm {
+	/* Jason reserves GPIO0-3, but R11T uses them for BLSP1 QUP1/I2C1. */
+	/delete-property/ gpio-reserved-ranges;
+	gpio-reserved-ranges = <8 4>;
+
+	touch_vdd_en: touch-vdd-en-state {
+		pins = "gpio15";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	r11t_ts_int_active: r11t-ts-int-active-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	r11t_ts_reset_active: r11t-ts-reset-active-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	mdss_dsi_active: mdss-dsi-active-state {
+		pins = "gpio53";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	mdss_dsi_suspend: mdss-dsi-suspend-state {
+		pins = "gpio53";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	mdss_te_active: mdss-te-active-state {
+		pins = "gpio59";
+		function = "mdp_vsync";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	mdss_te_suspend: mdss-te-suspend-state {
+		pins = "gpio59";
+		function = "mdp_vsync";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+};
+
+/* Keep USB in peripheral mode for the diagnostic initramfs console. */
+&usb3_dwc3 {
+	/delete-property/ extcon;
+	dr_mode = "peripheral";
+};

@@ -149,6 +149,17 @@ config QCOM_RMTFS_MEM
 
 	  Say y here if you intend to boot the modem remoteproc.
 
+config QCOM_R11T_MEMSHARE
+	tristate "OPPO R11T modem memory share service"
+	depends on ARCH_QCOM || COMPILE_TEST
+	depends on DMA_CMA
+	select QCOM_PDR_HELPERS
+	select QCOM_QMI_HELPERS
+	select QCOM_SCM
+	help
+	  Provide the Dynamic Heap Memory Share QMI service required by the
+	  OPPO R11T modem firmware during early startup.
+
 config QCOM_RPM_MASTER_STATS
 	tristate "Qualcomm RPM Master stats"
 	depends on ARCH_QCOM || COMPILE_TEST

@@ -29,6 +29,7 @@ MODULE_PARM_DESC(nologo, "Disables startup logo");
 
 static bool logos_freed;
 
+#ifndef CONFIG_LOGO_PERSISTENT
 static int __init fb_logo_late_init(void)
 {
 	logos_freed = true;
@@ -36,6 +37,7 @@ static int __init fb_logo_late_init(void)
 }
 
 late_initcall_sync(fb_logo_late_init);
+#endif
 
 /* logo's are marked __initdata. Use __ref to tell
  * modpost that it is intended that this function uses data

@@ -84,6 +84,8 @@ static int pdr_locator_new_server(struct qmi_handle *qmi,
 
 	pdr->locator_init_complete = true;
 	mutex_unlock(&pdr->lock);
+	pr_info("PDR: locator server node=%u port=%u version=%u instance=%u\n",
+		svc->node, svc->port, svc->version, svc->instance);
 
 	/* Service pending lookup requests */
 	schedule_work(&pdr->locator_work);
@@ -127,6 +129,8 @@ static int pdr_register_listener(struct pdr_handle *pdr,
 
 	req.enable = enable;
 	strscpy(req.service_path, pds->service_path, sizeof(req.service_path));
+	pr_info("PDR: registering listener for %s at node=%u port=%u\n",
+		pds->service_path, pds->addr.sq_node, pds->addr.sq_port);
 
 	ret = qmi_send_request(&pdr->notifier_hdl, &pds->addr,
 			       &txn, SERVREG_REGISTER_LISTENER_REQ,
@@ -152,6 +156,8 @@ static int pdr_register_listener(struct pdr_handle *pdr,
 	}
 
 	pds->state = resp.curr_state;
+	pr_info("PDR: listener for %s registered, state=0x%x\n",
+		pds->service_path, pds->state);
 
 	return 0;
 }
@@ -199,6 +205,9 @@ static int pdr_notifier_new_server(struct qmi_handle *qmi,
 	list_for_each_entry(pds, &pdr->lookups, node) {
 		if (pds->service == svc->service &&
 		    pds->instance == svc->instance) {
+			pr_info("PDR: notifier matched %s instance=%u node=%u port=%u\n",
+				pds->service_path, svc->instance,
+				svc->node, svc->port);
 			pds->service_connected = true;
 			pds->need_notifier_register = true;
 			pds->addr.sq_family = AF_QIPCRTR;
@@ -361,6 +370,9 @@ static int pdr_get_domain_list(struct servreg_get_domain_list_req *req,
 		return ret;
 
 	mutex_lock(&pdr->lock);
+	pr_info("PDR: sending locator request for %s to node=%u port=%u\n",
+		req->service_name, pdr->locator_addr.sq_node,
+		pdr->locator_addr.sq_port);
 	ret = qmi_send_request(&pdr->locator_hdl,
 			       &pdr->locator_addr,
 			       &txn, SERVREG_GET_DOMAIN_LIST_REQ,
@@ -373,6 +385,7 @@ static int pdr_get_domain_list(struct servreg_get_domain_list_req *req,
 		return ret;
 	}
 
+	pr_info("PDR: waiting for locator response for %s\n", req->service_name);
 	ret = qmi_txn_wait(&txn, 5 * HZ);
 	if (ret < 0) {
 		pr_err("PDR: %s get domain list txn wait failed: %d\n",
@@ -385,6 +398,8 @@ static int pdr_get_domain_list(struct servreg_get_domain_list_req *req,
 		       req->service_name, resp->resp.error);
 		return -EREMOTEIO;
 	}
+	pr_info("PDR: locator response for %s has %u/%u domains\n",
+		req->service_name, resp->domain_list_len, resp->total_domains);
 
 	return 0;
 }
@@ -421,6 +436,8 @@ static int pdr_locate_service(struct pdr_handle *pdr, struct pdr_service *pds)
 				pds->service_data_valid = entry->service_data_valid;
 				pds->service_data = entry->service_data;
 				pds->instance = entry->instance;
+				pr_info("PDR: located %s instance=%u\n",
+					pds->service_path, pds->instance);
 				return 0;
 			}
 		}
