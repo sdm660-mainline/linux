@@ -9,6 +9,7 @@
 /dts-v1/;
 
 #include "sdm660-xiaomi-jason.dts"
+#include <dt-bindings/leds/common.h>
 #include <dt-bindings/sound/qcom,q6afe.h>
 #include <dt-bindings/sound/qcom,q6asm.h>
 
@@ -350,6 +351,39 @@
 
 &pm660_fg {
 	status = "disabled";
+};
+
+&pm660l_lpg {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	qcom,power-source = <1>;
+	status = "okay";
+
+	/delete-node/ led@1;
+	/delete-node/ led@2;
+	/delete-node/ led@3;
+
+	/* Stock calls PM660L LPG channel 1 its white breathing LED. */
+	led@1 {
+		reg = <1>;
+		color = <LED_COLOR_ID_WHITE>;
+		function = LED_FUNCTION_STATUS;
+		default-state = "off";
+	};
+};
+
+&pm660l_flash {
+	status = "okay";
+
+	/* Rear camera flash/torch is connected only to downstream channel 0. */
+	led-0 {
+		function = LED_FUNCTION_FLASH;
+		color = <LED_COLOR_ID_WHITE>;
+		led-sources = <1>;
+		led-max-microamp = <100000>;
+		flash-max-microamp = <750000>;
+		flash-max-timeout-us = <1280000>;
+	};
 };
 
 &blsp_i2c1 {
