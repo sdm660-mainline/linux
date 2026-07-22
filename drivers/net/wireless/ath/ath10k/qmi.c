@@ -7,6 +7,8 @@
 #include <linux/completion.h>
 #include <linux/device.h>
 #include <linux/debugfs.h>
+#include <linux/etherdevice.h>
+#include <linux/hex.h>
 #include <linux/idr.h>
 #include <linux/kernel.h>
 #include <linux/of.h>
@@ -28,6 +30,10 @@
 #define SMEM_IMAGE_TABLE_CNSS_INDEX     13
 #define SMEM_IMAGE_VERSION_ENTRY_SIZE	128
 #define SMEM_IMAGE_VERSION_NAME_SIZE	75
+
+static char *wlan_mac_addr;
+module_param_named(mac_addr, wlan_mac_addr, charp, 0600);
+MODULE_PARM_DESC(mac_addr, "WLAN MAC address provisioned through WLFW QMI");
 
 static int ath10k_qmi_map_msa_permission(struct ath10k_qmi *qmi,
 					 struct ath10k_msa_mem_info *mem_info)
@@ -650,6 +656,54 @@ out:
 	return ret;
 }
 
+static int ath10k_qmi_mac_addr_send_sync_msg(struct ath10k_qmi *qmi)
+{
+	struct wlfw_mac_addr_resp_msg_v01 resp = {};
+	struct wlfw_mac_addr_req_msg_v01 req = {};
+	struct ath10k *ar = qmi->ar;
+	struct qmi_txn txn;
+	int ret;
+
+	if (!wlan_mac_addr)
+		return 0;
+
+	if (!mac_pton(wlan_mac_addr, req.mac_addr) ||
+	    !is_valid_ether_addr(req.mac_addr)) {
+		ath10k_err(ar, "invalid provisioned MAC address\n");
+		return -EINVAL;
+	}
+	req.mac_addr_valid = 1;
+
+	ret = qmi_txn_init(&qmi->qmi_hdl, &txn,
+			   wlfw_mac_addr_resp_msg_v01_ei, &resp);
+	if (ret < 0)
+		return ret;
+
+	ret = qmi_send_request(&qmi->qmi_hdl, NULL, &txn,
+			       QMI_WLFW_MAC_ADDR_REQ_V01,
+			       WLFW_MAC_ADDR_REQ_MSG_V01_MAX_MSG_LEN,
+			       wlfw_mac_addr_req_msg_v01_ei, &req);
+	if (ret < 0) {
+		qmi_txn_cancel(&txn);
+		return ret;
+	}
+
+	ret = qmi_txn_wait(&txn, ATH10K_QMI_TIMEOUT * HZ);
+	if (ret < 0)
+		return ret;
+
+	if (resp.resp.result != QMI_RESULT_SUCCESS_V01) {
+		ath10k_err(ar, "MAC address request rejected: %d\n",
+			   resp.resp.error);
+		return -EINVAL;
+	}
+
+	ether_addr_copy(ar->mac_addr, req.mac_addr);
+	ath10k_info(ar, "provisioned MAC address %pM through WLFW QMI\n",
+		    ar->mac_addr);
+	return 0;
+}
+
 static int ath10k_qmi_host_cap_send_sync(struct ath10k_qmi *qmi)
 {
 	struct wlfw_host_cap_resp_msg_v01 resp = {};
@@ -921,6 +975,10 @@ static void ath10k_qmi_event_msa_ready(struct ath10k_qmi *qmi)
 		goto out;
 
 	ret = ath10k_qmi_send_cal_report_req(qmi);
+	if (ret)
+		goto out;
+
+	ret = ath10k_qmi_mac_addr_send_sync_msg(qmi);
 
 out:
 	return;
