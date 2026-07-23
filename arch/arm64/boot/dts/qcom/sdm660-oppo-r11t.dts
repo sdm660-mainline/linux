@@ -345,8 +345,16 @@
 };
 
 /* R11T uses the external BQ27541 gauge. Keep charging policy untouched. */
+&battery {
+	charge-full-design-microamp-hours = <3220000>;
+	voltage-min-design-microvolt = <3400000>;
+	voltage-max-design-microvolt = <4200000>;
+	constant-charge-current-max-microamp = <500000>;
+};
+
 &pm660_charger {
-	status = "disabled";
+	monitored-battery = <&battery>;
+	status = "okay";
 };
 
 &pm660_fg {

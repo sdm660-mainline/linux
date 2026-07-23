@@ -594,6 +594,8 @@ static void smb_status_change_work(struct work_struct *work)
 		current_ua = SDP_CURRENT_UA;
 		break;
 	}
+	current_ua = min_t(unsigned int, current_ua,
+			   chip->batt_info->constant_charge_current_max_ua);
 
 	smb_set_current_limit(chip, current_ua);
 	power_supply_changed(chip->chg_psy);
@@ -1025,16 +1027,10 @@ static int smb_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, chip);
 
-	/*
-	 * This overrides all of the other current limits and is expected
-	 * to be used for setting limits based on temperature. We set some
-	 * relatively safe default value while still allowing a comfortably
-	 * fast charging rate. Once temperature monitoring is hooked up we
-	 * would expect this to be changed dynamically based on temperature
-	 * reporting.
-	 */
+	/* This is the final hardware charge-current ceiling. */
 	rc = regmap_write(chip->regmap, chip->base + FAST_CHARGE_CURRENT_CFG,
-			  1950000 / CURRENT_SCALE_FACTOR);
+			  chip->batt_info->constant_charge_current_max_ua /
+			  CURRENT_SCALE_FACTOR);
 	if (rc < 0)
 		return dev_err_probe(chip->dev, rc,
 				     "Couldn't write fast charge current cfg");
