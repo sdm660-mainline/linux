@@ -436,6 +436,8 @@
 		rmi4-f12@12 {
 			reg = <0x12>;
 			syna,sensor-type = <1>;
+			touchscreen-inverted-x;
+			touchscreen-inverted-y;
 		};
 
 		rmi4-f1a@1a {
