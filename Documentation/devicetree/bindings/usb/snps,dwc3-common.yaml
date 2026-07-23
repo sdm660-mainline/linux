@@ -42,6 +42,9 @@ properties:
     minItems: 1
     maxItems: 19
 
+  vbus-supply:
+    description: Regulator providing VBUS while operating in host mode.
+
   phy-names:
     minItems: 1
     maxItems: 19
@@ -429,4 +432,3 @@ required:
 
 additionalProperties: true
 ...
-

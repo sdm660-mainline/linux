@@ -21,6 +21,7 @@ properties:
   compatible:
     oneOf:
       - enum:
+          - qcom,pm660-vbus-reg
           - qcom,pm8150b-vbus-reg
       - items:
           - enum:

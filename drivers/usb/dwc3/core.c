@@ -30,6 +30,7 @@
 #include <linux/pinctrl/devinfo.h>
 #include <linux/reset.h>
 #include <linux/bitfield.h>
+#include <linux/regulator/consumer.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
@@ -2231,6 +2232,15 @@ int dwc3_core_probe(const struct dwc3_probe_data *data)
 	dwc3_get_properties(dwc);
 
 	dwc3_get_software_properties(dwc, &data->properties);
+
+	dwc->vbus = devm_regulator_get_optional(dev, "vbus");
+	if (IS_ERR(dwc->vbus)) {
+		if (PTR_ERR(dwc->vbus) == -ENODEV)
+			dwc->vbus = NULL;
+		else
+			return dev_err_probe(dev, PTR_ERR(dwc->vbus),
+					     "failed to get host VBUS supply\n");
+	}
 
 	dwc->usb_psy = dwc3_get_usb_power_supply(dwc);
 	if (IS_ERR(dwc->usb_psy))

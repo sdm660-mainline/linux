@@ -386,6 +386,18 @@
 	};
 };
 
+&spmi_bus {
+	pmic@0 {
+		usb_otg_vbus: usb-vbus-regulator@1500 {
+			compatible = "qcom,pm660-vbus-reg";
+			reg = <0x1500>;
+			regulator-name = "usb_otg_vbus";
+			regulator-min-microamp = <500000>;
+			regulator-max-microamp = <500000>;
+		};
+	};
+};
+
 &blsp_i2c1 {
 	status = "okay";
 
@@ -605,8 +617,11 @@
 	};
 };
 
-/* Keep USB in peripheral mode for the diagnostic initramfs console. */
+/* Default to the diagnostic console; userspace can explicitly enter host. */
 &usb3_dwc3 {
 	/delete-property/ extcon;
-	dr_mode = "peripheral";
+	dr_mode = "otg";
+	usb-role-switch;
+	role-switch-default-mode = "peripheral";
+	vbus-supply = <&usb_otg_vbus>;
 };

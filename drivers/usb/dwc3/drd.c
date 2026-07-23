@@ -11,6 +11,7 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
+#include <linux/regulator/consumer.h>
 
 #include "debug.h"
 #include "core.h"
@@ -451,7 +452,9 @@ static int dwc3_usb_role_switch_set(struct usb_role_switch *sw,
 				    enum usb_role role)
 {
 	struct dwc3 *dwc = usb_role_switch_get_drvdata(sw);
+	bool was_host = dwc->current_dr_role == DWC3_GCTL_PRTCAP_HOST;
 	u32 mode;
+	int ret;
 
 	switch (role) {
 	case USB_ROLE_HOST:
@@ -468,8 +471,21 @@ static int dwc3_usb_role_switch_set(struct usb_role_switch *sw,
 		break;
 	}
 
+	if (role == USB_ROLE_HOST && !was_host && dwc->vbus) {
+		ret = regulator_enable(dwc->vbus);
+		if (ret)
+			return ret;
+	}
+
 	dwc3_pre_set_role(dwc, role);
 	dwc3_set_mode(dwc, mode);
+
+	if (role != USB_ROLE_HOST && was_host && dwc->vbus) {
+		ret = regulator_disable(dwc->vbus);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
 }
 
@@ -628,4 +644,7 @@ void dwc3_drd_exit(struct dwc3 *dwc)
 
 	if (dwc->otg_irq)
 		free_irq(dwc->otg_irq, dwc);
+
+	if (dwc->vbus && regulator_is_enabled(dwc->vbus) > 0)
+		regulator_disable(dwc->vbus);
 }
