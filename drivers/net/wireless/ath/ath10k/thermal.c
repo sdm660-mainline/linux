@@ -136,6 +136,17 @@ void ath10k_thermal_set_throttling(struct ath10k *ar)
 	if (!ar->wmi.ops->gen_pdev_set_quiet_mode)
 		return;
 
+	/* WCN3990 firmware crashes deterministically on the quiet mode WMI
+	 * command despite advertising WMI_SERVICE_THERM_THROT. The crash
+	 * cascades into a full modem crash. See commit 53884577fbce
+	 * ("ath10k: skip sending quiet mode cmd for WCN3990").
+	 */
+	if (QCA_REV_WCN3990(ar)) {
+		ath10k_dbg(ar, ATH10K_DBG_BOOT,
+			   "skip quiet mode for WCN3990 (known crash trigger)\n");
+		return;
+	}
+
 	if (ar->state != ATH10K_STATE_ON)
 		return;
 
