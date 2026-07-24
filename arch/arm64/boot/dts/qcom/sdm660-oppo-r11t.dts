@@ -344,12 +344,12 @@
 	};
 };
 
-/* R11T uses the external BQ27541 gauge. Keep charging policy untouched. */
+/* Stock uses 4.35 V/2 A; keep conventional 5 V charging capped at 1.5 A. */
 &battery {
 	charge-full-design-microamp-hours = <3220000>;
 	voltage-min-design-microvolt = <3400000>;
-	voltage-max-design-microvolt = <4200000>;
-	constant-charge-current-max-microamp = <500000>;
+	voltage-max-design-microvolt = <4350000>;
+	constant-charge-current-max-microamp = <1500000>;
 };
 
 &pm660_charger {
