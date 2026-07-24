@@ -12,12 +12,22 @@
 // Probe reads REV_PGID to detect PG version, then requests firmware
 // asynchronously.  Every call to tas2557_enable() re-applies the firmware
 // program + config (firmware-driven PLL) before powering the Class-D stage.
+//
+// One DT node/i2c_client drives an array of up to TAS2557_MAX_DEV physical
+// TAS2557 chips (struct tas2557_priv::devs[]), all sharing one regmap by
+// swapping the i2c_client's address before each access (see
+// tas2557_change_book_page()) -- mirroring TI's own tas2781/tas2563
+// grouped-device driver instead of instantiating one driver per chip.
+// Firmware, DAI, power and mute state stay singular for the whole group;
+// only register-level state (book/page, ASI slot offsets, DSP program
+// bookkeeping) is tracked per physical chip.
 
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/gpio/consumer.h>
 #include <linux/regmap.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
 #include <linux/interrupt.h>
@@ -92,7 +102,47 @@ struct tas2557_firmware {
 	struct tas2557_config  *configs;
 };
 
-/* struct tas2557_priv - per-device driver state */
+/*
+ * struct tas2557_dev - per-physical-chip state
+ *
+ * One instance per entry in the DT `reg` array (see tas2557_parse_dt()).
+ */
+struct tas2557_dev {
+	unsigned int addr;
+
+	/* Book/page tracking for this chip's book-paged regmap access */
+	unsigned char current_book;
+	unsigned char current_page;
+
+	/* Hardware revision of this chip */
+	int pg_id;
+
+	/*
+	 * DSP program/config currently loaded and recovery-attempt count.
+	 * tas2557_set_program() always drives every devs[] entry to the
+	 * same program/config together (one shared firmware image), so
+	 * these stay in lock-step across the group; devs[0] is read back
+	 * as the group's representative value.
+	 */
+	unsigned int current_program;
+	unsigned int current_config;
+	unsigned int restart_count;
+
+	/* DT-configured audio parameters (ti,imon-slot-nos / ti,vmon-slot-nos) */
+	unsigned int imon_slot;
+	unsigned int vmon_slot;
+
+	/*
+	 * Cached ASI data-slot offsets in BCLK cycles for this chip.
+	 * Computed in hw_params()/set_tdm_slot() and re-applied by
+	 * tas2557_apply_runtime_state() after the SW reset in
+	 * tas2557_set_program() wipes the ASI offset registers.
+	 */
+	unsigned int asi_offset;	/* RX (playback) data-slot offset */
+	int asi_tx_offset;		/* TX (capture) offset, -1 = never set */
+};
+
+/* struct tas2557_priv - group driver state (one node, up to TAS2557_MAX_DEV chips) */
 struct tas2557_priv {
 	struct device	*dev;
 	struct regmap	*regmap;
@@ -103,46 +153,40 @@ struct tas2557_priv {
 	int		  irq;
 	bool		  irq_enabled;
 
-	/* Book/page tracking for book-paged regmap */
-	unsigned char current_book;
-	unsigned char current_page;
+	/* Physical chips managed by this node */
+	struct tas2557_dev devs[TAS2557_MAX_DEV];
+	unsigned int	    ndev;
 
-	/* Hardware revision */
-	int pg_id;
-
-	/* DT-configured audio parameters */
-	unsigned int channel;		/* 0=left, 1=right from ti,channel */
-	unsigned int imon_slot;		/* from ti,imon-slot-no */
-	unsigned int vmon_slot;		/* from ti,vmon-slot-no */
 	bool	     isense_enabled;
 	bool	     vsense_enabled;
 
 	/* Power state */
 	bool powered;
-	bool muted;
+	bool dac_muted;		/* mute state for SNDRV_PCM_STREAM_PLAYBACK */
+	bool sense_muted;	/* mute state for SNDRV_PCM_STREAM_CAPTURE */
 
-	/* Firmware state */
+	/* Firmware state -- one shared image for the whole group */
 	struct tas2557_firmware *fw;	/* NULL until tas2557_fw_ready() parses it */
 	char fw_name[64];		/* filename requested at probe */
 	bool fw_requested;		/* request_firmware_nowait() call is pending */
 	struct completion fw_done;	/* signalled when tas2557_fw_ready() returns */
-	unsigned int current_program;
-	unsigned int current_config;
 
 	/* Runtime audio configuration */
 	unsigned int sample_rate;
+	int dai_fmt;			/* ASI format from set_dai_fmt(), -1 = never set */
+	unsigned int wordlength;	/* ASI WORDLENGTH_* bits from hw_params */
 
-	/*
-	 * Cached ASI data-slot offset in BCLK cycles.  Computed in
-	 * hw_params()/set_tdm_slot() and re-applied in tas2557_enable()
-	 * after the SW reset in tas2557_set_program() wipes the ASI
-	 * offset registers.
-	 */
-	unsigned int asi_offset;
 	int tdm_slot_width;
-
-	/* Health tracking */
-	unsigned int restart_count;
+	bool tdm_configured;		/* true once set_tdm_slot() set an RX slot */
+	/*
+	 * RX slot index from set_tdm_slot(), -1 = never set (mono, or a
+	 * stereo board whose machine driver hasn't configured TDM yet).
+	 * Informational only: this group has exactly one DAI, so every
+	 * devs[] entry shares the same TDM slot; which firmware half
+	 * (DEV_A/DEV_B) each chip receives is selected by its index in
+	 * devs[]/the DT `reg` array instead (see tas2557_block_chn_range()).
+	 */
+	int tdm_rx_slot;
 
 	/* Volume control */
 	unsigned int dac_gain;
@@ -151,6 +195,7 @@ struct tas2557_priv {
 /* Forward declarations */
 static void tas2557_hw_reset(struct tas2557_priv *tas2557);
 static int tas2557_failsafe_recovery(struct tas2557_priv *tas2557);
+static int tas2557_apply_runtime_state(struct tas2557_priv *tas2557);
 
 /*
  * Default device initialization sequence - identical to the TI Android
@@ -182,9 +227,10 @@ static const unsigned int tas2557_irq_config[] = {
 
 /*
  * Startup sequence - power up Class-D, Boost, DSP/PLL clocks.
- * The ASI2 pin/divider setup (GPIO5-8) is the pin configuration from the
- * TI reference sequence; both ASI interfaces are enabled and configured
- * identically, and the board wiring determines which one carries audio.
+ * The ASI2 pin/divider setup (GPIO5-8) is specific to this driver's
+ * dual-amp stereo board topology, not part of TI's reference sequence;
+ * both ASI interfaces are enabled and configured identically, and the
+ * board wiring determines which one carries audio.
  * PLL configuration is NOT done here; it comes from the firmware PLL
  * block loaded by tas2557_set_program() before this sequence runs.
  */
@@ -196,7 +242,6 @@ static const unsigned int tas2557_startup_data[] = {
 	TAS2557_GPIO6_PIN_REG,            0x01,	/* GPIO6 = ASI2 WCLK input */
 	TAS2557_GPIO8_PIN_REG,            0x02,	/* GPIO8 = ASI2 DIN */
 	TAS2557_GPIO5_PIN_REG,            0x01,	/* GPIO5 = ASI2 BCLK input */
-	TAS2557_ASI2_DAC_FORMAT_REG,      0x18,	/* ASI2: 32-bit I2S */
 	TAS2557_ASI2_BDIV_CLK_SEL_REG,   0x01,
 	TAS2557_ASI2_BDIV_CLK_RATIO_REG, 0x01,
 	TAS2557_ASI2_BDIV_CLK_RATIO_REG, 0x81,	/* power up BDIV */
@@ -264,93 +309,129 @@ static const struct regmap_config tas2557_regmap_config = {
  *
  * All helpers take a composite register address encoded as
  *   TAS2557_REG(book, page, reg) = book*256*128 + page*128 + reg
+ * plus @chn, the index into tas2557->devs[] to address.
+ */
+
+/*
+ * tas2557_change_book_page - switch book/page, retargeting the chip first
+ * @chn: index into tas2557->devs[]
+ *
+ * All chips in the group share one i2c_client/regmap; redirecting register
+ * I/O to devs[chn] is done by mutating client->addr immediately before the
+ * access, the same trick as tasdevice_change_chn_book() in
+ * tas2781-comlib-i2c.c.  Just like that function, an address switch forces
+ * an immediate page-0 write: the devs[chn].current_page this function
+ * tracks describes what *that chip's* page register last was, but nothing
+ * has re-verified that since the bus was last aimed at devs[chn] -- another
+ * chip's own register writes in between never touch devs[chn]'s silicon, so
+ * the cached value is still correct, but forcing page 0 here removes any
+ * doubt and keeps every subsequent book switch starting from a known page,
+ * exactly as tasdevice_change_chn_book() does before checking cur_book.
  */
 static int tas2557_change_book_page(struct tas2557_priv *tas2557,
+				    unsigned int chn,
 				    unsigned char book, unsigned char page)
 {
-	int ret = 0;
+	struct i2c_client *client = to_i2c_client(tas2557->dev);
+	struct tas2557_dev *dv = &tas2557->devs[chn];
+	int ret;
 
-	if (tas2557->current_book == book && tas2557->current_page == page)
+	if (client->addr != dv->addr) {
+		client->addr = dv->addr;
+
+		ret = regmap_write(tas2557->regmap, TAS2557_PAGE_REG, 0);
+		if (ret < 0) {
+			dev_err(tas2557->dev,
+				"chn %u: page-0 switch after addr change failed: %d\n",
+				chn, ret);
+			return ret;
+		}
+		dv->current_page = 0;
+	}
+
+	if (dv->current_book == book && dv->current_page == page)
 		return 0;
 
-	if (tas2557->current_book != book) {
+	if (dv->current_book != book) {
 		/* Always switch to page 0 before changing books */
 		ret = regmap_write(tas2557->regmap, TAS2557_PAGE_REG, 0);
 		if (ret < 0) {
-			dev_err(tas2557->dev, "page-0 switch failed: %d\n", ret);
+			dev_err(tas2557->dev, "chn %u: page-0 switch failed: %d\n",
+				chn, ret);
 			return ret;
 		}
-		tas2557->current_page = 0;
+		dv->current_page = 0;
 
 		ret = regmap_write(tas2557->regmap, TAS2557_BOOK_REG, book);
 		if (ret < 0) {
-			dev_err(tas2557->dev, "book switch to %u failed: %d\n",
-				book, ret);
+			dev_err(tas2557->dev, "chn %u: book switch to %u failed: %d\n",
+				chn, book, ret);
 			return ret;
 		}
-		tas2557->current_book = book;
+		dv->current_book = book;
 	}
 
-	if (tas2557->current_page != page) {
+	if (dv->current_page != page) {
 		ret = regmap_write(tas2557->regmap, TAS2557_PAGE_REG, page);
 		if (ret < 0) {
-			dev_err(tas2557->dev, "page switch to %u failed: %d\n",
-				page, ret);
+			dev_err(tas2557->dev, "chn %u: page switch to %u failed: %d\n",
+				chn, page, ret);
 			return ret;
 		}
-		tas2557->current_page = page;
+		dv->current_page = page;
 	}
 
 	return 0;
 }
 
-static int tas2557_dev_read(struct tas2557_priv *tas2557,
+static int tas2557_dev_read(struct tas2557_priv *tas2557, unsigned int chn,
 			    unsigned int reg, unsigned int *value)
 {
 	int ret;
 
 	mutex_lock(&tas2557->dev_lock);
-	ret = tas2557_change_book_page(tas2557, TAS2557_BOOK_ID(reg),
+	ret = tas2557_change_book_page(tas2557, chn, TAS2557_BOOK_ID(reg),
 				       TAS2557_PAGE_ID(reg));
 	if (ret < 0)
 		goto out;
 
 	ret = regmap_read(tas2557->regmap, TAS2557_PAGE_REG_ADDR(reg), value);
 	if (ret < 0)
-		dev_err(tas2557->dev, "read reg 0x%06x failed: %d\n", reg, ret);
+		dev_err(tas2557->dev, "chn %u: read reg 0x%06x failed: %d\n",
+			chn, reg, ret);
 out:
 	mutex_unlock(&tas2557->dev_lock);
 	return ret;
 }
 
-static int tas2557_dev_write(struct tas2557_priv *tas2557,
+static int tas2557_dev_write(struct tas2557_priv *tas2557, unsigned int chn,
 			     unsigned int reg, unsigned int value)
 {
 	int ret;
 
 	mutex_lock(&tas2557->dev_lock);
-	ret = tas2557_change_book_page(tas2557, TAS2557_BOOK_ID(reg),
+	ret = tas2557_change_book_page(tas2557, chn, TAS2557_BOOK_ID(reg),
 				       TAS2557_PAGE_ID(reg));
 	if (ret < 0)
 		goto out;
 
 	ret = regmap_write(tas2557->regmap, TAS2557_PAGE_REG_ADDR(reg), value);
 	if (ret < 0)
-		dev_err(tas2557->dev, "write reg 0x%06x = 0x%02x failed: %d\n",
-			reg, value, ret);
+		dev_err(tas2557->dev, "chn %u: write reg 0x%06x = 0x%02x failed: %d\n",
+			chn, reg, value, ret);
 out:
 	mutex_unlock(&tas2557->dev_lock);
 	return ret;
 }
 
-static int tas2557_dev_update_bits(struct tas2557_priv *tas2557,
+static int tas2557_dev_update_bits(struct tas2557_priv *tas2557, unsigned int chn,
 				   unsigned int reg, unsigned int mask,
 				   unsigned int value)
 {
 	int ret;
 
 	mutex_lock(&tas2557->dev_lock);
-	ret = tas2557_change_book_page(tas2557, TAS2557_BOOK_ID(reg),
+	ret = tas2557_change_book_page(tas2557, chn, TAS2557_BOOK_ID(reg),
 				       TAS2557_PAGE_ID(reg));
 	if (ret < 0)
 		goto out;
@@ -358,14 +439,14 @@ static int tas2557_dev_update_bits(struct tas2557_priv *tas2557,
 	ret = regmap_update_bits(tas2557->regmap,
 				 TAS2557_PAGE_REG_ADDR(reg), mask, value);
 	if (ret < 0)
-		dev_err(tas2557->dev, "update_bits reg 0x%06x failed: %d\n",
-			reg, ret);
+		dev_err(tas2557->dev, "chn %u: update_bits reg 0x%06x failed: %d\n",
+			chn, reg, ret);
 out:
 	mutex_unlock(&tas2557->dev_lock);
 	return ret;
 }
 
-static int tas2557_dev_bulk_write(struct tas2557_priv *tas2557,
+static int tas2557_dev_bulk_write(struct tas2557_priv *tas2557, unsigned int chn,
 				  unsigned int reg, const u8 *data, size_t len)
 {
 	int ret;
@@ -375,7 +456,7 @@ static int tas2557_dev_bulk_write(struct tas2557_priv *tas2557,
 		return -EINVAL;
 
 	mutex_lock(&tas2557->dev_lock);
-	ret = tas2557_change_book_page(tas2557, TAS2557_BOOK_ID(reg),
+	ret = tas2557_change_book_page(tas2557, chn, TAS2557_BOOK_ID(reg),
 				       TAS2557_PAGE_ID(reg));
 	if (ret < 0)
 		goto out;
@@ -383,20 +464,21 @@ static int tas2557_dev_bulk_write(struct tas2557_priv *tas2557,
 	ret = regmap_bulk_write(tas2557->regmap,
 				TAS2557_PAGE_REG_ADDR(reg), data, len);
 	if (ret < 0)
-		dev_err(tas2557->dev, "bulk_write reg 0x%06x failed: %d\n",
-			reg, ret);
+		dev_err(tas2557->dev, "chn %u: bulk_write reg 0x%06x failed: %d\n",
+			chn, reg, ret);
 out:
 	mutex_unlock(&tas2557->dev_lock);
 	return ret;
 }
 
 /*
- * tas2557_load_data - walk a null-terminated {reg,val} sequence table
+ * tas2557_load_data - walk a null-terminated {reg,val} sequence table for
+ * one chip.
  *
  * Special reg values TAS2557_UDELAY and TAS2557_MDELAY insert delays;
  * 0xFFFFFFFF terminates.
  */
-static int tas2557_load_data(struct tas2557_priv *tas2557,
+static int tas2557_load_data(struct tas2557_priv *tas2557, unsigned int chn,
 			     const unsigned int *data)
 {
 	unsigned int reg, val;
@@ -414,7 +496,7 @@ static int tas2557_load_data(struct tas2557_priv *tas2557,
 		} else if (reg == TAS2557_MDELAY) {
 			msleep(val);
 		} else {
-			ret = tas2557_dev_write(tas2557, reg, val);
+			ret = tas2557_dev_write(tas2557, chn, reg, val);
 			if (ret < 0)
 				break;
 		}
@@ -422,6 +504,60 @@ static int tas2557_load_data(struct tas2557_priv *tas2557,
 	}
 
 	return ret;
+}
+
+/*
+ * tas2557_load_data_all - apply a {reg,val} sequence table to every chip
+ * in the group.  Used for the group-uniform tables above (defaults, IRQ
+ * config, startup/unmute/shutdown sequences): every chip gets identical
+ * values, but each chip's own registers still need their own write.
+ */
+static int tas2557_load_data_all(struct tas2557_priv *tas2557,
+				 const unsigned int *data)
+{
+	unsigned int chn;
+	int ret;
+
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		ret = tas2557_load_data(tas2557, chn, data);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+/* tas2557_write_all - write the same register/value to every chip */
+static int tas2557_write_all(struct tas2557_priv *tas2557,
+			     unsigned int reg, unsigned int value)
+{
+	unsigned int chn;
+	int ret;
+
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		ret = tas2557_dev_write(tas2557, chn, reg, value);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+/* tas2557_update_bits_all - update_bits the same register/mask/value on every chip */
+static int tas2557_update_bits_all(struct tas2557_priv *tas2557,
+				   unsigned int reg, unsigned int mask,
+				   unsigned int value)
+{
+	unsigned int chn;
+	int ret;
+
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		ret = tas2557_dev_update_bits(tas2557, chn, reg, mask, value);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
 }
 
 /* =========================================================================
@@ -901,7 +1037,7 @@ err:
  */
 
 static int tas2557_load_block(struct tas2557_priv *tas2557,
-			      struct tas2557_block *block)
+			      struct tas2557_block *block, unsigned int chn)
 {
 	const u8 *data = block->data;
 	unsigned int i;
@@ -909,8 +1045,8 @@ static int tas2557_load_block(struct tas2557_priv *tas2557,
 	u16 sleep_time, bulk_len;
 	int ret;
 
-	dev_dbg(tas2557->dev, "load block type=0x%x cmds=%u\n",
-		block->type, block->num_commands);
+	dev_dbg(tas2557->dev, "chn %u: load block type=0x%x cmds=%u\n",
+		chn, block->type, block->num_commands);
 
 	for (i = 0; i < block->num_commands; ) {
 		book   = data[i * 4];
@@ -920,7 +1056,7 @@ static int tas2557_load_block(struct tas2557_priv *tas2557,
 		i++;
 
 		if (offset <= 0x7f) {
-			ret = tas2557_dev_write(tas2557,
+			ret = tas2557_dev_write(tas2557, chn,
 						TAS2557_REG(book, page, offset),
 						value);
 			if (ret < 0)
@@ -946,11 +1082,11 @@ static int tas2557_load_block(struct tas2557_priv *tas2557,
 			offset = data[i * 4 + 2];
 
 			if (bulk_len > 1)
-				ret = tas2557_dev_bulk_write(tas2557,
+				ret = tas2557_dev_bulk_write(tas2557, chn,
 							     TAS2557_REG(book, page, offset),
 							     &data[i * 4 + 3], bulk_len);
 			else
-				ret = tas2557_dev_write(tas2557,
+				ret = tas2557_dev_write(tas2557, chn,
 							TAS2557_REG(book, page, offset),
 							data[i * 4 + 3]);
 			if (ret < 0)
@@ -966,78 +1102,101 @@ static int tas2557_load_block(struct tas2557_priv *tas2557,
 }
 
 /*
- * tas2557_block_wanted - should a firmware block be applied to this instance?
+ * tas2557_block_chn_range - which devs[] a firmware block type targets
  *
- * Stereo (device == 3) firmware carries tuning for two amplifiers: DEV_A
- * blocks for the left channel and DEV_B blocks for the right.  An instance
- * applies the device-independent blocks (PGM_ALL, CFG_POST*) plus the blocks
- * for its own channel.  Mono (device == 2) firmware has no DEV_B blocks, so
- * @want_dev_b is always false and the DEV_A blocks are applied.  Any other
- * (unknown) block type is rejected rather than applied to both devices.
+ * Mirrors tasdevice_load_block()'s dispatch in tas2781-fmwlib.c: DEV_A/
+ * DEV_B blocks target exactly one physical chip (selected by its index in
+ * the DT `reg` array, see the ti,tas2557.yaml binding), device-independent
+ * blocks (PGM_ALL, CFG_POST, CFG_POST_POWER) and the PLL block target every
+ * chip in the group.  @chnend is clamped to tas2557->ndev, so a DEV_B block
+ * becomes an empty range on a single-chip group instead of touching a
+ * devs[] slot that was never populated.  Returns false for a block type
+ * this driver does not recognise, so the caller does not apply it blindly.
  */
-static bool tas2557_block_wanted(unsigned int type, bool want_dev_b)
+static bool tas2557_block_chn_range(struct tas2557_priv *tas2557,
+				    unsigned int type,
+				    unsigned int *chn, unsigned int *chnend)
 {
 	switch (type) {
 	case TAS2557_BLOCK_PGM_DEV_A:
 	case TAS2557_BLOCK_CFG_COEFF_DEV_A:
 	case TAS2557_BLOCK_CFG_PRE_DEV_A:
-		return !want_dev_b;
+		*chn = 0;
+		*chnend = 1;
+		break;
 	case TAS2557_BLOCK_PGM_DEV_B:
 	case TAS2557_BLOCK_CFG_COEFF_DEV_B:
 	case TAS2557_BLOCK_CFG_PRE_DEV_B:
-		return want_dev_b;
+		*chn = 1;
+		*chnend = 2;
+		break;
+	case TAS2557_BLOCK_PLL:
 	case TAS2557_BLOCK_PGM_ALL:
 	case TAS2557_BLOCK_CFG_POST:
 	case TAS2557_BLOCK_CFG_POST_POWER:
-		/* device-independent blocks: apply to either instance */
-		return true;
+		*chn = 0;
+		*chnend = tas2557->ndev;
+		break;
 	default:
-		/* unknown type in program data: do not apply blindly */
 		return false;
 	}
+
+	if (*chnend > tas2557->ndev)
+		*chnend = tas2557->ndev;
+
+	return true;
 }
 
 /*
- * tas2557_load_fw_data - apply the blocks of a data set for this channel
- * @want_dev_b: apply DEV_B blocks (right channel of stereo firmware) rather
- *              than DEV_A; device-independent blocks are applied either way
+ * tas2557_load_fw_data - apply every block of a data set in storage order,
+ * each to whichever devs[] its type targets.  Used for program->data,
+ * which only ever contains PGM_ALL/PGM_DEV_A/PGM_DEV_B blocks with no
+ * ordering constraint between them.
  */
 static int tas2557_load_fw_data(struct tas2557_priv *tas2557,
-				struct tas2557_data *img_data,
-				bool want_dev_b)
+				struct tas2557_data *img_data)
 {
-	unsigned int i;
+	unsigned int i, chn, chnend, c;
 	int ret;
 
 	for (i = 0; i < img_data->num_blocks; i++) {
-		if (!tas2557_block_wanted(img_data->blocks[i].type, want_dev_b))
+		if (!tas2557_block_chn_range(tas2557, img_data->blocks[i].type,
+					     &chn, &chnend))
 			continue;
 
-		ret = tas2557_load_block(tas2557, &img_data->blocks[i]);
-		if (ret < 0)
-			return ret;
+		for (c = chn; c < chnend; c++) {
+			ret = tas2557_load_block(tas2557, &img_data->blocks[i], c);
+			if (ret < 0)
+				return ret;
+		}
 	}
 
 	return 0;
 }
 
 /*
- * tas2557_load_fw_data_type - apply only the blocks of a single type.
+ * tas2557_load_fw_data_type - apply only the blocks of a single type,
+ * in storage order, each to whichever devs[] that type targets.
  */
 static int tas2557_load_fw_data_type(struct tas2557_priv *tas2557,
 				     struct tas2557_data *img_data,
 				     unsigned int type)
 {
-	unsigned int i;
+	unsigned int i, chn, chnend, c;
 	int ret;
+
+	if (!tas2557_block_chn_range(tas2557, type, &chn, &chnend))
+		return 0;
 
 	for (i = 0; i < img_data->num_blocks; i++) {
 		if (img_data->blocks[i].type != type)
 			continue;
 
-		ret = tas2557_load_block(tas2557, &img_data->blocks[i]);
-		if (ret < 0)
-			return ret;
+		for (c = chn; c < chnend; c++) {
+			ret = tas2557_load_block(tas2557, &img_data->blocks[i], c);
+			if (ret < 0)
+				return ret;
+		}
 	}
 
 	return 0;
@@ -1045,38 +1204,33 @@ static int tas2557_load_fw_data_type(struct tas2557_priv *tas2557,
 
 /*
  * tas2557_load_config_data - apply a configuration's pre-power blocks in the
- * order the hardware expects: the pre-coefficient block, the coefficient
- * block, then the device-independent CFG_POST block.  The CFG_POST_POWER
- * block is NOT applied here; it needs active clocks and is loaded by
- * tas2557_load_config_post_power() after the device is powered up.
- * @want_dev_b selects the DEV_B (right) blocks of stereo firmware instead of
- * DEV_A (left); blocks are applied by type, not storage order (per TI).
+ * order the hardware expects: each chip's pre-coefficient block, then its
+ * coefficient block (DEV_A before DEV_B), then the device-independent
+ * CFG_POST block.  The CFG_POST_POWER block is NOT applied here; it needs
+ * active clocks and is loaded by tas2557_load_config_post_power() after the
+ * device is powered up.  Blocks are applied by type, not storage order (per
+ * TI); tas2557_block_chn_range() decides which chip(s) each type reaches.
  */
 static int tas2557_load_config_data(struct tas2557_priv *tas2557,
-				    struct tas2557_data *img_data,
-				    bool want_dev_b)
+				    struct tas2557_data *img_data)
 {
-	unsigned int pre, coeff;
+	static const unsigned int order[] = {
+		TAS2557_BLOCK_CFG_PRE_DEV_A,
+		TAS2557_BLOCK_CFG_COEFF_DEV_A,
+		TAS2557_BLOCK_CFG_PRE_DEV_B,
+		TAS2557_BLOCK_CFG_COEFF_DEV_B,
+		TAS2557_BLOCK_CFG_POST,
+	};
+	unsigned int i;
 	int ret;
 
-	if (want_dev_b) {
-		pre = TAS2557_BLOCK_CFG_PRE_DEV_B;
-		coeff = TAS2557_BLOCK_CFG_COEFF_DEV_B;
-	} else {
-		pre = TAS2557_BLOCK_CFG_PRE_DEV_A;
-		coeff = TAS2557_BLOCK_CFG_COEFF_DEV_A;
+	for (i = 0; i < ARRAY_SIZE(order); i++) {
+		ret = tas2557_load_fw_data_type(tas2557, img_data, order[i]);
+		if (ret < 0)
+			return ret;
 	}
 
-	ret = tas2557_load_fw_data_type(tas2557, img_data, pre);
-	if (ret < 0)
-		return ret;
-
-	ret = tas2557_load_fw_data_type(tas2557, img_data, coeff);
-	if (ret < 0)
-		return ret;
-
-	return tas2557_load_fw_data_type(tas2557, img_data,
-					TAS2557_BLOCK_CFG_POST);
+	return 0;
 }
 
 /*
@@ -1084,42 +1238,59 @@ static int tas2557_load_config_data(struct tas2557_priv *tas2557,
  * current configuration.  These register writes target DSP/clock state that
  * only latches once the Class-D/DSP power-up sequence has run, so this is
  * called from the power-up path after tas2557_startup_data, not during the
- * (powered-down) configuration load.
+ * (powered-down) configuration load.  current_config is kept in lock-step
+ * across every devs[] entry by tas2557_set_program(), so devs[0] is read
+ * back as the group's representative value.
  */
 static int tas2557_load_config_post_power(struct tas2557_priv *tas2557)
 {
 	struct tas2557_config *config;
 
-	if (!tas2557->fw || tas2557->current_config >= tas2557->fw->num_configs)
+	if (!tas2557->fw || tas2557->devs[0].current_config >= tas2557->fw->num_configs)
 		return 0;
 
-	config = &tas2557->fw->configs[tas2557->current_config];
+	config = &tas2557->fw->configs[tas2557->devs[0].current_config];
 
 	return tas2557_load_fw_data_type(tas2557, &config->data,
 					 TAS2557_BLOCK_CFG_POST_POWER);
 }
 
+/*
+ * tas2557_load_pll - apply a firmware PLL block to every chip in the group.
+ * PLL configuration is device-independent (each chip clocks itself off the
+ * same shared reference), so this is loaded on every devs[] entry.
+ */
 static int tas2557_load_pll(struct tas2557_priv *tas2557, unsigned int pll_idx)
 {
+	unsigned int chn;
+	int ret;
+
 	if (!tas2557->fw || pll_idx >= tas2557->fw->num_plls)
 		return -EINVAL;
 
 	dev_dbg(tas2557->dev, "loading PLL[%u]: %s\n",
 		pll_idx, tas2557->fw->plls[pll_idx].name);
 
-	return tas2557_load_block(tas2557, &tas2557->fw->plls[pll_idx].block);
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		ret = tas2557_load_block(tas2557,
+					 &tas2557->fw->plls[pll_idx].block, chn);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
 }
 
 /*
- * tas2557_set_program - reset device and load firmware program + config
+ * tas2557_set_program - reset device group and load firmware program + config
  *
  * This is the authoritative firmware-apply path.  It performs:
  *   (graceful shutdown if currently powered) -> hardware reset ->
- *   software reset -> default registers -> IRQ config ->
+ *   software reset -> default registers -> IRQ config (all per chip) ->
  *   program blocks (DSP coefficients) -> PLL block for config ->
  *   config blocks (sample-rate-specific settings)
  *
- * It does not re-power the device: callers that need the amplifier
+ * It does not re-power the device group: callers that need the amplifiers
  * running again after this call (tas2557_enable(), failsafe recovery)
  * re-apply the startup sequence themselves.
  *
@@ -1136,9 +1307,8 @@ static int tas2557_set_program(struct tas2557_priv *tas2557,
 	struct tas2557_firmware *fw = tas2557->fw;
 	struct tas2557_program *program;
 	struct tas2557_config  *config;
-	unsigned int cfg_idx;
+	unsigned int cfg_idx, chn;
 	int ret;
-	bool want_dev_b;
 
 	lockdep_assert_held(&tas2557->lock);
 
@@ -1192,44 +1362,45 @@ static int tas2557_set_program(struct tas2557_priv *tas2557,
 
 	/* Ramp down gracefully before the reset if currently powered */
 	if (tas2557->powered) {
-		ret = tas2557_load_data(tas2557, tas2557_shutdown_data);
+		ret = tas2557_load_data_all(tas2557, tas2557_shutdown_data);
 		if (ret < 0)
 			return ret;
 	}
 
-	/* Hard + soft reset, then baseline register setup */
+	/* Hard + soft reset (every chip), then baseline register setup */
 	tas2557_hw_reset(tas2557);
 
-	ret = tas2557_dev_write(tas2557, TAS2557_SW_RESET_REG, 0x01);
-	if (ret < 0)
-		return ret;
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		ret = tas2557_dev_write(tas2557, chn, TAS2557_SW_RESET_REG, 0x01);
+		if (ret < 0)
+			return ret;
+	}
 	usleep_range(1000, 2000);
 
-	ret = tas2557_load_data(tas2557, tas2557_default_data);
+	ret = tas2557_load_data_all(tas2557, tas2557_default_data);
 	if (ret < 0)
 		return ret;
 
 	/* Restore IRQ configuration lost by the reset */
-	ret = tas2557_load_data(tas2557, tas2557_irq_config);
+	ret = tas2557_load_data_all(tas2557, tas2557_irq_config);
 	if (ret < 0)
 		dev_warn(tas2557->dev, "IRQ config reload failed: %d\n", ret);
 
 	/*
-	 * Stereo firmware (device == 3) carries DEV_A (left) and DEV_B (right)
-	 * tuning; select this instance's channel.  Mono firmware has only
-	 * DEV_A blocks, so this stays false.
+	 * Load DSP program blocks.  Which chip(s) each block targets is
+	 * decided purely by the block's own type (PGM_ALL/PGM_DEV_A/
+	 * PGM_DEV_B) via tas2557_block_chn_range(); DEV_A/DEV_B tuning maps
+	 * onto devs[0]/devs[1], i.e. onto the chip order of the DT `reg`
+	 * array, not any runtime TDM slot selection.
 	 */
-	want_dev_b = fw->device == TAS2557_FW_DEVICE_STEREO &&
-		     tas2557->channel == 1;
-
-	/* Load DSP program blocks */
 	dev_dbg(tas2557->dev, "loading program %u (%s)\n",
 		prog_idx, program->name);
-	ret = tas2557_load_fw_data(tas2557, &program->data, want_dev_b);
+	ret = tas2557_load_fw_data(tas2557, &program->data);
 	if (ret < 0)
 		return ret;
 
-	tas2557->current_program = prog_idx;
+	for (chn = 0; chn < tas2557->ndev; chn++)
+		tas2557->devs[chn].current_program = prog_idx;
 
 	/* Load PLL configuration for this config (firmware-driven) */
 	if (config->pll < fw->num_plls) {
@@ -1242,11 +1413,12 @@ static int tas2557_set_program(struct tas2557_priv *tas2557,
 	dev_dbg(tas2557->dev,
 		"loading config %u (%s) rate=%u Hz PLL[%u]\n",
 		config_idx, config->name, config->sample_rate, config->pll);
-	ret = tas2557_load_config_data(tas2557, &config->data, want_dev_b);
+	ret = tas2557_load_config_data(tas2557, &config->data);
 	if (ret < 0)
 		return ret;
 
-	tas2557->current_config = config_idx;
+	for (chn = 0; chn < tas2557->ndev; chn++)
+		tas2557->devs[chn].current_config = config_idx;
 
 	return 0;
 }
@@ -1315,16 +1487,15 @@ static void tas2557_fw_ready(const struct firmware *fw_entry, void *context)
 		dev_err(tas2557->dev, "initial program load failed: %d\n", ret);
 	else
 		dev_info(tas2557->dev,
-			 "%s %s ready: fw '%s' ver=0x%x drv=0x%x (%u prog, %u cfg)\n",
-			 tas2557_pg_name(tas2557->pg_id),
-			 tas2557->channel ? "right" : "left", tas2557->fw_name,
+			 "%s ready: fw '%s' ver=0x%x drv=0x%x (%u prog, %u cfg)\n",
+			 tas2557_pg_name(tas2557->devs[0].pg_id), tas2557->fw_name,
 			 fw->fw_version, fw->driver_version,
 			 fw->num_programs, fw->num_configs);
 
 	mutex_unlock(&tas2557->lock);
 
 done:
-	complete(&tas2557->fw_done);
+	complete_all(&tas2557->fw_done);
 }
 
 /*
@@ -1356,10 +1527,14 @@ static void tas2557_fw_teardown(void *data)
  */
 static void tas2557_hw_reset(struct tas2557_priv *tas2557)
 {
+	unsigned int chn;
+
 	if (!tas2557->reset_gpio) {
 		mutex_lock(&tas2557->dev_lock);
-		tas2557->current_book = 0xff;
-		tas2557->current_page = 0xff;
+		for (chn = 0; chn < tas2557->ndev; chn++) {
+			tas2557->devs[chn].current_book = 0xff;
+			tas2557->devs[chn].current_page = 0xff;
+		}
 		mutex_unlock(&tas2557->dev_lock);
 		return;
 	}
@@ -1367,13 +1542,15 @@ static void tas2557_hw_reset(struct tas2557_priv *tas2557)
 	/* Assert reset (active-low: logical 1 = reset asserted) */
 	gpiod_set_value_cansleep(tas2557->reset_gpio, 1);
 	usleep_range(5000, 6000);
-	/* Release reset */
+	/* Release reset -- resets every chip on the shared reset line */
 	gpiod_set_value_cansleep(tas2557->reset_gpio, 0);
 	usleep_range(10000, 11000);
 
 	mutex_lock(&tas2557->dev_lock);
-	tas2557->current_book = 0xff;
-	tas2557->current_page = 0xff;
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		tas2557->devs[chn].current_book = 0xff;
+		tas2557->devs[chn].current_page = 0xff;
+	}
 	mutex_unlock(&tas2557->dev_lock);
 }
 
@@ -1409,82 +1586,95 @@ static void tas2557_irq_disarm(struct tas2557_priv *tas2557)
 /*
  * tas2557_irq_handler - threaded fault IRQ handler
  *
- * GPIO4 is programmed as the INT1 output (see tas2557_irq_config); the
- * chip drives it active-high and holds it until FLAGS_1/FLAGS_2 are read.
- * The chip's INT output is gated off while diagnosing the fault and
- * re-enabled once the condition has been read/handled.
+ * GPIO4 is programmed as the INT1 output (see tas2557_irq_config) on every
+ * chip; the group shares a single host INT line, so all chips' INT outputs
+ * are gated off together while diagnosing a fault and re-enabled together
+ * once the condition has been read/handled.  FLAGS_1/FLAGS_2/POWER_UP_FLAG
+ * are read back from each chip in turn: any single chip reporting a fault
+ * triggers failsafe recovery for the whole group.
  */
 static irqreturn_t tas2557_irq_handler(int irq, void *data)
 {
 	struct tas2557_priv *tas2557 = data;
-	unsigned int int1 = 0, int2 = 0, pwr_flag = 0;
-	int ret;
+	unsigned int chn;
+	bool fault = false;
+	int ret = 0;
 
 	mutex_lock(&tas2557->lock);
 
 	if (!tas2557->fw || !tas2557->powered) {
 		mutex_unlock(&tas2557->lock);
+		return IRQ_NONE;
+	}
+
+	/* Gate the chips' INT output while diagnosing the fault */
+	tas2557_write_all(tas2557, TAS2557_GPIO4_PIN_REG, 0x00);
+
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		unsigned int int1 = 0, int2 = 0, pwr_flag = 0;
+
+		ret = tas2557_dev_read(tas2557, chn, TAS2557_FLAGS_1, &int1);
+		if (ret >= 0)
+			ret = tas2557_dev_read(tas2557, chn, TAS2557_FLAGS_2, &int2);
+
+		if (ret < 0) {
+			dev_err(tas2557->dev, "IRQ: chn %u failed to read FLAGS\n", chn);
+			fault = true;
+			break;
+		}
+
+		if ((int1 & 0xfc) || (int2 & 0x0c)) {
+			/*
+			 * Clock faults while muted are expected: the host is
+			 * allowed to stop the I2S clocks around stream stop
+			 * while the amplifier is still powered.  Nothing to
+			 * recover from.
+			 */
+			if (tas2557->dac_muted && !(int1 & 0xd8)) {
+				dev_dbg(tas2557->dev,
+					"IRQ: chn %u clock stop while muted (FLAGS_1=0x%02x FLAGS_2=0x%02x)\n",
+					chn, int1, int2);
+				continue;
+			}
+			dev_err(tas2557->dev, "IRQ: chn %u FLAGS_1=0x%02x FLAGS_2=0x%02x\n",
+				chn, int1, int2);
+			fault = true;
+			break;
+		}
+
+		if (!tas2557->dac_muted) {
+			ret = tas2557_dev_read(tas2557, chn, TAS2557_POWER_UP_FLAG_REG,
+					       &pwr_flag);
+			if (ret < 0) {
+				fault = true;
+				break;
+			}
+
+			if ((pwr_flag & 0xc0) != 0xc0) {
+				dev_err(tas2557->dev, "IRQ: chn %u power-up flag=0x%02x\n",
+					chn, pwr_flag);
+				fault = true;
+				break;
+			}
+		}
+	}
+
+	if (!fault) {
+		/* No fault (or expected clock stop): re-enable the INT output */
+		tas2557_write_all(tas2557, TAS2557_GPIO4_PIN_REG, 0x07);
+		mutex_unlock(&tas2557->lock);
 		return IRQ_HANDLED;
 	}
 
-	/* Gate the chip's INT output while diagnosing the fault */
-	tas2557_dev_write(tas2557, TAS2557_GPIO4_PIN_REG, 0x00);
-
-	ret = tas2557_dev_read(tas2557, TAS2557_FLAGS_1, &int1);
-	if (ret >= 0)
-		ret = tas2557_dev_read(tas2557, TAS2557_FLAGS_2, &int2);
-
-	if (ret < 0) {
-		dev_err(tas2557->dev, "IRQ: failed to read FLAGS\n");
-		goto reset;
-	}
-
-	if ((int1 & 0xfc) || (int2 & 0x0c)) {
-		/*
-		 * Clock faults while muted are expected: the host is
-		 * allowed to stop the I2S clocks around stream stop while
-		 * the amplifier is still powered.  Nothing to recover from.
-		 */
-		if (tas2557->muted && !(int1 & 0xd8)) {
-			dev_dbg(tas2557->dev,
-				"IRQ: clock stop while muted (FLAGS_1=0x%02x FLAGS_2=0x%02x)\n",
-				int1, int2);
-			goto out;
-		}
-		dev_err(tas2557->dev, "IRQ: FLAGS_1=0x%02x FLAGS_2=0x%02x\n",
-			int1, int2);
-		goto reset;
-	}
-
-	if (!tas2557->muted) {
-		ret = tas2557_dev_read(tas2557, TAS2557_POWER_UP_FLAG_REG,
-				       &pwr_flag);
-		if (ret < 0)
-			goto reset;
-
-		if ((pwr_flag & 0xc0) != 0xc0) {
-			dev_err(tas2557->dev, "IRQ: power-up flag=0x%02x\n",
-				pwr_flag);
-			goto reset;
-		}
-	}
-
-	/* No fault (or expected clock stop): re-enable the INT output */
-out:
-	tas2557_dev_write(tas2557, TAS2557_GPIO4_PIN_REG, 0x07);
-	mutex_unlock(&tas2557->lock);
-	return IRQ_HANDLED;
-
-reset:
 	if (tas2557_failsafe_recovery(tas2557) == 0)
-		tas2557_dev_write(tas2557, TAS2557_GPIO4_PIN_REG, 0x07);
+		tas2557_write_all(tas2557, TAS2557_GPIO4_PIN_REG, 0x07);
 
 	mutex_unlock(&tas2557->lock);
 	return IRQ_HANDLED;
 }
 
 /*
- * tas2557_clk_err_detect - gate the chip's clock error/halt detection
+ * tas2557_clk_err_detect - gate the chips' clock error/halt detection
  *
  * The host is allowed to stop the I2S clocks whenever no audio is
  * playing (amplifier muted), so detection is armed only between unmute
@@ -1494,47 +1684,98 @@ reset:
  */
 static int tas2557_clk_err_detect(struct tas2557_priv *tas2557, bool enable)
 {
-	return tas2557_dev_write(tas2557, TAS2557_CLK_ERR_CTRL,
+	return tas2557_write_all(tas2557, TAS2557_CLK_ERR_CTRL,
 				 enable ? 0x2b : 0x00);
 }
 
 /*
- * tas2557_failsafe_recovery - re-initialise the device after a fault IRQ
+ * tas2557_sns_ctrl_value - compute TAS2557_SNS_CTRL_REG for one chip from
+ * cached state
+ *
+ * Shared by tas2557_apply_runtime_state() and the ISENSE/VSENSE mixer
+ * controls, so toggling either sense while already powered routes it to
+ * the same DT-configured slot a fresh power-up would use.  isense_enabled/
+ * vsense_enabled are shared group-level switches; imon_slot/vmon_slot are
+ * per chip (from ti,imon-slot-nos/ti,vmon-slot-nos).
+ */
+static unsigned int tas2557_sns_ctrl_value(struct tas2557_priv *tas2557,
+					   unsigned int chn)
+{
+	unsigned int sns = 0;
+
+	if (tas2557->isense_enabled)
+		sns |= (tas2557->devs[chn].imon_slot & 0x7) << TAS2557_ISNS_SLOT_SHIFT;
+	if (tas2557->vsense_enabled)
+		sns |= (tas2557->devs[chn].vmon_slot & 0x7) << TAS2557_VSNS_SLOT_SHIFT;
+
+	return sns;
+}
+
+/* tas2557_sns_ctrl_write_all - apply tas2557_sns_ctrl_value() to every chip */
+static int tas2557_sns_ctrl_write_all(struct tas2557_priv *tas2557)
+{
+	unsigned int chn;
+	int ret;
+
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		ret = tas2557_dev_write(tas2557, chn, TAS2557_SNS_CTRL_REG,
+					tas2557_sns_ctrl_value(tas2557, chn));
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+/*
+ * tas2557_failsafe_recovery - re-initialise the device group after a fault IRQ
  *
  * Caller must hold tas2557->lock (called from tas2557_irq_handler()).
  * Capped at 5 attempts so a permanently faulty amplifier does not spin
- * the IRQ thread forever.
+ * the IRQ thread forever; restart_count is tracked per chip but the whole
+ * group is recovered together, so every devs[] entry is incremented in
+ * lock-step and devs[0] is read back as the group's representative value.
  */
 static int tas2557_failsafe_recovery(struct tas2557_priv *tas2557)
 {
+	unsigned int chn;
 	int ret;
 
 	lockdep_assert_held(&tas2557->lock);
 
-	tas2557->restart_count++;
-	dev_info(tas2557->dev, "failsafe recovery attempt %u\n",
-		 tas2557->restart_count);
+	for (chn = 0; chn < tas2557->ndev; chn++)
+		tas2557->devs[chn].restart_count++;
 
-	if (tas2557->restart_count > 5) {
+	dev_info(tas2557->dev, "failsafe recovery attempt %u\n",
+		 tas2557->devs[0].restart_count);
+
+	if (tas2557->devs[0].restart_count > 5) {
 		dev_err(tas2557->dev, "too many recovery attempts, giving up\n");
 		return -EIO;
 	}
 
 	tas2557_hw_reset(tas2557);
 
-	ret = tas2557_load_data(tas2557, tas2557_default_data);
+	ret = tas2557_load_data_all(tas2557, tas2557_default_data);
 	if (ret < 0)
 		return ret;
 
 	if (tas2557->fw) {
-		ret = tas2557_set_program(tas2557, tas2557->current_program,
-					  (int)tas2557->current_config);
+		ret = tas2557_set_program(tas2557, tas2557->devs[0].current_program,
+					  (int)tas2557->devs[0].current_config);
 		if (ret < 0)
 			return ret;
 	}
 
 	if (tas2557->powered) {
-		ret = tas2557_load_data(tas2557, tas2557_startup_data);
+		unsigned int sense_soft_mask = TAS2557_VSENSE_SOFT_MUTE |
+						TAS2557_ISENSE_SOFT_MUTE;
+
+		ret = tas2557_load_data_all(tas2557, tas2557_startup_data);
+		if (ret < 0)
+			return ret;
+
+		ret = tas2557_apply_runtime_state(tas2557);
 		if (ret < 0)
 			return ret;
 
@@ -1542,13 +1783,35 @@ static int tas2557_failsafe_recovery(struct tas2557_priv *tas2557)
 		if (ret < 0)
 			return ret;
 
-		if (!tas2557->muted) {
-			ret = tas2557_load_data(tas2557, tas2557_unmute_data);
+		if (!tas2557->dac_muted) {
+			ret = tas2557_load_data_all(tas2557, tas2557_unmute_data);
+			if (ret >= 0 && tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_MUTE_REG,
+							      TAS2557_ISENSE_MUTE,
+							      TAS2557_ISENSE_MUTE);
+			if (ret >= 0 && tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_SOFT_MUTE_REG,
+							      sense_soft_mask,
+							      sense_soft_mask);
+			if (ret >= 0)
+				ret = tas2557_clk_err_detect(tas2557, true);
 			if (ret < 0)
 				return ret;
 		} else {
 			/* Muted: clocks not guaranteed, keep detection off */
 			ret = tas2557_clk_err_detect(tas2557, false);
+			if (ret >= 0 && !tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_MUTE_REG,
+							      TAS2557_ISENSE_MUTE,
+							      0);
+			if (ret >= 0 && !tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_SOFT_MUTE_REG,
+							      sense_soft_mask,
+							      0);
 			if (ret < 0)
 				return ret;
 		}
@@ -1569,58 +1832,175 @@ static int tas2557_failsafe_recovery(struct tas2557_priv *tas2557)
  *   4. Load the CFG_POST_POWER firmware block
  *   5. Check POWER_UP_FLAG + FLAGS for PLL lock / clock errors
  *
- * The device stays muted after power-up; tas2557_mute_stream() applies
- * the unmute (or mute) register sequence separately, so a stream that
+ * All of the above run against every chip in the group.  The device stays
+ * muted after power-up; tas2557_mute_stream() applies the unmute (or mute)
+ * register sequence separately per stream direction, so a stream that
  * starts muted (e.g. during a volume ramp) never briefly unmutes.
  * =========================================================================
  */
 static void tas2557_check_pll_lock(struct tas2557_priv *tas2557)
 {
-	unsigned int flag = 0, f1 = 0, f2 = 0;
-	int i;
+	unsigned int chn;
 
 	/*
 	 * The PLL needs a few ms to lock after the I2S bit clock starts
 	 * flowing.  Poll POWER_UP_FLAG rather than sampling it once, so we
 	 * don't emit a spurious "not locked" warning during clock ramp-up.
 	 */
-	for (i = 0; i < 20; i++) {
-		tas2557_dev_read(tas2557, TAS2557_POWER_UP_FLAG_REG, &flag);
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		unsigned int flag = 0, f1 = 0, f2 = 0;
+		int i;
+
+		for (i = 0; i < 20; i++) {
+			tas2557_dev_read(tas2557, chn, TAS2557_POWER_UP_FLAG_REG, &flag);
+			if ((flag & 0xc0) == 0xc0)
+				break;
+			usleep_range(2000, 2500);
+		}
+
+		tas2557_dev_read(tas2557, chn, TAS2557_FLAGS_1, &f1);
+		tas2557_dev_read(tas2557, chn, TAS2557_FLAGS_2, &f2);
+
 		if ((flag & 0xc0) == 0xc0)
-			break;
-		usleep_range(2000, 2500);
+			dev_dbg(tas2557->dev,
+				"chn %u: PLL locked, power-up OK (FLAG=0x%02x F1=0x%02x F2=0x%02x)\n",
+				chn, flag, f1, f2);
+		else
+			dev_warn(tas2557->dev,
+				 "chn %u: PLL or clock may not have locked (FLAG=0x%02x F1=0x%02x F2=0x%02x)\n",
+				 chn, flag, f1, f2);
+
+		if (f1 & 0x04)
+			dev_warn(tas2557->dev, "chn %u: clock error detected (FLAGS_1=0x%02x)\n",
+				 chn, f1);
 	}
-
-	tas2557_dev_read(tas2557, TAS2557_FLAGS_1, &f1);
-	tas2557_dev_read(tas2557, TAS2557_FLAGS_2, &f2);
-
-	if ((flag & 0xc0) == 0xc0)
-		dev_dbg(tas2557->dev,
-			"PLL locked, power-up OK (FLAG=0x%02x F1=0x%02x F2=0x%02x)\n",
-			flag, f1, f2);
-	else
-		dev_warn(tas2557->dev,
-			 "PLL or clock may not have locked (FLAG=0x%02x F1=0x%02x F2=0x%02x)\n",
-			 flag, f1, f2);
-
-	if (f1 & 0x04)
-		dev_warn(tas2557->dev, "clock error detected (FLAGS_1=0x%02x)\n",
-			 f1);
 }
 
 /*
- * tas2557_enable - power the amplifier up or down
+ * tas2557_apply_runtime_state - re-apply cached runtime state after a reset
+ *
+ * tas2557_set_program()'s SW reset wipes the sense-slot, sense-enable,
+ * DAC gain, ASI format and ASI data-slot offset registers on every chip;
+ * this restores them all from the cached driver state.  Must be called
+ * after tas2557_startup_data has powered up Class-D/Boost/DSP, since these
+ * registers only latch with clocks running.
+ *
+ * Caller must hold tas2557->lock.
+ */
+static int tas2557_apply_runtime_state(struct tas2557_priv *tas2557)
+{
+	static const unsigned int fmt_regs[] = {
+		TAS2557_ASI1_DAC_FORMAT_REG, TAS2557_ASI2_DAC_FORMAT_REG,
+		TAS2557_ASI1_ADC_FORMAT_REG, TAS2557_ASI2_ADC_FORMAT_REG,
+	};
+	unsigned int chn, i;
+	int ret;
+
+	lockdep_assert_held(&tas2557->lock);
+
+	/* Configure current/voltage sense output slots */
+	if (tas2557->isense_enabled || tas2557->vsense_enabled) {
+		ret = tas2557_sns_ctrl_write_all(tas2557);
+		if (ret < 0)
+			return ret;
+	}
+
+	/*
+	 * tas2557_startup_data hardcodes both sense-enable bits on;
+	 * make the cached ALSA switch state win instead.
+	 */
+	ret = tas2557_update_bits_all(tas2557, TAS2557_POWER_CTRL2_REG,
+				      TAS2557_ISENSE_ENABLE | TAS2557_VSENSE_ENABLE,
+				      (tas2557->isense_enabled ? TAS2557_ISENSE_ENABLE : 0) |
+				      (tas2557->vsense_enabled ? TAS2557_VSENSE_ENABLE : 0));
+	if (ret < 0)
+		return ret;
+
+	/* Apply DAC gain */
+	ret = tas2557_update_bits_all(tas2557, TAS2557_SPK_CTRL_REG,
+				      TAS2557_DAC_GAIN_MASK,
+				      tas2557->dac_gain << TAS2557_DAC_GAIN_SHIFT);
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * Re-apply the ASI format (if set via set_dai_fmt) and word length
+	 * (from the last hw_params) that the SW reset cleared, on both the
+	 * DAC (playback) and ADC (IV-sense capture) format registers of
+	 * both ASIs, so capture stays in sync with playback.  Word length
+	 * is unconditional (a valid default is seeded at probe).
+	 */
+
+	for (i = 0; i < ARRAY_SIZE(fmt_regs); i++) {
+		ret = tas2557_update_bits_all(tas2557, fmt_regs[i],
+					      TAS2557_WORDLENGTH_MASK,
+					      tas2557->wordlength);
+		if (ret < 0)
+			return ret;
+
+		if (tas2557->dai_fmt >= 0) {
+			ret = tas2557_update_bits_all(tas2557, fmt_regs[i],
+						      TAS2557_FORMAT_MASK,
+						      tas2557->dai_fmt);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	/*
+	 * Re-apply the cached ASI data-slot offset (BCLK cycles) for each
+	 * chip.  The SW reset in tas2557_set_program() cleared the ASI
+	 * offset registers, so program them now the clocks are up.
+	 * Both ASIs are written; the board wiring selects which one
+	 * actually carries audio.
+	 */
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		struct tas2557_dev *dv = &tas2557->devs[chn];
+
+		ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI2_OFFSET1_REG,
+					dv->asi_offset);
+		if (ret < 0)
+			return ret;
+
+		ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI1_OFFSET1_REG,
+					dv->asi_offset);
+		if (ret < 0)
+			return ret;
+
+		/* Re-apply the cached TX (capture) slot offset, if ever set */
+		if (dv->asi_tx_offset >= 0) {
+			ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI1_OFFSET2_REG,
+						dv->asi_tx_offset);
+			if (ret < 0)
+				return ret;
+
+			ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI2_OFFSET2_REG,
+						dv->asi_tx_offset);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * tas2557_enable - power the amplifier group up or down
  *
  * Caller must hold tas2557->lock.  Does not touch the fault IRQ or the
  * mute state; see tas2557_classd_event() and tas2557_mute_stream().
  */
 static int tas2557_enable(struct tas2557_priv *tas2557, bool enable)
 {
+	unsigned int chn;
 	int ret = 0;
 
 	lockdep_assert_held(&tas2557->lock);
 
 	if (enable && !tas2557->powered) {
+		unsigned int sense_soft_mask = TAS2557_VSENSE_SOFT_MUTE |
+						TAS2557_ISENSE_SOFT_MUTE;
+
 		if (!tas2557->fw) {
 			dev_warn(tas2557->dev,
 				 "firmware not loaded, cannot produce audio; install %s\n",
@@ -1634,7 +2014,7 @@ static int tas2557_enable(struct tas2557_priv *tas2557, bool enable)
 		 * rate.  This performs hw/sw reset and loads the firmware's
 		 * PLL block; no manual PLL register writes are needed or done.
 		 */
-		ret = tas2557_set_program(tas2557, tas2557->current_program, -1);
+		ret = tas2557_set_program(tas2557, tas2557->devs[0].current_program, -1);
 		if (ret < 0) {
 			dev_err(tas2557->dev,
 				"firmware program load failed on enable: %d\n",
@@ -1642,43 +2022,17 @@ static int tas2557_enable(struct tas2557_priv *tas2557, bool enable)
 			return ret;
 		}
 
-		/* Power up Class-D + Boost + ASI2 clocks */
-		ret = tas2557_load_data(tas2557, tas2557_startup_data);
+		/* Power up Class-D + Boost + ASI2 clocks on every chip */
+		ret = tas2557_load_data_all(tas2557, tas2557_startup_data);
 		if (ret < 0) {
 			dev_err(tas2557->dev, "startup sequence failed: %d\n",
 				ret);
 			return ret;
 		}
 
-		/* Configure current/voltage sense output slots */
-		if (tas2557->isense_enabled || tas2557->vsense_enabled) {
-			unsigned int sns = 0;
-
-			if (tas2557->isense_enabled)
-				sns |= (tas2557->imon_slot & 0x7) <<
-					TAS2557_ISNS_SLOT_SHIFT;
-			if (tas2557->vsense_enabled)
-				sns |= (tas2557->vmon_slot & 0x7) <<
-					TAS2557_VSNS_SLOT_SHIFT;
-			tas2557_dev_write(tas2557, TAS2557_SNS_CTRL_REG, sns);
-		}
-
-		/* Apply DAC gain */
-		tas2557_dev_update_bits(tas2557, TAS2557_SPK_CTRL_REG,
-					TAS2557_DAC_GAIN_MASK,
-					tas2557->dac_gain << TAS2557_DAC_GAIN_SHIFT);
-
-		/*
-		 * Re-apply the cached ASI data-slot offset (BCLK cycles).
-		 * The SW reset in tas2557_set_program() cleared the ASI
-		 * offset registers, so program them now the clocks are up.
-		 * Both ASIs are written; the board wiring selects which one
-		 * actually carries audio.
-		 */
-		tas2557_dev_write(tas2557, TAS2557_ASI2_OFFSET1_REG,
-				  tas2557->asi_offset);
-		tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET1_REG,
-				  tas2557->asi_offset);
+		ret = tas2557_apply_runtime_state(tas2557);
+		if (ret < 0)
+			return ret;
 
 		/* DSP post-power coefficients need active clocks to latch */
 		ret = tas2557_load_config_post_power(tas2557);
@@ -1689,43 +2043,67 @@ static int tas2557_enable(struct tas2557_priv *tas2557, bool enable)
 		}
 
 		/*
-		 * Apply the recorded mute state.  On DPCM systems the
-		 * mute_stream(0) callback for a back-end DAI runs at
-		 * back-end prepare time, BEFORE the DAPM widgets power up,
-		 * so the unmute may already have been recorded while the
-		 * device was still off: honour it now.  When still muted,
-		 * also disarm the clock error detection that
+		 * Apply the recorded per-direction mute state.  On DPCM
+		 * systems the mute_stream(0) callback for a back-end DAI
+		 * runs at back-end prepare time, BEFORE the DAPM widgets
+		 * power up, so the unmute may already have been recorded
+		 * while the device was still off: honour it now.  A
+		 * capture-only (IV-sense) stream can be unmuted while the
+		 * DAC stays muted, and vice versa.  When the DAC is still
+		 * muted, also disarm the clock error detection that
 		 * tas2557_startup_data enabled, since the host may not be
 		 * clocking the bus yet; tas2557_mute_stream() re-arms it.
 		 */
-		if (tas2557->muted) {
-			ret = tas2557_clk_err_detect(tas2557, false);
-		} else {
-			ret = tas2557_load_data(tas2557, tas2557_unmute_data);
+		if (!tas2557->dac_muted) {
+			ret = tas2557_load_data_all(tas2557, tas2557_unmute_data);
+			if (ret >= 0 && tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_MUTE_REG,
+							      TAS2557_ISENSE_MUTE,
+							      TAS2557_ISENSE_MUTE);
+			if (ret >= 0 && tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_SOFT_MUTE_REG,
+							      sense_soft_mask,
+							      sense_soft_mask);
 			if (ret >= 0)
 				ret = tas2557_clk_err_detect(tas2557, true);
+		} else {
+			ret = tas2557_clk_err_detect(tas2557, false);
+			if (ret >= 0 && !tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_MUTE_REG,
+							      TAS2557_ISENSE_MUTE,
+							      0);
+			if (ret >= 0 && !tas2557->sense_muted)
+				ret = tas2557_update_bits_all(tas2557,
+							      TAS2557_SOFT_MUTE_REG,
+							      sense_soft_mask,
+							      0);
 		}
 		if (ret < 0)
 			return ret;
 
-		/* Verify PLL lock and clock health */
+		/* Verify PLL lock and clock health on every chip */
 		tas2557_check_pll_lock(tas2557);
 
 		tas2557->powered = true;
-		tas2557->restart_count = 0;
+		for (chn = 0; chn < tas2557->ndev; chn++)
+			tas2557->devs[chn].restart_count = 0;
 
-		dev_dbg(tas2557->dev, "amplifier powered on (prog=%u cfg=%u)\n",
-			tas2557->current_program, tas2557->current_config);
+		dev_dbg(tas2557->dev, "amplifier group powered on (prog=%u cfg=%u)\n",
+			tas2557->devs[0].current_program, tas2557->devs[0].current_config);
 
 	} else if (!enable && tas2557->powered) {
-		ret = tas2557_load_data(tas2557, tas2557_shutdown_data);
+		ret = tas2557_load_data_all(tas2557, tas2557_shutdown_data);
 		if (ret < 0)
 			dev_err(tas2557->dev, "shutdown failed: %d\n", ret);
 
 		tas2557->powered = false;
-		tas2557->muted   = true;
+		tas2557->dac_muted = true;
+		tas2557->sense_muted = true;
 
-		dev_dbg(tas2557->dev, "amplifier powered off\n");
+		dev_dbg(tas2557->dev, "amplifier group powered off\n");
 	}
 
 	return ret;
@@ -1742,7 +2120,7 @@ static int tas2557_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_component *component = dai->component;
 	struct tas2557_priv *tas2557 = snd_soc_component_get_drvdata(component);
 	unsigned int rate = params_rate(params);
-	unsigned int width, offset;
+	unsigned int chn, wordlength;
 	int ret;
 
 	mutex_lock(&tas2557->lock);
@@ -1750,39 +2128,74 @@ static int tas2557_hw_params(struct snd_pcm_substream *substream,
 	dev_dbg(tas2557->dev, "hw_params: rate=%u width=%d\n",
 		rate, params_physical_width(params));
 
-	/* Store the rate; tas2557_enable() uses it to pick the config */
-	tas2557->sample_rate = rate;
+	/*
+	 * Validate the ASI word length up front (before committing any
+	 * cached state); it is reapplied per chip by
+	 * tas2557_apply_runtime_state() since the SW reset clears it.
+	 */
+	switch (params_width(params)) {
+	case 16:
+		wordlength = TAS2557_WORDLENGTH_16BIT;
+		break;
+	case 20:
+		wordlength = TAS2557_WORDLENGTH_20BIT;
+		break;
+	case 24:
+		wordlength = TAS2557_WORDLENGTH_24BIT;
+		break;
+	case 32:
+		wordlength = TAS2557_WORDLENGTH_32BIT;
+		break;
+	default:
+		dev_err(tas2557->dev, "unsupported sample width %d\n",
+			params_width(params));
+		mutex_unlock(&tas2557->lock);
+		return -EINVAL;
+	}
 
 	/*
-	 * The ASI word length is fixed by tas2557_startup_data to match
-	 * what the DSP firmware expects; it does not depend on the stream
-	 * format, so no WORDLENGTH bits are written here.  Only the
-	 * channel data-slot offset (in BCLK cycles) depends on the
-	 * stream: channel 0 sits at offset 1 (the validated hardware
-	 * configuration); later channels follow, width*2 apart.
+	 * The data-slot offset defaults to 0 and is applied identically to
+	 * every chip in the group.  An explicit snd_soc_dai_set_tdm_slot()
+	 * takes precedence over this default and leaves asi_offset
+	 * untouched.
 	 */
-	width = tas2557->tdm_slot_width > 0 ? tas2557->tdm_slot_width :
-					      params_physical_width(params);
-	offset = (tas2557->channel == 0) ? 1 : 1 + width * 2;
-	tas2557->asi_offset = offset;
+	if (!tas2557->tdm_configured) {
+		for (chn = 0; chn < tas2557->ndev; chn++)
+			tas2557->devs[chn].asi_offset = 0;
+	}
 
 	/* Playback runs over ASI2; ASI1 is programmed too (per TI driver) */
-	ret = tas2557_dev_write(tas2557, TAS2557_ASI2_OFFSET1_REG, offset);
-	if (ret < 0)
-		dev_warn(tas2557->dev, "ASI2 offset write failed: %d\n", ret);
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		unsigned int offset = tas2557->devs[chn].asi_offset;
 
-	ret = tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET1_REG, offset);
-	if (ret < 0)
-		dev_warn(tas2557->dev, "ASI1 offset write failed: %d\n", ret);
+		ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI2_OFFSET1_REG, offset);
+		if (ret < 0) {
+			dev_err(tas2557->dev, "chn %u: ASI2 offset write failed: %d\n",
+				chn, ret);
+			mutex_unlock(&tas2557->lock);
+			return ret;
+		}
 
-	dev_dbg(tas2557->dev, "ASI: %s channel, offset=%u BCLK cycles\n",
-		tas2557->channel ? "right" : "left", offset);
+		ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI1_OFFSET1_REG, offset);
+		if (ret < 0) {
+			dev_err(tas2557->dev, "chn %u: ASI1 offset write failed: %d\n",
+				chn, ret);
+			mutex_unlock(&tas2557->lock);
+			return ret;
+		}
+
+		dev_dbg(tas2557->dev, "chn %u: ASI offset=%u BCLK cycles\n", chn, offset);
+	}
 
 	/*
 	 * PLL (MAIN_CLKIN, PLL_CLKIN, PLL J/P/D/N) is not configured here.
 	 * It is set entirely by the firmware PLL block loaded via
 	 * tas2557_set_program() during tas2557_enable().
 	 */
+
+	/* Commit cached stream state now the hardware writes have succeeded */
+	tas2557->sample_rate = rate;
+	tas2557->wordlength = wordlength;
 
 	mutex_unlock(&tas2557->lock);
 
@@ -1816,11 +2229,17 @@ static int tas2557_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	}
 
 	mutex_lock(&tas2557->lock);
-	ret = tas2557_dev_update_bits(tas2557, TAS2557_ASI1_DAC_FORMAT_REG,
+	tas2557->dai_fmt = asi_fmt;
+	ret = tas2557_update_bits_all(tas2557, TAS2557_ASI1_DAC_FORMAT_REG,
 				      TAS2557_FORMAT_MASK, asi_fmt);
 	if (ret >= 0)
-		ret = tas2557_dev_update_bits(tas2557,
-					      TAS2557_ASI2_DAC_FORMAT_REG,
+		ret = tas2557_update_bits_all(tas2557, TAS2557_ASI2_DAC_FORMAT_REG,
+					      TAS2557_FORMAT_MASK, asi_fmt);
+	if (ret >= 0)
+		ret = tas2557_update_bits_all(tas2557, TAS2557_ASI1_ADC_FORMAT_REG,
+					      TAS2557_FORMAT_MASK, asi_fmt);
+	if (ret >= 0)
+		ret = tas2557_update_bits_all(tas2557, TAS2557_ASI2_ADC_FORMAT_REG,
 					      TAS2557_FORMAT_MASK, asi_fmt);
 	mutex_unlock(&tas2557->lock);
 
@@ -1834,6 +2253,7 @@ static int tas2557_set_tdm_slot(struct snd_soc_dai *dai,
 	struct snd_soc_component *component = dai->component;
 	struct tas2557_priv *tas2557 = snd_soc_component_get_drvdata(component);
 	int rx_slot = -1, tx_slot = -1;
+	unsigned int chn;
 	int ret = 0;
 
 	if (rx_mask) {
@@ -1864,25 +2284,42 @@ static int tas2557_set_tdm_slot(struct snd_soc_dai *dai,
 	tas2557->tdm_slot_width = slot_width;
 
 	if (rx_slot >= 0) {
-		/* RX (playback) data-slot offset in BCLK cycles */
-		tas2557->asi_offset = rx_slot * slot_width;
-		ret = tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET1_REG,
-					tas2557->asi_offset);
-		if (ret >= 0)
-			ret = tas2557_dev_write(tas2557,
-						TAS2557_ASI2_OFFSET1_REG,
-						tas2557->asi_offset);
+		tas2557->tdm_configured = true;
+		tas2557->tdm_rx_slot = rx_slot;
+		/*
+		 * RX (playback) data-slot offset in BCLK cycles.  There is
+		 * one DAI for the whole group, so every chip is programmed
+		 * to the same slot.
+		 */
+		for (chn = 0; chn < tas2557->ndev; chn++) {
+			tas2557->devs[chn].asi_offset = rx_slot * slot_width;
+
+			ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI1_OFFSET1_REG,
+						tas2557->devs[chn].asi_offset);
+			if (ret >= 0)
+				ret = tas2557_dev_write(tas2557, chn,
+							TAS2557_ASI2_OFFSET1_REG,
+							tas2557->devs[chn].asi_offset);
+			if (ret < 0)
+				break;
+		}
 	}
 
 	if (ret >= 0 && tx_slot >= 0) {
 		unsigned int tx_offset = tx_slot * slot_width;
 
-		ret = tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET2_REG,
-					tx_offset);
-		if (ret >= 0)
-			ret = tas2557_dev_write(tas2557,
-						TAS2557_ASI2_OFFSET2_REG,
+		for (chn = 0; chn < tas2557->ndev; chn++) {
+			tas2557->devs[chn].asi_tx_offset = tx_offset;
+
+			ret = tas2557_dev_write(tas2557, chn, TAS2557_ASI1_OFFSET2_REG,
 						tx_offset);
+			if (ret >= 0)
+				ret = tas2557_dev_write(tas2557, chn,
+							TAS2557_ASI2_OFFSET2_REG,
+							tx_offset);
+			if (ret < 0)
+				break;
+		}
 	}
 
 	if (ret >= 0)
@@ -1897,36 +2334,66 @@ static int tas2557_mute_stream(struct snd_soc_dai *dai, int mute, int direction)
 {
 	struct snd_soc_component *component = dai->component;
 	struct tas2557_priv *tas2557 = snd_soc_component_get_drvdata(component);
+	unsigned int sense_soft_mask = TAS2557_VSENSE_SOFT_MUTE |
+				       TAS2557_ISENSE_SOFT_MUTE;
 	int ret = 0;
 
 	mutex_lock(&tas2557->lock);
 
 	if (!tas2557->powered) {
-		tas2557->muted = mute;
+		if (direction == SNDRV_PCM_STREAM_CAPTURE)
+			tas2557->sense_muted = mute;
+		else
+			tas2557->dac_muted = mute;
 		mutex_unlock(&tas2557->lock);
 		return 0;
 	}
 
-	if (mute) {
+	if (direction == SNDRV_PCM_STREAM_CAPTURE) {
+		ret = tas2557_update_bits_all(tas2557, TAS2557_MUTE_REG,
+					      TAS2557_ISENSE_MUTE,
+					      mute ? TAS2557_ISENSE_MUTE : 0);
+		if (ret >= 0)
+			ret = tas2557_update_bits_all(tas2557,
+						      TAS2557_SOFT_MUTE_REG,
+						      sense_soft_mask,
+						      mute ? sense_soft_mask : 0);
+		tas2557->sense_muted = mute;
+	} else if (mute) {
 		/* Detection off first: the host is about to stop the clocks */
 		ret = tas2557_clk_err_detect(tas2557, false);
 		if (ret >= 0)
-			ret = tas2557_dev_write(tas2557,
-						TAS2557_SOFT_MUTE_REG, 0x01);
+			ret = tas2557_update_bits_all(tas2557,
+						      TAS2557_SOFT_MUTE_REG,
+						      TAS2557_PDM_SOFT_MUTE,
+						      TAS2557_PDM_SOFT_MUTE);
 		if (ret >= 0) {
 			usleep_range(10000, 11000);
-			ret = tas2557_dev_write(tas2557,
-						TAS2557_MUTE_REG, 0x03);
+			ret = tas2557_update_bits_all(tas2557,
+						      TAS2557_MUTE_REG,
+						      TAS2557_CLASSD_MUTE,
+						      TAS2557_CLASSD_MUTE);
 		}
+		tas2557->dac_muted = mute;
 	} else {
 		/* Same register values as tas2557_unmute_data, same order */
-		ret = tas2557_load_data(tas2557, tas2557_unmute_data);
+		ret = tas2557_load_data_all(tas2557, tas2557_unmute_data);
+		/* unmute_data clears sense mutes too; re-assert if needed */
+		if (ret >= 0 && tas2557->sense_muted)
+			ret = tas2557_update_bits_all(tas2557,
+						      TAS2557_MUTE_REG,
+						      TAS2557_ISENSE_MUTE,
+						      TAS2557_ISENSE_MUTE);
+		if (ret >= 0 && tas2557->sense_muted)
+			ret = tas2557_update_bits_all(tas2557,
+						      TAS2557_SOFT_MUTE_REG,
+						      sense_soft_mask,
+						      sense_soft_mask);
 		/* Clocks are running now: arm clock error detection */
 		if (ret >= 0)
 			ret = tas2557_clk_err_detect(tas2557, true);
+		tas2557->dac_muted = mute;
 	}
-
-	tas2557->muted = mute;
 
 	mutex_unlock(&tas2557->lock);
 	return ret;
@@ -1937,7 +2404,6 @@ static const struct snd_soc_dai_ops tas2557_dai_ops = {
 	.set_fmt       = tas2557_set_dai_fmt,
 	.set_tdm_slot  = tas2557_set_tdm_slot,
 	.mute_stream   = tas2557_mute_stream,
-	.no_capture_mute = 1,
 };
 
 static struct snd_soc_dai_driver tas2557_dai = {
@@ -1957,6 +2423,13 @@ static struct snd_soc_dai_driver tas2557_dai = {
 		.formats = TAS2557_FORMATS,
 	},
 	.ops = &tas2557_dai_ops,
+	/*
+	 * One firmware config (hence one rate) is active at a time, and
+	 * playback and capture share the single ASI word length, so both
+	 * substreams must agree on rate and sample width.
+	 */
+	.symmetric_rate = 1,
+	.symmetric_sample_bits = 1,
 };
 
 /* =========================================================================
@@ -1993,17 +2466,20 @@ static int tas2557_volume_put(struct snd_kcontrol *kc,
 		return 0;
 	}
 
-	tas2557->dac_gain = gain;
-
-	if (tas2557->powered)
-		ret = tas2557_dev_update_bits(tas2557, TAS2557_SPK_CTRL_REG,
+	if (tas2557->powered) {
+		ret = tas2557_update_bits_all(tas2557, TAS2557_SPK_CTRL_REG,
 					      TAS2557_DAC_GAIN_MASK,
 					      gain << TAS2557_DAC_GAIN_SHIFT);
+		if (ret < 0) {
+			mutex_unlock(&tas2557->lock);
+			return ret;
+		}
+	}
+
+	/* Only commit the cached gain once the hardware write has succeeded */
+	tas2557->dac_gain = gain;
 
 	mutex_unlock(&tas2557->lock);
-
-	if (ret < 0)
-		return ret;
 
 	return 1;
 }
@@ -2033,17 +2509,32 @@ static int tas2557_isense_put(struct snd_kcontrol *kc,
 		return 0;
 	}
 
-	tas2557->isense_enabled = en;
-
-	if (tas2557->powered)
-		ret = tas2557_dev_update_bits(tas2557, TAS2557_POWER_CTRL2_REG,
+	if (tas2557->powered) {
+		ret = tas2557_update_bits_all(tas2557, TAS2557_POWER_CTRL2_REG,
 					      TAS2557_ISENSE_ENABLE,
 					      en ? TAS2557_ISENSE_ENABLE : 0);
+		if (ret < 0) {
+			mutex_unlock(&tas2557->lock);
+			return ret;
+		}
+	}
+
+	/*
+	 * Commit the cached state only once the enable bit is in the
+	 * hardware (or while unpowered, where it is applied on the next
+	 * power-up); tas2557_sns_ctrl_write_all() below reads it.
+	 */
+	tas2557->isense_enabled = en;
+
+	if (tas2557->powered && (en || tas2557->vsense_enabled)) {
+		ret = tas2557_sns_ctrl_write_all(tas2557);
+		if (ret < 0) {
+			mutex_unlock(&tas2557->lock);
+			return ret;
+		}
+	}
 
 	mutex_unlock(&tas2557->lock);
-
-	if (ret < 0)
-		return ret;
 
 	return 1;
 }
@@ -2073,17 +2564,32 @@ static int tas2557_vsense_put(struct snd_kcontrol *kc,
 		return 0;
 	}
 
-	tas2557->vsense_enabled = en;
-
-	if (tas2557->powered)
-		ret = tas2557_dev_update_bits(tas2557, TAS2557_POWER_CTRL2_REG,
+	if (tas2557->powered) {
+		ret = tas2557_update_bits_all(tas2557, TAS2557_POWER_CTRL2_REG,
 					      TAS2557_VSENSE_ENABLE,
 					      en ? TAS2557_VSENSE_ENABLE : 0);
+		if (ret < 0) {
+			mutex_unlock(&tas2557->lock);
+			return ret;
+		}
+	}
+
+	/*
+	 * Commit the cached state only once the enable bit is in the
+	 * hardware (or while unpowered, where it is applied on the next
+	 * power-up); tas2557_sns_ctrl_write_all() below reads it.
+	 */
+	tas2557->vsense_enabled = en;
+
+	if (tas2557->powered && (tas2557->isense_enabled || en)) {
+		ret = tas2557_sns_ctrl_write_all(tas2557);
+		if (ret < 0) {
+			mutex_unlock(&tas2557->lock);
+			return ret;
+		}
+	}
 
 	mutex_unlock(&tas2557->lock);
-
-	if (ret < 0)
-		return ret;
 
 	return 1;
 }
@@ -2119,6 +2625,18 @@ static int tas2557_classd_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
+		/*
+		 * Wait here, not inside tas2557_enable(): that function
+		 * holds tas2557->lock, which tas2557_fw_ready() must
+		 * acquire before it can complete tas2557->fw_done, so
+		 * waiting on the firmware from inside the lock would
+		 * deadlock against the firmware-ready callback.
+		 */
+		if (tas2557->fw_requested &&
+		    !wait_for_completion_timeout(&tas2557->fw_done,
+						  msecs_to_jiffies(5000)))
+			dev_warn(tas2557->dev, "firmware load timed out\n");
+
 		mutex_lock(&tas2557->lock);
 		ret = tas2557_enable(tas2557, true);
 		mutex_unlock(&tas2557->lock);
@@ -2181,48 +2699,65 @@ static const struct snd_soc_dapm_route tas2557_dapm_routes[] = {
 static int tas2557_codec_probe(struct snd_soc_component *component)
 {
 	struct tas2557_priv *tas2557 = snd_soc_component_get_drvdata(component);
-	unsigned int pg_id;
 	const char *default_fw;
+	unsigned int chn;
 	int ret;
 
 	tas2557_hw_reset(tas2557);
 
-	ret = tas2557_dev_write(tas2557, TAS2557_SW_RESET_REG, 0x01);
-	if (ret < 0) {
-		dev_err(tas2557->dev, "software reset failed: %d\n", ret);
-		return ret;
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		ret = tas2557_dev_write(tas2557, chn, TAS2557_SW_RESET_REG, 0x01);
+		if (ret < 0) {
+			dev_err(tas2557->dev, "chn %u: software reset failed: %d\n",
+				chn, ret);
+			return ret;
+		}
 	}
 	usleep_range(1000, 2000);
 
-	ret = tas2557_dev_read(tas2557, TAS2557_REV_PGID_REG, &pg_id);
-	if (ret < 0) {
-		dev_err(tas2557->dev, "failed to read REV_PGID: %d\n", ret);
-		return ret;
+	for (chn = 0; chn < tas2557->ndev; chn++) {
+		unsigned int pg_id;
+
+		ret = tas2557_dev_read(tas2557, chn, TAS2557_REV_PGID_REG, &pg_id);
+		if (ret < 0) {
+			dev_err(tas2557->dev, "chn %u: failed to read REV_PGID: %d\n",
+				chn, ret);
+			return ret;
+		}
+		tas2557->devs[chn].pg_id = pg_id;
 	}
 
-	switch (pg_id) {
+	/*
+	 * Firmware selection is group-wide (one shared image); the PG
+	 * version of devs[0] is used as the representative silicon
+	 * revision, matching how current_program/current_config/pg_id are
+	 * otherwise read back from devs[0] elsewhere in this driver.
+	 */
+	switch (tas2557->devs[0].pg_id) {
 	case TAS2557_PG_VERSION_1P0:
-		dev_dbg(tas2557->dev, "silicon: PG1.0 (0x%02x)\n", pg_id);
+		dev_dbg(tas2557->dev, "silicon: PG1.0 (0x%02x)\n",
+			tas2557->devs[0].pg_id);
 		default_fw = TAS2557_PG1P0_FW_NAME;
 		break;
 	case TAS2557_PG_VERSION_2P0:
-		dev_dbg(tas2557->dev, "silicon: PG2.0 (0x%02x)\n", pg_id);
+		dev_dbg(tas2557->dev, "silicon: PG2.0 (0x%02x)\n",
+			tas2557->devs[0].pg_id);
 		default_fw = TAS2557_FW_NAME;
 		break;
 	case TAS2557_PG_VERSION_2P1:
-		dev_dbg(tas2557->dev, "silicon: PG2.1 (0x%02x)\n", pg_id);
+		dev_dbg(tas2557->dev, "silicon: PG2.1 (0x%02x)\n",
+			tas2557->devs[0].pg_id);
 		default_fw = TAS2557_FW_NAME;
 		break;
 	default:
 		dev_warn(tas2557->dev,
 			 "unknown silicon version 0x%02x, assuming PG2.x fw\n",
-			 pg_id);
+			 tas2557->devs[0].pg_id);
 		default_fw = TAS2557_FW_NAME;
 		break;
 	}
 
 	mutex_lock(&tas2557->lock);
-	tas2557->pg_id = pg_id;
 	/*
 	 * A "firmware-name" DT property (read at i2c probe) overrides the
 	 * PG-based default; dual-amp stereo boards load a different DSP
@@ -2232,13 +2767,13 @@ static int tas2557_codec_probe(struct snd_soc_component *component)
 		strscpy(tas2557->fw_name, default_fw, sizeof(tas2557->fw_name));
 	mutex_unlock(&tas2557->lock);
 
-	ret = tas2557_load_data(tas2557, tas2557_default_data);
+	ret = tas2557_load_data_all(tas2557, tas2557_default_data);
 	if (ret < 0) {
 		dev_err(tas2557->dev, "default data load failed: %d\n", ret);
 		return ret;
 	}
 
-	ret = tas2557_load_data(tas2557, tas2557_irq_config);
+	ret = tas2557_load_data_all(tas2557, tas2557_irq_config);
 	if (ret < 0)
 		dev_warn(tas2557->dev, "IRQ config failed: %d\n", ret);
 
@@ -2263,8 +2798,8 @@ static int tas2557_codec_probe(struct snd_soc_component *component)
 	}
 	mutex_unlock(&tas2557->lock);
 
-	dev_dbg(tas2557->dev, "codec probed, requesting firmware '%s'\n",
-		tas2557->fw_name);
+	dev_dbg(tas2557->dev, "codec probed (%u chip(s)), requesting firmware '%s'\n",
+		tas2557->ndev, tas2557->fw_name);
 	return 0;
 }
 
@@ -2291,11 +2826,11 @@ static int tas2557_resume(struct snd_soc_component *component)
 
 	tas2557_hw_reset(tas2557);
 
-	ret = tas2557_load_data(tas2557, tas2557_default_data);
+	ret = tas2557_load_data_all(tas2557, tas2557_default_data);
 	if (ret < 0)
 		dev_err(tas2557->dev, "defaults reload on resume failed: %d\n",
 			ret);
-	else if (tas2557_load_data(tas2557, tas2557_irq_config) < 0)
+	else if (tas2557_load_data_all(tas2557, tas2557_irq_config) < 0)
 		dev_warn(tas2557->dev, "IRQ config reload on resume failed\n");
 
 	mutex_unlock(&tas2557->lock);
@@ -2322,6 +2857,82 @@ static const struct snd_soc_component_driver soc_component_tas2557 = {
  * I2C driver
  * =========================================================================
  */
+
+/*
+ * tas2557_parse_dt - populate tas2557->devs[]/ndev and their DT parameters
+ *
+ * `reg` holds one I2C address per physical chip in the group (up to
+ * TAS2557_MAX_DEV); read per-index with of_property_read_reg(), the same
+ * OF-array-reading loop tasdevice_parse_dt() uses in tas2781-i2c.c, since
+ * i2c_client::addr only ever reflects the first entry.  Falls back to a
+ * single chip at the i2c_client's own address when there is no OF node.
+ *
+ * ti,imon-slot-nos / ti,vmon-slot-nos are u32 arrays, one entry per devs[]
+ * index; a missing property or one with fewer entries than ndev leaves the
+ * unfilled tail at the pre-seeded scalar defaults (0 / 2, matching the old
+ * single-chip property defaults, replicated across every index).
+ */
+static int tas2557_parse_dt(struct tas2557_priv *tas2557, struct i2c_client *client)
+{
+	struct device *dev = tas2557->dev;
+	struct device_node *np = dev->of_node;
+	unsigned int imon_slots[TAS2557_MAX_DEV] = { 0, 0 };
+	unsigned int vmon_slots[TAS2557_MAX_DEV] = { 2, 2 };
+	unsigned int i;
+	int ndev = 0;
+
+	if (np) {
+		u64 addr;
+
+		for (i = 0; i < TAS2557_MAX_DEV; i++) {
+			if (of_property_read_reg(np, i, &addr, NULL))
+				break;
+			tas2557->devs[ndev++].addr = addr;
+		}
+	}
+
+	if (ndev == 0) {
+		ndev = 1;
+		tas2557->devs[0].addr = client->addr;
+	}
+
+	tas2557->ndev = ndev;
+
+	of_property_read_variable_u32_array(np, "ti,imon-slot-nos",
+					    imon_slots, 1, tas2557->ndev);
+	of_property_read_variable_u32_array(np, "ti,vmon-slot-nos",
+					    vmon_slots, 1, tas2557->ndev);
+
+	for (i = 0; i < tas2557->ndev; i++) {
+		if (imon_slots[i] > 7)
+			return dev_err_probe(dev, -EINVAL,
+					     "ti,imon-slot-nos[%u] must be 0-7\n", i);
+		if (vmon_slots[i] > 7)
+			return dev_err_probe(dev, -EINVAL,
+					     "ti,vmon-slot-nos[%u] must be 0-7\n", i);
+
+		tas2557->devs[i].imon_slot = imon_slots[i];
+		tas2557->devs[i].vmon_slot = vmon_slots[i];
+		tas2557->devs[i].current_book = 0xff;
+		tas2557->devs[i].current_page = 0xff;
+		tas2557->devs[i].pg_id = 0;
+		tas2557->devs[i].current_program = 0;
+		tas2557->devs[i].current_config = 0;
+		tas2557->devs[i].restart_count = 0;
+		/*
+		 * Seed the cached ASI data-slot offset before any
+		 * hw_params() or set_tdm_slot() call arrives; matches the
+		 * default slot (offset 0) tas2557_hw_params() falls back to
+		 * when no explicit TDM configuration exists.
+		 */
+		tas2557->devs[i].asi_offset = 0;
+		/* -1 means "never set"; see tas2557_apply_runtime_state() */
+		tas2557->devs[i].asi_tx_offset = -1;
+	}
+
+	return 0;
+}
+
 static int tas2557_i2c_probe(struct i2c_client *client)
 {
 	static const char * const tas2557_supplies[] = {
@@ -2344,43 +2955,27 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 	init_completion(&tas2557->fw_done);
 	tas2557->fw_requested = false;
 
+	ret = tas2557_parse_dt(tas2557, client);
+	if (ret)
+		return ret;
+
 	/* Default gain (0 dB) */
 	tas2557->dac_gain = TAS2557_DAC_GAIN_MAX;
 
-	/* The device comes out of reset muted */
-	tas2557->muted = true;
+	/* The device group comes out of reset muted */
+	tas2557->dac_muted = true;
+	tas2557->sense_muted = true;
 
-	/* DT properties with defaults per the pinned contract */
-	if (of_property_read_u32(dev->of_node, "ti,channel", &tas2557->channel))
-		tas2557->channel = 0;	/* left */
-	else if (tas2557->channel > 1)
-		return dev_err_probe(dev, -EINVAL,
-				     "ti,channel must be 0 or 1\n");
+	/* -1 means "never set"; see tas2557_apply_runtime_state() */
+	tas2557->dai_fmt = -1;
+	tas2557->tdm_rx_slot = -1;
 
-	if (of_property_read_u32(dev->of_node, "ti,imon-slot-no",
-				 &tas2557->imon_slot))
-		tas2557->imon_slot = 0;
-	else if (tas2557->imon_slot > 7)
-		return dev_err_probe(dev, -EINVAL,
-				     "ti,imon-slot-no must be 0-7\n");
-
-	if (of_property_read_u32(dev->of_node, "ti,vmon-slot-no",
-				 &tas2557->vmon_slot))
-		tas2557->vmon_slot = 2;
-	else if (tas2557->vmon_slot > 7)
-		return dev_err_probe(dev, -EINVAL,
-				     "ti,vmon-slot-no must be 0-7\n");
+	/* Seed a valid ASI word length before the first hw_params() */
+	tas2557->wordlength = TAS2557_WORDLENGTH_32BIT;
 
 	/* Optional explicit firmware name; overrides the PG-based default */
 	if (!of_property_read_string(dev->of_node, "firmware-name", &fw_name))
 		strscpy(tas2557->fw_name, fw_name, sizeof(tas2557->fw_name));
-
-	/*
-	 * Seed the cached ASI data-slot offset before any hw_params() or
-	 * set_tdm_slot() call arrives; 32 is the fixed ASI word length
-	 * used by tas2557_startup_data.
-	 */
-	tas2557->asi_offset = (tas2557->channel == 0) ? 1 : 1 + 32 * 2;
 
 	ret = devm_regulator_bulk_get_enable(dev, ARRAY_SIZE(tas2557_supplies),
 					     tas2557_supplies);
@@ -2391,7 +2986,7 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 
 	/*
 	 * Reset GPIO is modeled active-low in DT: the logical value 0
-	 * (GPIOD_OUT_LOW) deasserts reset, releasing the device.
+	 * (GPIOD_OUT_LOW) deasserts reset, releasing the device group.
 	 */
 	tas2557->reset_gpio = devm_gpiod_get_optional(dev, "reset",
 						      GPIOD_OUT_LOW);
@@ -2403,10 +2998,6 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 	if (IS_ERR(tas2557->regmap))
 		return dev_err_probe(dev, PTR_ERR(tas2557->regmap),
 				     "regmap init failed\n");
-
-	/* Mark book/page as unknown so the first access triggers a switch */
-	tas2557->current_book = 0xff;
-	tas2557->current_page = 0xff;
 
 	/*
 	 * Registered here, right after regmap init: devm actions run in
@@ -2441,8 +3032,8 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 		return dev_err_probe(dev, ret,
 				     "component registration failed\n");
 
-	dev_dbg(dev, "TAS2557 probed (I2C addr 0x%02x, %s channel)\n",
-		client->addr, tas2557->channel ? "right" : "left");
+	dev_dbg(dev, "TAS2557 probed (%u chip(s), primary I2C addr 0x%02x)\n",
+		tas2557->ndev, client->addr);
 	return 0;
 }
 

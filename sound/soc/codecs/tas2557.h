@@ -208,6 +208,16 @@
 #define TAS2557_BLOCK_CFG_POST		0x05
 #define TAS2557_BLOCK_CFG_POST_POWER	0x06
 
+/*
+ * One DT node manages an array of up to TAS2557_MAX_DEV physical chips
+ * (see the ti,tas2557.yaml binding's `reg` array) -- mirroring TI's own
+ * tas2781/tas2563 grouped-device architecture instead of one node per
+ * chip.  The uCDSP firmware format only ever defines DEV_A/DEV_B block
+ * types (see the block type codes above); there is no third slot to
+ * extend into no matter how many entries a future DT `reg` array has.
+ */
+#define TAS2557_MAX_DEV	2
+
 /* Firmware driver version flags (driver_version field) */
 #define PPC_DRIVER_CRCCHK	0x00000200
 #define PPC_DRIVER_CONFDEV	0x00000300
