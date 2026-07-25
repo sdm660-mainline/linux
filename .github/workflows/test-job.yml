@@ -1,0 +1,35 @@
+name: Test container job
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - qcom-sdm660-6.*.y
+      - qcom-sdm660-7.*.y
+    tags:
+      - v*-sdm660
+  workflow_dispatch:
+jobs:
+  test-docker:
+    runs-on: [self-hosted, Linux, aarch64]
+    container:
+      image: minlexx/alpine-kbuilder:latest
+      env:
+        TEST_VAR: hello
+      volumes:
+        - /home/runner/_work/linux/linux:/mnt/linux
+    steps:
+      - name: Check for dockerenv file
+        run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
+      - name: Show off
+        run: |
+          fastfetch
+          gcc --version
+          clang --version
+          ld.lld --version
+          pahole --version
+      - name: Show env
+        run: env
+      - name: Check linux mount
+        run: ls -la --color /mnt/linux
+
