@@ -51,8 +51,7 @@ struct nt36672a_panel_desc {
 	enum mipi_dsi_pixel_format format;
 	unsigned int lanes;
 
-	void (*send_init_cmds_1)(struct mipi_dsi_multi_context *dsi_ctx);
-	void (*send_init_cmds_2)(struct mipi_dsi_multi_context *dsi_ctx);
+	void (*send_init_cmds)(struct mipi_dsi_multi_context *dsi_ctx);
 	void (*send_deinit_cmds)(struct mipi_dsi_multi_context *dsi_ctx);
 };
 
@@ -140,22 +139,9 @@ static int nt36672a_panel_prepare(struct drm_panel *panel)
 
 	dsi_ctx.accum_err = nt36672a_panel_power_on(pinfo);
 
-	/* send first part of init cmds */
-	if (pinfo->desc->send_init_cmds_1)
-		pinfo->desc->send_init_cmds_1(&dsi_ctx);
-
-	mipi_dsi_dcs_exit_sleep_mode_multi(&dsi_ctx);
-
-	/* 0x46 = 70 ms delay */
-	mipi_dsi_msleep(&dsi_ctx, 70);
-
-	mipi_dsi_dcs_set_display_on_multi(&dsi_ctx);
-
-	/* Send rest of the init cmds */
-	if (pinfo->desc->send_init_cmds_2)
-		pinfo->desc->send_init_cmds_2(&dsi_ctx);
-
-	mipi_dsi_msleep(&dsi_ctx, 120);
+	/* send init cmds */
+	if (pinfo->desc->send_init_cmds)
+		pinfo->desc->send_init_cmds(&dsi_ctx);
 
 	if (dsi_ctx.accum_err < 0)
 		gpiod_set_value(pinfo->reset_gpio, 0);
@@ -192,7 +178,7 @@ static const struct drm_panel_funcs panel_funcs = {
 	.get_modes = nt36672a_panel_get_modes,
 };
 
-static void tianma_fhd_video_send_init_cmds_1(struct mipi_dsi_multi_context *dsi_ctx)
+static void tianma_fhd_video_send_init_cmds(struct mipi_dsi_multi_context *dsi_ctx)
 {
 	u8 reg;
 
@@ -352,15 +338,19 @@ static void tianma_fhd_video_send_init_cmds_1(struct mipi_dsi_multi_context *dsi
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0x51, 0xff);
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0x53, 0x24);
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0x55, 0x00);
-}
 
-static void tianma_fhd_video_send_init_cmds_2(struct mipi_dsi_multi_context *dsi_ctx)
-{
+	mipi_dsi_dcs_exit_sleep_mode_multi(dsi_ctx);
+	/* 0x46 = 70 ms delay */
+	mipi_dsi_msleep(dsi_ctx, 70);
+	mipi_dsi_dcs_set_display_on_multi(dsi_ctx);
+
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0xff, 0x24);
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0xfb, 0x01);
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0xc3, 0x01);
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0xc4, 0x54);
 	mipi_dsi_dcs_write_seq_multi(dsi_ctx, 0xff, 0x10);
+
+	mipi_dsi_msleep(dsi_ctx, 120);
 }
 
 static void tianma_fhd_video_send_deinit_cmds(struct mipi_dsi_multi_context *dsi_ctx)
@@ -399,8 +389,7 @@ static const struct nt36672a_panel_desc tianma_fhd_video_panel_desc = {
 			| MIPI_DSI_MODE_VIDEO_BURST,
 	.format = MIPI_DSI_FMT_RGB888,
 	.lanes = 4,
-	.send_init_cmds_1 = tianma_fhd_video_send_init_cmds_1,
-	.send_init_cmds_2 = tianma_fhd_video_send_init_cmds_2,
+	.send_init_cmds = tianma_fhd_video_send_init_cmds,
 	.send_deinit_cmds = tianma_fhd_video_send_deinit_cmds,
 };
 
