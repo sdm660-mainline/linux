@@ -417,6 +417,8 @@ static int nt36672a_panel_add(struct nt36672a_panel *pinfo)
 	if (ret)
 		return dev_err_probe(dev, ret, "Failed to get backlight\n");
 
+	pinfo->base.prepare_prev_first = true;
+
 	drm_panel_add(&pinfo->base);
 
 	return 0;
