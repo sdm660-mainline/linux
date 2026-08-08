@@ -1475,8 +1475,6 @@ patternProperties:
     description: SGX Sensortech
   "^sharp,.*":
     description: Sharp Corporation
-  "^shenchao,.*":
-    description: Shenzhen Zhuohong Electronic Technology Co., Ltd.
   "^shift,.*":
     description: SHIFT GmbH
   "^shimafuji,.*":
