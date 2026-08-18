@@ -18,9 +18,15 @@
 #include "qcom_pmic_typec_pdphy.h"
 #include "qcom_pmic_typec_port.h"
 
+typedef int (*pmic_typec_port_probe_fn)(struct platform_device *pdev,
+					struct pmic_typec *tcpm,
+					const struct pmic_typec_port_resources *res,
+					struct regmap *regmap, u32 base);
+
 struct pmic_typec_resources {
 	const struct pmic_typec_pdphy_resources	*pdphy_res;
 	const struct pmic_typec_port_resources	*port_res;
+	pmic_typec_port_probe_fn			port_probe;
 };
 
 static int qcom_pmic_typec_init(struct tcpc_dev *tcpc)
@@ -60,8 +66,7 @@ static int qcom_pmic_typec_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = qcom_pmic_typec_port_probe(pdev, tcpm,
-					 res->port_res, regmap, base);
+	ret = res->port_probe(pdev, tcpm, res->port_res, regmap, base);
 	if (ret)
 		return ret;
 
@@ -137,11 +142,13 @@ static void qcom_pmic_typec_remove(struct platform_device *pdev)
 static const struct pmic_typec_resources pm8150b_typec_res = {
 	.pdphy_res = &pm8150b_pdphy_res,
 	.port_res = &pm8150b_port_res,
+	.port_probe = qcom_pmic_typec_port_probe,
 };
 
 static const struct pmic_typec_resources pmi632_typec_res = {
 	/* PD PHY not present */
 	.port_res = &pm8150b_port_res,
+	.port_probe = qcom_pmic_typec_port_probe,
 };
 
 static const struct of_device_id qcom_pmic_typec_table[] = {
