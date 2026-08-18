@@ -17,6 +17,7 @@
 #include "qcom_pmic_typec.h"
 #include "qcom_pmic_typec_pdphy.h"
 #include "qcom_pmic_typec_port.h"
+#include "qcom_pmic_typec_port_pm660.h"
 
 typedef int (*pmic_typec_port_probe_fn)(struct platform_device *pdev,
 					struct pmic_typec *tcpm,
@@ -151,7 +152,14 @@ static const struct pmic_typec_resources pmi632_typec_res = {
 	.port_probe = qcom_pmic_typec_port_probe,
 };
 
+static const struct pmic_typec_resources pm660_typec_res = {
+	.pdphy_res = &pm8150b_pdphy_res,
+	.port_res = &pm660_port_res,
+	.port_probe = qcom_pmic_typec_pm660_port_probe,
+};
+
 static const struct of_device_id qcom_pmic_typec_table[] = {
+	{ .compatible = "qcom,pm660-typec", .data = &pm660_typec_res },
 	{ .compatible = "qcom,pm8150b-typec", .data = &pm8150b_typec_res },
 	{ .compatible = "qcom,pmi632-typec", .data = &pmi632_typec_res },
 	{ }
