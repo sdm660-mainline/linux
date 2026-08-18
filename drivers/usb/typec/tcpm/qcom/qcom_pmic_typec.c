@@ -17,6 +17,7 @@
 #include "qcom_pmic_typec.h"
 #include "qcom_pmic_typec_pdphy.h"
 #include "qcom_pmic_typec_port.h"
+#include "qcom_pmic_typec_port_gen1.h"
 
 typedef int (*pmic_typec_port_probe_fn)(struct platform_device *pdev,
 					struct pmic_typec *tcpm,
@@ -139,6 +140,12 @@ static void qcom_pmic_typec_remove(struct platform_device *pdev)
 	fwnode_handle_put(tcpm->tcpc.fwnode);
 }
 
+static const struct pmic_typec_resources gen1_typec_res = {
+	.pdphy_res = &pm8150b_pdphy_res,
+	.port_res = &gen1_port_res,
+	.port_probe = qcom_pmic_typec_gen1_port_probe,
+};
+
 static const struct pmic_typec_resources pm8150b_typec_res = {
 	.pdphy_res = &pm8150b_pdphy_res,
 	.port_res = &pm8150b_port_res,
@@ -152,8 +159,10 @@ static const struct pmic_typec_resources pmi632_typec_res = {
 };
 
 static const struct of_device_id qcom_pmic_typec_table[] = {
+	{ .compatible = "qcom,pm660-typec", .data = &gen1_typec_res },
 	{ .compatible = "qcom,pm8150b-typec", .data = &pm8150b_typec_res },
 	{ .compatible = "qcom,pmi632-typec", .data = &pmi632_typec_res },
+	{ .compatible = "qcom,pmi8998-typec", .data = &gen1_typec_res },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, qcom_pmic_typec_table);
