@@ -40,6 +40,14 @@ properties:
 
   monitored-battery: true
 
+  vbus:
+    $ref: /schemas/regulator/regulator.yaml#
+    type: object
+    description:
+      Regulator providing VBUS when the charger operates in USB host mode.
+
+    unevaluatedProperties: false
+
 required:
   - compatible
   - reg
