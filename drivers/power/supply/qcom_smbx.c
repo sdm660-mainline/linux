@@ -9,6 +9,7 @@
  */
 
 #include <linux/bits.h>
+#include <linux/delay.h>
 #include <linux/devm-helpers.h>
 #include <linux/iio/consumer.h>
 #include <linux/interrupt.h>
@@ -20,6 +21,7 @@
 #include <linux/of.h>
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
+#include <linux/regulator/driver.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
 
@@ -112,6 +114,28 @@
 
 #define OTG_ENG_OTG_CFG					0x1C0
 #define ENG_BUCKBOOST_HALT1_8_MODE_BIT			BIT(0)
+
+#define OTG_STATUS					0x109
+#define BOOST_SOFTSTART_DONE_BIT			BIT(3)
+
+#define CMD_OTG						0x140
+#define OTG_EN_BIT					BIT(0)
+
+#define OTG_CURRENT_LIMIT_CFG				0x152
+#define OTG_CURRENT_LIMIT_MASK				GENMASK(2, 0)
+
+#define DC_ENG_SSUPPLY_CFG2				0x4C1
+#define ENG_SSUPPLY_IVREF_OTG_SS_MASK			GENMASK(2, 0)
+#define OTG_SS_SLOW					0x3
+
+#define OTG_CURRENT_MIN_UA				250000
+#define OTG_CURRENT_MAX_UA				2000000
+#define OTG_CURRENT_STEP_UA				250000
+#define OTG_CURRENT_DEFAULT_UA				1500000
+
+#define OTG_MAX_RETRIES					15
+#define OTG_MIN_DELAY_US				2000
+#define OTG_MAX_DELAY_US				9000
 
 #define APSD_STATUS					0x307
 #define APSD_STATUS_7_BIT				BIT(7)
@@ -547,6 +571,178 @@ static int smb_set_current_limit(struct smb_chip *chip, unsigned int val)
 			    val_raw);
 }
 
+
+static int smb_set_otg_current_limit(struct smb_chip *chip, unsigned int ua)
+{
+	unsigned int raw;
+
+	if (ua < OTG_CURRENT_MIN_UA || ua > OTG_CURRENT_MAX_UA ||
+	    (ua - OTG_CURRENT_MIN_UA) % OTG_CURRENT_STEP_UA)
+		return -EINVAL;
+
+	raw = (ua - OTG_CURRENT_MIN_UA) / OTG_CURRENT_STEP_UA;
+
+	return regmap_update_bits(chip->regmap,
+				  chip->base + OTG_CURRENT_LIMIT_CFG,
+				  OTG_CURRENT_LIMIT_MASK, raw);
+}
+
+static int smb_enable_otg_wa(struct smb_chip *chip)
+{
+	static const unsigned int startup_current_ua[] = {
+		250000, 500000, 1000000, 1500000,
+	};
+	unsigned int status, delay;
+	int ret, i, retry;
+
+	for (i = 0; i < ARRAY_SIZE(startup_current_ua); i++) {
+		ret = smb_set_otg_current_limit(chip, startup_current_ua[i]);
+		if (ret)
+			return ret;
+
+		ret = regmap_write(chip->regmap, chip->base + CMD_OTG, OTG_EN_BIT);
+		if (ret)
+			return ret;
+
+		for (retry = 0; retry < OTG_MAX_RETRIES; retry++) {
+			delay = retry > 5 ? OTG_MAX_DELAY_US : OTG_MIN_DELAY_US;
+			usleep_range(delay, delay + 100);
+
+			ret = regmap_read(chip->regmap, chip->base + OTG_STATUS,
+					  &status);
+			if (ret)
+				goto disable_otg;
+
+			if (status & BOOST_SOFTSTART_DONE_BIT)
+				return smb_set_otg_current_limit(
+						chip, OTG_CURRENT_DEFAULT_UA);
+		}
+
+		ret = regmap_write(chip->regmap, chip->base + CMD_OTG, 0);
+		if (ret)
+			return ret;
+	}
+
+	return -ETIMEDOUT;
+
+disable_otg:
+	regmap_write(chip->regmap, chip->base + CMD_OTG, 0);
+	return ret;
+}
+
+static int smb_vbus_enable(struct regulator_dev *rdev)
+{
+	struct smb_chip *chip = rdev_get_drvdata(rdev);
+	int ret;
+
+	ret = regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
+				 USBIN_SUSPEND_BIT, USBIN_SUSPEND_BIT);
+	if (ret)
+		return ret;
+
+	ret = regmap_update_bits(chip->regmap,
+				 chip->base + OTG_ENG_OTG_CFG,
+				 ENG_BUCKBOOST_HALT1_8_MODE_BIT,
+				 ENG_BUCKBOOST_HALT1_8_MODE_BIT);
+	if (ret)
+		goto resume_usbin;
+
+	ret = smb_enable_otg_wa(chip);
+	if (ret)
+		goto restore_halt_mode;
+
+	return 0;
+
+restore_halt_mode:
+	regmap_update_bits(chip->regmap, chip->base + OTG_ENG_OTG_CFG,
+			   ENG_BUCKBOOST_HALT1_8_MODE_BIT, 0);
+resume_usbin:
+	regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
+			   USBIN_SUSPEND_BIT, 0);
+
+	return ret;
+}
+
+static int smb_vbus_disable(struct regulator_dev *rdev)
+{
+	struct smb_chip *chip = rdev_get_drvdata(rdev);
+	int ret, rc;
+
+	ret = smb_set_otg_current_limit(chip, OTG_CURRENT_MIN_UA);
+
+	rc = regmap_write(chip->regmap, chip->base + CMD_OTG, 0);
+	if (!ret && rc)
+		ret = rc;
+
+	rc = regmap_update_bits(chip->regmap, chip->base + OTG_ENG_OTG_CFG,
+				 ENG_BUCKBOOST_HALT1_8_MODE_BIT, 0);
+	if (!ret && rc)
+		ret = rc;
+
+	rc = regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
+				 USBIN_SUSPEND_BIT, 0);
+	if (!ret && rc)
+		ret = rc;
+
+	return ret;
+}
+
+static int smb_vbus_is_enabled(struct regulator_dev *rdev)
+{
+	struct smb_chip *chip = rdev_get_drvdata(rdev);
+	unsigned int val;
+	int ret;
+
+	ret = regmap_read(chip->regmap, chip->base + CMD_OTG, &val);
+	if (ret)
+		return ret;
+
+	return !!(val & OTG_EN_BIT);
+}
+
+static const struct regulator_ops smb_vbus_reg_ops = {
+	.enable = smb_vbus_enable,
+	.disable = smb_vbus_disable,
+	.is_enabled = smb_vbus_is_enabled,
+};
+
+static const struct regulator_desc smb_vbus_reg_desc = {
+	.owner = THIS_MODULE,
+	.type = REGULATOR_VOLTAGE,
+	.ops = &smb_vbus_reg_ops,
+	.of_match = "vbus",
+	.name = "qcom,smb2-vbus",
+	.fixed_uV = 5000000,
+	.n_voltages = 1,
+};
+
+static int smb_register_vbus_regulator(struct smb_chip *chip)
+{
+	struct regulator_config config = {};
+	struct regulator_dev *rdev;
+	int ret;
+
+	ret = regmap_update_bits(chip->regmap, chip->base + DC_ENG_SSUPPLY_CFG2,
+				 ENG_SSUPPLY_IVREF_OTG_SS_MASK, OTG_SS_SLOW);
+	if (ret)
+		return ret;
+
+	ret = smb_set_otg_current_limit(chip, OTG_CURRENT_MIN_UA);
+	if (ret)
+		return ret;
+
+	config.dev = chip->dev;
+	config.driver_data = chip;
+	config.regmap = chip->regmap;
+
+	rdev = devm_regulator_register(chip->dev, &smb_vbus_reg_desc, &config);
+	if (IS_ERR(rdev))
+		return dev_err_probe(chip->dev, PTR_ERR(rdev),
+				     "failed to register VBUS regulator\n");
+
+	return 0;
+}
+
 static void smb_status_change_work(struct work_struct *work)
 {
 	unsigned int charger_type, current_ua;
@@ -961,6 +1157,21 @@ static int smb_probe(struct platform_device *pdev)
 	rc = smb_init_hw(chip);
 	if (rc < 0)
 		return rc;
+
+
+	if (of_device_is_compatible(chip->dev->of_node, "qcom,pm660-charger")) {
+		struct device_node *vbus_node;
+
+		vbus_node = of_get_child_by_name(chip->dev->of_node,
+						 "vbus");
+		if (vbus_node) {
+			of_node_put(vbus_node);
+
+			rc = smb_register_vbus_regulator(chip);
+			if (rc < 0)
+				return rc;
+		}
+	}
 
 	supply_config.drv_data = chip;
 	supply_config.fwnode = dev_fwnode(&pdev->dev);
