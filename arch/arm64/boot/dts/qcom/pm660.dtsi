@@ -9,6 +9,7 @@
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/spmi/spmi.h>
 #include <dt-bindings/thermal/thermal.h>
+#include <dt-bindings/usb/pd.h>
 
 / {
 	thermal-zones {
@@ -89,6 +90,67 @@
 			io-channel-names = "usbin_i", "usbin_v";
 
 			status = "disabled";
+
+			/* power supplier for USB host */
+			pm660_vbus_vreg: vbus {
+				regulator-name = "pm660-vbus";
+				regulator-min-microvolt = <5000000>;
+				regulator-max-microvolt = <5000000>;
+
+				status = "disabled";
+			};
+		};
+
+		pm660_typec: typec@1300 {
+			compatible = "qcom,pm660-typec";
+			reg = <0x1300>, <0x1700>;
+
+			interrupts = <0x0 0x13 0x7 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x0 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x1 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x2 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x3 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x4 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x5 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x6 IRQ_TYPE_EDGE_RISING>;
+
+			interrupt-names = "type-c-change",
+					  "sig-tx",
+					  "sig-rx",
+					  "msg-tx",
+					  "msg-rx",
+					  "msg-tx-failed",
+					  "msg-tx-discarded",
+					  "msg-rx-discarded";
+
+			status = "disabled";
+
+			connector {
+				compatible = "usb-c-connector";
+				label = "USB-C";
+
+				power-role = "dual";
+				data-role = "dual";
+				try-power-role = "sink";
+
+				vbus-supply = <&pm660_vbus_vreg>;
+
+				source-pdos = <PDO_FIXED(5000, 900,
+					       PDO_FIXED_DUAL_ROLE |
+					       PDO_FIXED_USB_COMM |
+					       PDO_FIXED_DATA_SWAP)>;
+
+				sink-pdos = <PDO_FIXED(5000, 3000,
+					     PDO_FIXED_DUAL_ROLE |
+					     PDO_FIXED_USB_COMM |
+					     PDO_FIXED_DATA_SWAP)
+					     PDO_FIXED(9000, 3000,
+					     PDO_FIXED_DUAL_ROLE |
+					     PDO_FIXED_USB_COMM |
+					     PDO_FIXED_DATA_SWAP)>;
+
+				op-sink-microwatt = <2500000>;
+			};
 		};
 
 		pm660_temp: temp-alarm@2400 {
