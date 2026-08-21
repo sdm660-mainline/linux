@@ -62,6 +62,7 @@ struct himax_ts_data;
 struct himax_chip {
 	u32 id;
 	int (*check_id)(struct himax_ts_data *ts);
+	int (*init)(struct himax_ts_data *ts);
 	int (*read_events)(struct himax_ts_data *ts, struct himax_event *event,
 			   size_t length);
 };
@@ -364,6 +365,12 @@ static int himax_probe(struct i2c_client *client)
 			return error;
 	}
 
+	if (ts->chip->init) {
+		error = ts->chip->init(ts);
+		if (error)
+			return error;
+	}
+
 	error = himax_input_register(ts);
 	if (error)
 		return error;
@@ -395,8 +402,45 @@ static int himax_resume(struct device *dev)
 
 static DEFINE_SIMPLE_DEV_PM_OPS(himax_pm_ops, himax_suspend, himax_resume);
 
+static int hx83112a_init(struct himax_ts_data *ts)
+{
+	int error;
+	u32 buf[2];
+
+	/*
+	 * By default, the chip boots into safe mode. We clear the FW ISR
+	 * register and perform a second hardware reset to boot normally.
+	 */
+	buf[0] = 0x9000005c;
+	buf[1] = 0x00000000;
+	error = regmap_bulk_write(ts->regmap, HIMAX_AHB_ADDR_BYTE_0, buf, 2);
+	if (error)
+		return error;
+
+	himax_reset(ts);
+
+	/* Give the MCU time to reload firmware */
+	msleep(100);
+
+	/* Enable the touch algorithm */
+	buf[0] = 0x1000748c;
+	buf[1] = 0xa55aa55a;
+	error = regmap_bulk_write(ts->regmap, HIMAX_AHB_ADDR_BYTE_0, buf, 2);
+	if (error)
+		return error;
+
+	return 0;
+}
+
 static const struct himax_chip hx83100a_chip = {
 	.read_events = hx83100a_read_events,
+};
+
+static const struct himax_chip hx83112a_chip = {
+	.id = 0x83112a,
+	.check_id = himax_check_product_id,
+	.init = hx83112a_init,
+	.read_events = himax_read_events,
 };
 
 static const struct himax_chip hx83112b_chip = {
@@ -407,6 +451,7 @@ static const struct himax_chip hx83112b_chip = {
 
 static const struct i2c_device_id himax_ts_id[] = {
 	{ .name = "hx83100a", .driver_data = (kernel_ulong_t)&hx83100a_chip },
+	{ .name = "hx83112a", .driver_data = (kernel_ulong_t)&hx83112a_chip },
 	{ .name = "hx83112b", .driver_data = (kernel_ulong_t)&hx83112b_chip },
 	{ /* sentinel */ }
 };
@@ -415,6 +460,7 @@ MODULE_DEVICE_TABLE(i2c, himax_ts_id);
 #ifdef CONFIG_OF
 static const struct of_device_id himax_of_match[] = {
 	{ .compatible = "himax,hx83100a", .data = &hx83100a_chip },
+	{ .compatible = "himax,hx83112a", .data = &hx83112a_chip },
 	{ .compatible = "himax,hx83112b", .data = &hx83112b_chip },
 	{ /* sentinel */ }
 };
