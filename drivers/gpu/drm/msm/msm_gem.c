@@ -63,6 +63,7 @@ static void put_iova_spaces(struct drm_gem_object *obj, struct drm_gpuvm *vm,
 
 static void msm_gem_close(struct drm_gem_object *obj, struct drm_file *file)
 {
+	struct msm_drm_private *priv = obj->dev->dev_private;
 	struct msm_context *ctx = file->driver_priv;
 
 	update_ctx_mem(file, -obj->size);
@@ -84,6 +85,10 @@ static void msm_gem_close(struct drm_gem_object *obj, struct drm_file *file)
 	if (msm_context_is_vmbind(ctx))
 		return;
 
+	/* A global VM's VMAs are torn down by the @vma_ref drop above */
+	if (priv->gpu && ctx->vm == priv->gpu->vm)
+		return;
+
 	/*
 	 * TODO we might need to kick this to a queue to avoid blocking
 	 * in CLOSE ioctl
@@ -95,7 +100,7 @@ static void msm_gem_close(struct drm_gem_object *obj, struct drm_file *file)
 }
 
 /*
- * Get/put for kms->vm VMA
+ * Get/put for VMAs in VMs shared between contexts: kms->vm, gpu->vm
  */
 
 void msm_gem_vma_get(struct drm_gem_object *obj)
@@ -109,6 +114,12 @@ void msm_gem_vma_put(struct drm_gem_object *obj)
 
 	if (atomic_dec_return(&to_msm_bo(obj)->vma_ref))
 		return;
+
+	if (priv->gpu && priv->gpu->vm_shared) {
+		dma_resv_wait_timeout(obj->resv, DMA_RESV_USAGE_BOOKKEEP, false,
+				      MAX_SCHEDULE_TIMEOUT);
+		put_iova_spaces(obj, priv->gpu->vm, true, "vma_put");
+	}
 
 	if (!priv->kms)
 		return;
