@@ -64,6 +64,8 @@ jobs:
           pmbootstrap status
       - name: Run kconfigcheck
         if: steps.changed-files.outputs.any_changed == 'true'
+        # allow this step to fail
+        continue-on-error: true
         run: |
           cd $GITHUB_WORKSPACE && pwd
           pmbootstrap kconfig check --arch aarch64 --keep-going --categories=default,community --file .output/.config

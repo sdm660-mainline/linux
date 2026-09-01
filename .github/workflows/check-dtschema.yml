@@ -43,6 +43,12 @@ jobs:
           . venv_dtschema/bin/activate
           pip3 install dtschema yamllint
           deactivate
+      - name: Print dtschema version
+        run: |
+          . venv_dtschema/bin/activate
+          echo "dtschema version: "
+          dt-doc-validate --version
+          deactivate
       - name: Check DTBs
         run: |
           . venv_dtschema/bin/activate
