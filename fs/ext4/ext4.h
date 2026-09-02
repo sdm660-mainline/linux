@@ -3542,16 +3542,12 @@ static inline void ext4_isize_set(struct ext4_inode *raw_inode, loff_t i_size)
 }
 
 /*
- * Reading s_groups_count requires using smp_rmb() afterwards.  See
- * the locking protocol documented in the comments of ext4_group_add()
- * in resize.c
+ * Reading s_groups_count uses acquire semantics.
  */
 static inline ext4_group_t ext4_get_groups_count(struct super_block *sb)
 {
-	ext4_group_t	ngroups = EXT4_SB(sb)->s_groups_count;
-
-	smp_rmb();
-	return ngroups;
+	/* Pairs with smp_store_release() in ext4_update_super() */
+	return smp_load_acquire(&EXT4_SB(sb)->s_groups_count);
 }
 
 static inline ext4_group_t ext4_flex_group(struct ext4_sb_info *sbi,
