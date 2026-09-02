@@ -122,14 +122,6 @@
 			no-map;
 		};
 	};
-	/*
-	 * Until we hook up type-c detection, we
-	 * have to stick with this. But it works.
-	 */
-	extcon_usb: extcon-usb {
-		compatible = "linux,extcon-usb-gpio";
-		id-gpios = <&tlmm 58 GPIO_ACTIVE_HIGH>;
-	};
 };
 
 &adreno_gpu {
@@ -228,6 +220,24 @@
 };
 
 &pm660_rradc {
+	status = "okay";
+};
+
+&pm660_typec {
+	vdd-pdphy-supply = <&vreg_l7b_3p125>; /* already used by qusb2phy0 as vdda-phy-dpdm-supply */
+
+	status = "okay";
+
+	connector {
+		port {
+			pm660_typec_hs_in: endpoint {
+				remote-endpoint = <&usb_dwc3_hs_out>;
+			};
+		};
+	};
+};
+
+&pm660_vbus_vreg {
 	status = "okay";
 };
 
@@ -709,8 +719,14 @@
 	phys = <&qusb2phy0>;
 	phy-names = "usb2-phy";
 
-	dr_mode = "peripheral";
-	extcon = <&extcon_usb>;
+	dr_mode = "otg";
+	usb-role-switch;
+
+	port {
+		usb_dwc3_hs_out: endpoint {
+			remote-endpoint = <&pm660_typec_hs_in>;
+		};
+	};
 };
 
 &venus {
