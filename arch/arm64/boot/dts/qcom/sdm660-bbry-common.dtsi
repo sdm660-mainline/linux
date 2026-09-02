@@ -340,6 +340,95 @@
 		};
 	};
 };
+&blsp_i2c2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	leds@30 {
+		compatible = "qcom,leds-smg31323";
+		reg = <0x30>;
+		vdd-supply = <&vreg_bob>;
+
+		keyboard_backlight: keyboard-backlight {
+			linux,name = "keyboard-backlight";
+			led,mask = /bits/ 8 <0x15>;
+			led,max_brightness = <0xFF>;
+		};
+
+		keyboard_backlight_1: keyboard-backlight_1 {
+			linux,name = "keyboard-backlight_1";
+			led,mask = /bits/ 8 <0x01>;
+			led,max_brightness = <0xFF>;
+		};
+
+		keyboard_backlight_2: keyboard-backlight_2 {
+			linux,name = "keyboard-backlight_2";
+			led,mask = /bits/ 8 <0x04>;
+			led,max_brightness = <0xFF>;
+		};
+
+		keyboard_backlight_3: keyboard-backlight_3 {
+			linux,name = "keyboard-backlight_3";
+			led,mask = /bits/ 8 <0x10>;
+			led,max_brightness = <0xFF>;
+		};
+	};
+
+	aw2027@64 {
+		compatible = "awinic,aw2027_led";
+		reg = <0x64>;
+		vdd-supply = <&vreg_bob>;
+
+		aw2027,rgb {
+			aw2027,name = "keyboard-backlight";
+			aw2027,id = <7>;
+			aw2027,imax = <2>;
+			aw2027,led-current = <0xf>;
+			aw2027,max-brightness = <255>;
+			aw2027,rise-time-ms = <6>;
+			aw2027,hold-time-ms = <0>;
+			aw2027,fall-time-ms = <6>;
+			aw2027,off-time-ms = <4>;
+		};
+
+		aw2027,red {
+			aw2027,name = "keyboard-backlight_1";
+			aw2027,id = <1>;
+			aw2027,imax = <2>;
+			aw2027,led-current = <0xf>;
+			aw2027,max-brightness = <255>;
+			aw2027,rise-time-ms = <6>;
+			aw2027,hold-time-ms = <0>;
+			aw2027,fall-time-ms = <6>;
+			aw2027,off-time-ms = <4>;
+		};
+
+		aw2027,green {
+			aw2027,name = "keyboard-backlight_2";
+			aw2027,id = <2>;
+			aw2027,imax = <2>;
+			aw2027,led-current = <0xf>;
+			aw2027,max-brightness = <255>;
+			aw2027,rise-time-ms = <6>;
+			aw2027,hold-time-ms = <0>;
+			aw2027,fall-time-ms = <6>;
+			aw2027,off-time-ms = <4>;
+		};
+
+		aw2027,blue {
+			aw2027,name = "keyboard-backlight_3";
+			aw2027,id = <4>;
+			aw2027,imax = <2>;
+			aw2027,led-current = <0xf>;
+			aw2027,max-brightness = <255>;
+			aw2027,rise-time-ms = <6>;
+			aw2027,hold-time-ms = <0>;
+			aw2027,fall-time-ms = <6>;
+			aw2027,off-time-ms = <4>;
+		};
+	};
+};
 
 &blsp_i2c4 {
 	#address-cells = <1>;
