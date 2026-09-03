@@ -809,14 +809,23 @@ found:
 	 * Note that if blocks have been preallocated
 	 * ext4_ext_map_blocks() returns with buffer head unmapped
 	 */
-	if (retval > 0 && map->m_flags & EXT4_MAP_MAPPED)
+	if (retval > 0) {
 		/*
-		 * If we need to convert extent to unwritten
-		 * we continue and do the actual work in
-		 * ext4_ext_map_blocks()
+		 * If we need to convert written extent to unwritten or
+		 * convert unwritten extent to written, continue and do
+		 * the actual work in ext4_ext_map_blocks().
 		 */
-		if (!(flags & EXT4_GET_BLOCKS_CONVERT_UNWRITTEN))
+		if (map->m_flags & EXT4_MAP_MAPPED &&
+		    !(flags & EXT4_GET_BLOCKS_CONVERT_UNWRITTEN))
 			goto out_handle;
+		if (map->m_flags & EXT4_MAP_UNWRITTEN &&
+		    (flags & EXT4_GET_BLOCKS_UNWRIT_EXT) &&
+		    !(flags & EXT4_GET_BLOCKS_CONVERT)) {
+			/* Contains EXT4_GET_BLOCKS_CREATE - mark mapped. */
+			map->m_flags |= EXT4_MAP_MAPPED;
+			goto out_handle;
+		}
+	}
 
 	if (!handle) {
 		handle = ext4_journal_start(inode, EXT4_HT_MAP_BLOCKS,
