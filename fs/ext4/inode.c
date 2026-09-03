@@ -825,6 +825,13 @@ found:
 			map->m_flags |= EXT4_MAP_MAPPED;
 			goto out_handle;
 		}
+	} else if (retval == 0) {
+		/*
+		 * Do not allocate blocks for holes in the context of
+		 * data submission path.
+		 */
+		if (!map->m_flags && (flags & EXT4_GET_BLOCKS_IO_SUBMIT))
+			goto out_handle;
 	}
 
 	if (!handle) {
