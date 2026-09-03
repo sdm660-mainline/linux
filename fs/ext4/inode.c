@@ -4241,9 +4241,22 @@ int ext4_block_zero_eof(struct inode *inode, loff_t from, loff_t end)
 	 * truncating up or performing an append write, because there might be
 	 * exposing stale on-disk data which may caused by concurrent post-EOF
 	 * mmap write during folio writeback.
+	 *
+	 * Ordered I/O is required only when zeroing the tail of a block that
+	 * overlaps with i_disksize. If the zeroed range falls outside that
+	 * block, the zeroed data lies beyond the existing on-disk data. It
+	 * will be written out before i_disksize is later extended past
+	 * i_size, so no stale data can be exposed.
+	 *
+	 * Note that it's safe to read i_disksize without holding i_data_sem
+	 * here. Since we already hold i_rwsem, the only possible race is with
+	 * concurrent writeback that updates i_disksize. And if such a race
+	 * occurs, it means the previous unaligned EOF block has already been
+	 * zeroed (if needed) and persisted to disk.
 	 */
 	if (ext4_should_order_data(inode) &&
-	    did_zero && zero_written && !IS_DAX(inode)) {
+	    did_zero && zero_written && !IS_DAX(inode) &&
+	    from < round_up(READ_ONCE(EXT4_I(inode)->i_disksize), blocksize)) {
 		handle_t *handle;
 
 		handle = ext4_journal_start(inode, EXT4_HT_MISC, 1);
