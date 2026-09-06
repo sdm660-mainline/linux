@@ -459,6 +459,9 @@
 };
 
 &pm660_haptics {
+	qcom,actuator-type = <1>;
+	qcom,wave-play-rate-us = <5263>;
+
 	status = "okay";
 };
 

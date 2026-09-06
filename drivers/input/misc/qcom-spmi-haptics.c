@@ -813,11 +813,10 @@ static int spmi_haptics_probe(struct platform_device *pdev)
 		goto register_fail;
 	}
 
-	// We only support LRAs for now
 	haptics->actuator_type = HAP_TYPE_LRA;
 	ret = of_property_read_u32(node, "qcom,actuator-type", &val);
 	if (!ret) {
-		if (val != HAP_TYPE_LRA) {
+		if (val != HAP_TYPE_LRA && val != HAP_TYPE_ERM) {
 			dev_err(&pdev->dev, "qcom,actuator-type (%d) isn't supported\n", val);
 			ret = -EINVAL;
 			goto register_fail;
