@@ -11,6 +11,7 @@
 #include "pm660l.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
+#include <dt-bindings/input/qcom,spmi-haptics.h>
 #include <dt-bindings/leds/common.h>
 
 /delete-node/ &adsp_region;
@@ -459,6 +460,9 @@
 };
 
 &pm660_haptics {
+	qcom,actuator-type = <HAP_TYPE_ERM>;
+	qcom,wave-play-rate-us = <5263>;
+
 	status = "okay";
 };
 
