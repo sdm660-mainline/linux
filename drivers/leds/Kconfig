@@ -137,16 +137,16 @@ config LEDS_AW200XX
 	  To compile this driver as a module, choose M here: the module
 	  will be called leds-aw200xx.
 
-config LEDS_AW2013
-	tristate "LED support for Awinic AW2013"
+config LEDS_AW20XX
+	tristate "LED support for Awinic AW2013/AW2027"
 	depends on LEDS_CLASS && I2C && OF
 	select REGMAP_I2C
 	help
-	  This option enables support for the AW2013 3-channel
-	  LED driver.
+	  This option enables support for the AW20XX 3-channel
+	  LED drivers.
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called leds-aw2013.
+	  will be called leds-aw20xx.
 
 config LEDS_BCM6328
 	tristate "LED Support for Broadcom BCM6328"
