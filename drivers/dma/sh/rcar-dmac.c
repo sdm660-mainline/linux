@@ -2013,6 +2013,11 @@ static const struct rcar_dmac_of_data rcar_gen4_dmac_data = {
 	.broken_ipmmu_microTLB0 = 1,
 };
 
+static const struct rcar_dmac_of_data rcar_gen5_dmac_data = {
+	.chan_offset_base = 0x0,
+	.chan_offset_stride = 0x1000,
+};
+
 static const struct of_device_id rcar_dmac_of_ids[] = {
 	{
 		.compatible = "renesas,rcar-dmac",
@@ -2020,6 +2025,9 @@ static const struct of_device_id rcar_dmac_of_ids[] = {
 	}, {
 		.compatible = "renesas,rcar-gen4-dmac",
 		.data = &rcar_gen4_dmac_data,
+	}, {
+		.compatible = "renesas,rcar-gen5-dmac",
+		.data = &rcar_gen5_dmac_data,
 	}, {
 		/*
 		 * Backward compatibility for between v5.12 - v5.19
@@ -2045,6 +2053,6 @@ static struct platform_driver rcar_dmac_driver = {
 
 module_platform_driver(rcar_dmac_driver);
 
-MODULE_DESCRIPTION("R-Car Gen2 DMA Controller Driver");
+MODULE_DESCRIPTION("R-Car DMA Controller Driver");
 MODULE_AUTHOR("Laurent Pinchart <laurent.pinchart@ideasonboard.com>");
 MODULE_LICENSE("GPL v2");
