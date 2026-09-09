@@ -1998,13 +1998,13 @@ static void rcar_dmac_shutdown(struct platform_device *pdev)
 }
 
 static const struct rcar_dmac_of_data rcar_dmac_data = {
-	.chan_offset_base	= 0x8000,
-	.chan_offset_stride	= 0x80,
+	.chan_offset_base = 0x8000,
+	.chan_offset_stride = 0x80,
 };
 
 static const struct rcar_dmac_of_data rcar_gen4_dmac_data = {
-	.chan_offset_base	= 0x0,
-	.chan_offset_stride	= 0x1000,
+	.chan_offset_base = 0x0,
+	.chan_offset_stride = 0x1000,
 };
 
 static const struct of_device_id rcar_dmac_of_ids[] = {
