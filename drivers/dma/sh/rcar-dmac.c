@@ -219,10 +219,12 @@ struct rcar_dmac {
  * struct rcar_dmac_of_data - This driver's OF data
  * @chan_offset_base: DMAC channels base offset
  * @chan_offset_stride: DMAC channels offset stride
+ * @broken_ipmmu_microTLB0: flag if the connected IPMMU has microTLB0 issues
  */
 struct rcar_dmac_of_data {
 	u32 chan_offset_base;
 	u32 chan_offset_stride;
+	unsigned int broken_ipmmu_microTLB0:1;
 };
 
 /* -----------------------------------------------------------------------------
@@ -1877,8 +1879,9 @@ static int rcar_dmac_probe(struct platform_device *pdev)
 	 * can't use it with the IPMMU. As the IOMMU API operates at the device
 	 * level we can't disable it selectively, so ignore channel 0 for now if
 	 * the device is part of an IOMMU group.
+	 * Not applicable if system uses something else than IPMMU like SMMU.
 	 */
-	if (device_iommu_mapped(&pdev->dev))
+	if (data->broken_ipmmu_microTLB0 && device_iommu_mapped(&pdev->dev))
 		dmac->channels_mask &= ~BIT(0);
 
 	dmac->channels = devm_kcalloc(&pdev->dev, dmac->n_channels,
@@ -2000,11 +2003,14 @@ static void rcar_dmac_shutdown(struct platform_device *pdev)
 static const struct rcar_dmac_of_data rcar_dmac_data = {
 	.chan_offset_base = 0x8000,
 	.chan_offset_stride = 0x80,
+	.broken_ipmmu_microTLB0 = 1,
 };
 
 static const struct rcar_dmac_of_data rcar_gen4_dmac_data = {
 	.chan_offset_base = 0x0,
 	.chan_offset_stride = 0x1000,
+	/* Set to play safe. Needs testing if Gen4 is really affected */
+	.broken_ipmmu_microTLB0 = 1,
 };
 
 static const struct of_device_id rcar_dmac_of_ids[] = {
