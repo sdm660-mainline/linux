@@ -1310,6 +1310,21 @@ config TOUCHSCREEN_SX8654
 	  To compile this driver as a module, choose M here: the
 	  module will be called sx8654.
 
+config TOUCHSCREEN_SYNAPTICS_TCM_I2C
+	tristate "Synaptics TouchComm I2C touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have a Synaptics TouchComm (TCM) touch controller
+	  attached over I2C, such as the S3908 found in the OnePlus 9RT.
+
+	  Only controllers that boot into application mode out of their own
+	  flash are supported; there is no host firmware download.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called synaptics_tcm_i2c.
+
 config TOUCHSCREEN_TPS6507X
 	tristate "TPS6507x based touchscreens"
 	depends on I2C

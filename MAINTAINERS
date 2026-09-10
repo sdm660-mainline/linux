@@ -26145,6 +26145,13 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/regulator/silergy,sy8106a.yaml
 F:	drivers/regulator/sy8106a-regulator.c
 
+SYNAPTICS TOUCHCOMM I2C TOUCHSCREEN DRIVER
+M:	Vsevolod Nevorotov <sevanevorotov29@gmail.com>
+L:	linux-input@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/input/touchscreen/syna,s3908.yaml
+F:	drivers/input/touchscreen/synaptics_tcm_i2c.c
+
 SYNC FILE FRAMEWORK
 M:	Sumit Semwal <sumit.semwal@linaro.org>
 L:	linux-media@vger.kernel.org
