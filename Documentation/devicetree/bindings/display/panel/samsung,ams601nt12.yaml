@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/panel/samsung,ams601nt12.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Truly TD4322 MIPI-DSI panels
+
+maintainers:
+  - Alexey Minnekhanov <alexeymin@minlexx.ru>
+
+description:
+  Samsung AMS601NT12 6.01" 1080x2160 command mode LCD panel found in
+  Motorola Moto Z3 Play smartphone.
+
+allOf:
+  - $ref: panel-common.yaml#
+
+properties:
+  compatible:
+    items:
+      - const: samsung,ams601nt12
+
+  reg:
+    maxItems: 1
+
+  iovcc-supply:
+    description: I/O voltage rail
+
+  vsn-supply:
+    description: Negative source voltage rail
+
+  vsp-supply:
+    description: Positive source voltage rail
+
+required:
+  - compatible
+  - reg
+  - reset-gpios
+  - port
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    dsi {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        panel@0 {
+            compatible = "samsung,ams601nt12";
+            reg = <0>;
+            backlight = <&backlight>;
+            reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+
+            port {
+                panel_in: endpoint {
+                    remote-endpoint = <&dsi_out>;
+                };
+            };
+        };
+    };
+
+...
