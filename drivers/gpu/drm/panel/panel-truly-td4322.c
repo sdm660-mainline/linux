@@ -6,6 +6,7 @@
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
+#include <linux/regulator/consumer.h>
 #include <linux/of.h>
 
 #include <drm/drm_mipi_dsi.h>
@@ -16,7 +17,14 @@
 struct truly_td4322 {
 	struct drm_panel panel;
 	struct mipi_dsi_device *dsi;
+	struct regulator_bulk_data *supplies;
 	struct gpio_desc *reset_gpio;
+};
+
+static const struct regulator_bulk_data truly_td4322_supplies[] = {
+	{ .supply = "iovcc" },
+	{ .supply = "vsn" },
+	{ .supply = "vsp" },
 };
 
 static inline struct truly_td4322 *to_truly_td4322(struct drm_panel *panel)
@@ -72,12 +80,19 @@ static int truly_td4322_prepare(struct drm_panel *panel)
 	struct device *dev = &ctx->dsi->dev;
 	int ret;
 
+	ret = regulator_bulk_enable(ARRAY_SIZE(truly_td4322_supplies), ctx->supplies);
+	if (ret < 0) {
+		dev_err(dev, "Failed to enable regulators: %d\n", ret);
+		return ret;
+	}
+
 	truly_td4322_reset(ctx);
 
 	ret = truly_td4322_on(ctx);
 	if (ret < 0) {
 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
 		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+		regulator_bulk_disable(ARRAY_SIZE(truly_td4322_supplies), ctx->supplies);
 		return ret;
 	}
 
@@ -95,6 +110,7 @@ static int truly_td4322_unprepare(struct drm_panel *panel)
 		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
 
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+	regulator_bulk_disable(ARRAY_SIZE(truly_td4322_supplies), ctx->supplies);
 
 	return 0;
 }
@@ -137,6 +153,13 @@ static int truly_td4322_probe(struct mipi_dsi_device *dsi)
 				   DRM_MODE_CONNECTOR_DSI);
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
+
+	ret = devm_regulator_bulk_get_const(dev,
+					    ARRAY_SIZE(truly_td4322_supplies),
+					    truly_td4322_supplies,
+					    &ctx->supplies);
+	if (ret < 0)
+		return ret;
 
 	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio))
