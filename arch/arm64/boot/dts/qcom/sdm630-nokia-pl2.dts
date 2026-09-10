@@ -150,7 +150,8 @@
 			linux,phandle = <0x134>;
 		};
 
-// [    8.747408] subsys-pil-tz soc:qcom,kgsl-hyp: a508_zap: loading from 0x00000000fd200000 to 0x00000000fd202000
+		/* subsys-pil-tz soc:qcom,kgsl-hyp: a508_zap:
+		 * loading from 0x00000000fd200000 to 0x00000000fd202000 */
 		zap_shader_region: gpu@fd200000 {
 			compatible = "shared-dma-pool";
 			reg = <0x0 0xfd200000 0x0 0x2000>;
@@ -200,10 +201,10 @@
 
 	/* HCI Bluetooth */
 	bluetooth {
-		compatible = "qcom,wcn3990-bt"; // common for all QCOM
-		vddxo-supply = <&vreg_l9a_1p8>; // downstream: vdd-core-supply
-		vddrf-supply = <&vreg_l6a_1p3>; // vdd-pa-supply
-		vddch0-supply = <&vreg_l19a_3p3>; // vdd-ldo-supply
+		compatible = "qcom,wcn3990-bt";
+		vddxo-supply = <&vreg_l9a_1p8>;
+		vddrf-supply = <&vreg_l6a_1p3>;
+		vddch0-supply = <&vreg_l19a_3p3>;
 		vddio-supply = <&vreg_l13a_1p8>;
 		max-speed = <3200000>;
 	};
@@ -238,10 +239,6 @@
 	status = "okay";
 };
 
-//&camss {
-//	status = "okay";
-//};
-
 &mdss {
 	status = "okay";
 };
@@ -260,7 +257,6 @@
 
 		backlight = <&pm660l_wled>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
-		disp-te-gpios = <&tlmm 59 GPIO_ACTIVE_HIGH>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
