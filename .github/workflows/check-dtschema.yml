@@ -75,6 +75,5 @@ jobs:
         run: |
           rm -r venv_dtschema
       - name: Analyze results
-        continue-on-error: true
         run: |
           python3 .github/workflows/analyze_dtbs_check.py build-dtbs-check/results.txt
