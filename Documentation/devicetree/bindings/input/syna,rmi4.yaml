@@ -57,6 +57,10 @@ properties:
   vdd-supply: true
   vio-supply: true
 
+  panel:
+    description: Reference to the panel this touchscreen follows for power sequencing.
+    $ref: /schemas/types.yaml#/definitions/phandle
+
   rmi4-f01@1:
     type: object
     additionalProperties: false
