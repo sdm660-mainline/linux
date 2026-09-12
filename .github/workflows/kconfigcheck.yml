@@ -30,10 +30,10 @@ jobs:
           sudo apt -y upgrade
           sudo apt -y autoremove
       - name: Checkout linux source from git
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-          fetch-tags: true
+          fetch-depth: 100
+          fetch-tags: false
           clean: false
       - name: Get changed files
         id: changed-files
