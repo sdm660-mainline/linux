@@ -30,8 +30,10 @@ jobs:
           sudo apt -y upgrade
           sudo apt -y autoremove
       - name: Checkout linux source from git
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
+          fetch-depth: 0
+          fetch-tags: true
           clean: false
       - name: Prepare linux kernel .config using sdm660_defconfig
         run: |
