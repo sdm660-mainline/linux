@@ -780,6 +780,181 @@ static const struct regmap_access_table abx80x_write_table = {
 	.n_no_ranges = ARRAY_SIZE(abx80x_no_write_ranges),
 };
 
+static int abx80x_probe(struct device *dev, struct regmap *regmap, int irq,
+			struct device_node *np, unsigned int part)
+{
+	struct abx80x_priv *priv;
+	int i, err, trickle_cfg = -EINVAL;
+	char buf[7];
+	unsigned int partnumber;
+	unsigned int majrev, minrev;
+	unsigned int lot;
+	unsigned int wafer;
+	unsigned int uid;
+
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (priv == NULL)
+		return -ENOMEM;
+
+	priv->rtc = devm_rtc_allocate_device(dev);
+	if (IS_ERR(priv->rtc))
+		return PTR_ERR(priv->rtc);
+
+	priv->rtc->ops = &abx80x_rtc_ops;
+	priv->irq = irq;
+	priv->regmap = regmap;
+	err = devm_mutex_init(dev, &priv->lock);
+	if (err)
+		return err;
+
+	dev_set_drvdata(dev, priv);
+
+	err = regmap_bulk_read(regmap, ABX8XX_REG_ID0, buf, sizeof(buf));
+	if (err < 0) {
+		dev_err(dev, "Unable to read partnumber\n");
+		return -EIO;
+	}
+
+	partnumber = (buf[0] << 8) | buf[1];
+	majrev = buf[2] >> 3;
+	minrev = buf[2] & 0x7;
+	lot = ((buf[4] & 0x80) << 2) | ((buf[6] & 0x80) << 1) | buf[3];
+	uid = ((buf[4] & 0x7f) << 8) | buf[5];
+	wafer = (buf[6] & 0x7c) >> 2;
+	dev_info(dev, "model %04x, revision %u.%u, lot %x, wafer %x, uid %x\n",
+		 partnumber, majrev, minrev, lot, wafer, uid);
+
+	err = regmap_update_bits(regmap, ABX8XX_REG_CTRL1,
+				 ABX8XX_CTRL_12_24 | ABX8XX_CTRL_ARST | ABX8XX_CTRL_WRITE,
+				 ABX8XX_CTRL_WRITE);
+	if (err < 0) {
+		dev_err(dev, "Unable to write control register\n");
+		return -EIO;
+	}
+
+	/* Configure RV1805 specifics */
+	if (part == RV1805) {
+		/*
+		 * Avoid accidentally entering test mode. This can happen
+		 * on the RV1805 in case the reserved bit 5 in control2
+		 * register is set. RV-1805-C3 datasheet indicates that
+		 * the bit should be cleared in section 11h - Control2.
+		 */
+		err = regmap_update_bits(regmap, ABX8XX_REG_CTRL2,
+					 ABX8XX_CTRL2_RSVD, 0);
+		if (err < 0) {
+			dev_err(dev, "Unable to write control2 register\n");
+			return -EIO;
+		}
+
+		/*
+		 * Write the configuration key register to enable access to
+		 * the config2 register
+		 */
+		if (abx80x_write_config_key(dev, ABX8XX_CFG_KEY_MISC) < 0)
+			return -EIO;
+
+		/*
+		 * Avoid extra power leakage. The RV1805 uses smaller
+		 * 10pin package and the EXTI input is not present.
+		 * Disable it to avoid leakage.
+		 */
+		err = regmap_write_bits(regmap, ABX8XX_REG_OUT_CTRL,
+					ABX8XX_OUT_CTRL_EXDS,
+					ABX8XX_OUT_CTRL_EXDS);
+		if (err < 0) {
+			dev_err(dev,
+				"Unable to write output control register\n");
+			return -EIO;
+		}
+	}
+
+	/* part autodetection */
+	if (part == ABX80X) {
+		for (i = 0; abx80x_caps[i].pn; i++)
+			if (partnumber == abx80x_caps[i].pn)
+				break;
+		if (abx80x_caps[i].pn == 0) {
+			dev_err(dev, "Unknown part: %04x\n", partnumber);
+			return -EINVAL;
+		}
+		part = i;
+	}
+
+	if (partnumber != abx80x_caps[part].pn) {
+		dev_err(dev, "partnumber mismatch %04x != %04x\n",
+			partnumber, abx80x_caps[part].pn);
+		return -EINVAL;
+	}
+
+	if (np && abx80x_caps[part].has_tc)
+		trickle_cfg = abx80x_dt_trickle_cfg(dev);
+
+	if (trickle_cfg > 0) {
+		dev_info(dev, "Enabling trickle charger: %02x\n", trickle_cfg);
+		abx80x_enable_trickle_charger(dev, trickle_cfg);
+	}
+
+	err = regmap_write(regmap, ABX8XX_REG_CD_TIMER_CTL, BIT(2));
+	if (err)
+		return err;
+
+	/* Disable unused interrupts */
+	err = regmap_update_bits(regmap, ABX8XX_REG_IRQ,
+				 ABX8XX_IRQ_EX1E | ABX8XX_IRQ_EX2E |
+				 ABX8XX_IRQ_TIE | ABX8XX_IRQ_BLIE, 0);
+	if (err < 0) {
+		dev_err(dev, "Unable to update irq register\n");
+		return -EIO;
+	}
+
+	/* Unlock write access to Oscillator Control Register */
+	if (abx80x_write_config_key(dev, ABX8XX_CFG_KEY_OSC) < 0)
+		return -EIO;
+
+	err = regmap_write_bits(regmap, ABX8XX_REG_OSC,
+				ABX8XX_OSC_ACIE | ABX8XX_OSC_OFIE, 0);
+	if (err < 0) {
+		dev_err(dev, "Unable to update Oscillator Control register\n");
+		return -EIO;
+	}
+
+	if (abx80x_caps[part].has_wdog) {
+		err = abx80x_setup_watchdog(dev);
+		if (err)
+			return err;
+	}
+
+	err = abx80x_setup_nvmem(priv);
+	if (err)
+		return err;
+
+	if (priv->irq > 0) {
+		dev_info(dev, "IRQ %d supplied\n", priv->irq);
+		err = devm_request_threaded_irq(dev, priv->irq, NULL,
+						abx80x_handle_irq,
+						IRQF_SHARED | IRQF_ONESHOT,
+						"abx8xx",
+						dev);
+		if (err) {
+			dev_err(dev, "unable to request IRQ, alarms disabled\n");
+			priv->irq = 0;
+		}
+	}
+	if (priv->irq <= 0)
+		clear_bit(RTC_FEATURE_ALARM, priv->rtc->features);
+
+	err = rtc_add_group(priv->rtc, &rtc_calib_attr_group);
+	if (err) {
+		dev_err(dev, "Failed to create sysfs group: %d\n", err);
+		return err;
+	}
+
+	return devm_rtc_register_device(priv->rtc);
+}
+
+#if IS_ENABLED(CONFIG_I2C)
+
 static const struct regmap_config abx80x_regmap_config_i2c = {
 	.reg_bits = 8,
 	.val_bits = 8,
@@ -803,193 +978,6 @@ static const struct i2c_device_id abx80x_id[] = {
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, abx80x_id);
-
-static int abx80x_probe(struct i2c_client *client)
-{
-	struct regmap *regmap;
-	struct device_node *np = client->dev.of_node;
-	struct abx80x_priv *priv;
-	int i, err, trickle_cfg = -EINVAL;
-	char buf[7];
-	unsigned int part = (uintptr_t)i2c_get_match_data(client);
-	unsigned int partnumber;
-	unsigned int majrev, minrev;
-	unsigned int lot;
-	unsigned int wafer;
-	unsigned int uid;
-
-	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
-		return -ENODEV;
-
-	regmap = devm_regmap_init_i2c(client, &abx80x_regmap_config_i2c);
-	if (IS_ERR(regmap)) {
-		dev_err(&client->dev, "Unable to allocate regmap\n");
-		return PTR_ERR(regmap);
-	}
-
-	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
-	if (priv == NULL)
-		return -ENOMEM;
-
-	priv->rtc = devm_rtc_allocate_device(&client->dev);
-	if (IS_ERR(priv->rtc))
-		return PTR_ERR(priv->rtc);
-
-	priv->rtc->ops = &abx80x_rtc_ops;
-	priv->irq = client->irq;
-	priv->regmap = regmap;
-	err = devm_mutex_init(&client->dev, &priv->lock);
-	if (err)
-		return err;
-
-	dev_set_drvdata(&client->dev, priv);
-
-	err = regmap_bulk_read(regmap, ABX8XX_REG_ID0, buf, sizeof(buf));
-	if (err < 0) {
-		dev_err(&client->dev, "Unable to read partnumber\n");
-		return -EIO;
-	}
-
-	partnumber = (buf[0] << 8) | buf[1];
-	majrev = buf[2] >> 3;
-	minrev = buf[2] & 0x7;
-	lot = ((buf[4] & 0x80) << 2) | ((buf[6] & 0x80) << 1) | buf[3];
-	uid = ((buf[4] & 0x7f) << 8) | buf[5];
-	wafer = (buf[6] & 0x7c) >> 2;
-	dev_info(&client->dev, "model %04x, revision %u.%u, lot %x, wafer %x, uid %x\n",
-		 partnumber, majrev, minrev, lot, wafer, uid);
-
-	err = regmap_update_bits(regmap, ABX8XX_REG_CTRL1,
-				 ABX8XX_CTRL_12_24 | ABX8XX_CTRL_ARST | ABX8XX_CTRL_WRITE,
-				 ABX8XX_CTRL_WRITE);
-	if (err < 0) {
-		dev_err(&client->dev, "Unable to write control register\n");
-		return -EIO;
-	}
-
-	/* Configure RV1805 specifics */
-	if (part == RV1805) {
-		/*
-		 * Avoid accidentally entering test mode. This can happen
-		 * on the RV1805 in case the reserved bit 5 in control2
-		 * register is set. RV-1805-C3 datasheet indicates that
-		 * the bit should be cleared in section 11h - Control2.
-		 */
-		err = regmap_update_bits(regmap, ABX8XX_REG_CTRL2,
-					 ABX8XX_CTRL2_RSVD, 0);
-		if (err < 0) {
-			dev_err(&client->dev, "Unable to write control2 register\n");
-			return -EIO;
-		}
-
-		/*
-		 * Write the configuration key register to enable access to
-		 * the config2 register
-		 */
-		if (abx80x_write_config_key(&client->dev, ABX8XX_CFG_KEY_MISC) < 0)
-			return -EIO;
-
-		/*
-		 * Avoid extra power leakage. The RV1805 uses smaller
-		 * 10pin package and the EXTI input is not present.
-		 * Disable it to avoid leakage.
-		 */
-		err = regmap_write_bits(regmap, ABX8XX_REG_OUT_CTRL,
-					ABX8XX_OUT_CTRL_EXDS,
-					ABX8XX_OUT_CTRL_EXDS);
-		if (err < 0) {
-			dev_err(&client->dev,
-				"Unable to write output control register\n");
-			return -EIO;
-		}
-	}
-
-	/* part autodetection */
-	if (part == ABX80X) {
-		for (i = 0; abx80x_caps[i].pn; i++)
-			if (partnumber == abx80x_caps[i].pn)
-				break;
-		if (abx80x_caps[i].pn == 0) {
-			dev_err(&client->dev, "Unknown part: %04x\n",
-				partnumber);
-			return -EINVAL;
-		}
-		part = i;
-	}
-
-	if (partnumber != abx80x_caps[part].pn) {
-		dev_err(&client->dev, "partnumber mismatch %04x != %04x\n",
-			partnumber, abx80x_caps[part].pn);
-		return -EINVAL;
-	}
-
-	if (np && abx80x_caps[part].has_tc)
-		trickle_cfg = abx80x_dt_trickle_cfg(&client->dev);
-
-	if (trickle_cfg > 0) {
-		dev_info(&client->dev, "Enabling trickle charger: %02x\n",
-			 trickle_cfg);
-		abx80x_enable_trickle_charger(&client->dev, trickle_cfg);
-	}
-
-	err = regmap_write(regmap, ABX8XX_REG_CD_TIMER_CTL, BIT(2));
-	if (err)
-		return err;
-
-	/* Disable unused interrupts */
-	err = regmap_update_bits(regmap, ABX8XX_REG_IRQ,
-				 ABX8XX_IRQ_EX1E | ABX8XX_IRQ_EX2E |
-				 ABX8XX_IRQ_TIE | ABX8XX_IRQ_BLIE, 0);
-	if (err < 0) {
-		dev_err(&client->dev, "Unable to update irq register\n");
-		return -EIO;
-	}
-
-	/* Unlock write access to Oscillator Control Register */
-	if (abx80x_write_config_key(client, ABX8XX_CFG_KEY_OSC) < 0)
-		return -EIO;
-
-	err = regmap_write_bits(regmap, ABX8XX_REG_OSC,
-				ABX8XX_OSC_ACIE | ABX8XX_OSC_OFIE, 0);
-	if (err < 0) {
-		dev_err(&client->dev, "Unable to update Oscillator Control register\n");
-		return -EIO;
-	}
-
-	if (abx80x_caps[part].has_wdog) {
-		err = abx80x_setup_watchdog(&client->dev);
-		if (err)
-			return err;
-	}
-
-	err = abx80x_setup_nvmem(priv);
-	if (err)
-		return err;
-
-	if (priv->irq > 0) {
-		dev_info(&client->dev, "IRQ %d supplied\n", priv->irq);
-		err = devm_request_threaded_irq(&client->dev, priv->irq, NULL,
-						abx80x_handle_irq,
-						IRQF_SHARED | IRQF_ONESHOT,
-						"abx8xx",
-						&client->dev);
-		if (err) {
-			dev_err(&client->dev, "unable to request IRQ, alarms disabled\n");
-			priv->irq = 0;
-		}
-	}
-	if (priv->irq <= 0)
-		clear_bit(RTC_FEATURE_ALARM, priv->rtc->features);
-
-	err = rtc_add_group(priv->rtc, &rtc_calib_attr_group);
-	if (err) {
-		dev_err(&client->dev, "Failed to create sysfs group: %d\n",
-			err);
-		return err;
-	}
-
-	return devm_rtc_register_device(priv->rtc);
-}
 
 #ifdef CONFIG_OF
 static const struct of_device_id abx80x_of_match[] = {
@@ -1038,16 +1026,67 @@ static const struct of_device_id abx80x_of_match[] = {
 MODULE_DEVICE_TABLE(of, abx80x_of_match);
 #endif
 
+static int abx80x_i2c_probe(struct i2c_client *client)
+{
+	unsigned int part = (uintptr_t)i2c_get_match_data(client);
+	struct regmap *regmap;
+
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
+		return -ENODEV;
+
+	regmap = devm_regmap_init_i2c(client, &abx80x_regmap_config_i2c);
+	if (IS_ERR(regmap)) {
+		dev_err(&client->dev, "Unable to allocate regmap\n");
+		return PTR_ERR(regmap);
+	}
+
+	return abx80x_probe(&client->dev, regmap, client->irq,
+			    client->dev.of_node, part);
+}
+
 static struct i2c_driver abx80x_driver = {
 	.driver		= {
 		.name	= "rtc-abx80x",
 		.of_match_table = of_match_ptr(abx80x_of_match),
 	},
-	.probe		= abx80x_probe,
+	.probe		= abx80x_i2c_probe,
 	.id_table	= abx80x_id,
 };
 
-module_i2c_driver(abx80x_driver);
+static int abx80x_register_driver(void)
+{
+	return i2c_add_driver(&abx80x_driver);
+}
+
+static void abx80x_unregister_driver(void)
+{
+	i2c_del_driver(&abx80x_driver);
+}
+
+#else
+
+static int abx80x_register_driver(void)
+{
+	return 0;
+}
+
+static void abx80x_unregister_driver(void)
+{
+}
+
+#endif /* IS_ENABLED(CONFIG_I2C) */
+
+static int __init abx80x_init(void)
+{
+	return abx80x_register_driver();
+}
+module_init(abx80x_init);
+
+static void __exit abx80x_exit(void)
+{
+	abx80x_unregister_driver();
+}
+module_exit(abx80x_exit);
 
 MODULE_AUTHOR("Philippe De Muyter <phdm@macqel.be>");
 MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@bootlin.com>");
