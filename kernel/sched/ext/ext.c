@@ -1127,7 +1127,7 @@ void schedule_dsq_reenq(struct scx_sched *sch, struct scx_dispatch_q *dsq,
 	} else if (!(dsq->id & SCX_DSQ_FLAG_BUILTIN)) {
 		rq = this_rq();
 
-		struct scx_dsq_pcpu *dsq_pcpu = per_cpu_ptr(dsq->pcpu, cpu_of(rq));
+		struct scx_dsq_pcpu *dsq_pcpu = per_cpu_ptr(dsq->pcpu_user, cpu_of(rq));
 		struct scx_deferred_reenq_user *dru = &dsq_pcpu->deferred_reenq_user;
 
 		/*
@@ -4701,7 +4701,7 @@ void scx_tg_init(struct task_group *tg)
 	tg->scx.weight = CGROUP_WEIGHT_DFL;
 	tg->scx.bw_period_us = default_bw_period_us();
 	tg->scx.bw_quota_us = RUNTIME_INF;
-	tg->scx.idle = false;
+	tg->scx.sched_idle = false;
 }
 
 /**
@@ -4784,7 +4784,7 @@ int scx_tg_online(struct task_group *tg)
 				  .bw_period_us = tg->scx.bw_period_us,
 				  .bw_quota_us = tg->scx.bw_quota_us,
 				  .bw_burst_us = tg->scx.bw_burst_us,
-				  .sched_idle = tg->scx.idle };
+				  .sched_idle = tg->scx.sched_idle };
 
 			ret = SCX_CALL_OP_RET(sch, cgroup_init,
 					      NULL, tg->css.cgroup, &args);
@@ -4951,11 +4951,11 @@ void scx_group_set_idle(struct task_group *tg, bool idle)
 	sch = scx_tg_knob_sched(tg);
 
 	if (scx_cgroup_enabled && sch && SCX_HAS_OP(sch, cgroup_set_idle) &&
-	    tg->scx.idle != idle)
+	    tg->scx.sched_idle != idle)
 		SCX_CALL_OP(sch, cgroup_set_idle, NULL, tg_cgrp(tg), idle);
 
 	/* Update the task group's idle state */
-	tg->scx.idle = idle;
+	tg->scx.sched_idle = idle;
 
 	percpu_up_read(&scx_cgroup_ops_rwsem);
 }
@@ -5069,12 +5069,16 @@ s32 scx_init_dsq(struct scx_dispatch_q *dsq, u64 dsq_id, struct scx_sched *sch)
 	dsq->id = dsq_id;
 	dsq->sched = sch;
 
-	dsq->pcpu = alloc_percpu(struct scx_dsq_pcpu);
-	if (!dsq->pcpu)
+	/* per-DSQ deferred reenq state is only needed for user DSQs */
+	if (dsq_id & SCX_DSQ_FLAG_BUILTIN)
+		return 0;
+
+	dsq->pcpu_user = alloc_percpu(struct scx_dsq_pcpu);
+	if (!dsq->pcpu_user)
 		return -ENOMEM;
 
 	for_each_possible_cpu(cpu) {
-		struct scx_dsq_pcpu *pcpu = per_cpu_ptr(dsq->pcpu, cpu);
+		struct scx_dsq_pcpu *pcpu = per_cpu_ptr(dsq->pcpu_user, cpu);
 
 		pcpu->dsq = dsq;
 		INIT_LIST_HEAD(&pcpu->deferred_reenq_user.node);
@@ -5087,8 +5091,11 @@ static void exit_dsq(struct scx_dispatch_q *dsq)
 {
 	s32 cpu;
 
+	if (!dsq->pcpu_user)
+		return;
+
 	for_each_possible_cpu(cpu) {
-		struct scx_dsq_pcpu *pcpu = per_cpu_ptr(dsq->pcpu, cpu);
+		struct scx_dsq_pcpu *pcpu = per_cpu_ptr(dsq->pcpu_user, cpu);
 		struct scx_deferred_reenq_user *dru = &pcpu->deferred_reenq_user;
 		struct rq *rq = cpu_rq(cpu);
 
@@ -5102,7 +5109,7 @@ static void exit_dsq(struct scx_dispatch_q *dsq)
 		}
 	}
 
-	free_percpu(dsq->pcpu);
+	free_percpu(dsq->pcpu_user);
 }
 
 static void free_dsq_rcufn(struct rcu_head *rcu)
@@ -5206,7 +5213,7 @@ static int scx_cgroup_init(struct scx_sched *sch)
 				.bw_period_us = tg->scx.bw_period_us,
 				.bw_quota_us = tg->scx.bw_quota_us,
 				.bw_burst_us = tg->scx.bw_burst_us,
-				.sched_idle = tg->scx.idle,
+				.sched_idle = tg->scx.sched_idle,
 			};
 
 			ret = SCX_CALL_OP_RET(sch, cgroup_init, NULL, css->cgroup, &args);
@@ -5878,7 +5885,7 @@ static void bypass_lb_node(struct scx_sched *sch, int node)
 
 	/*
 	 * We don't want CPUs to have more than $nr_donor_target tasks and
-	 * balancing to fill donee CPUs upto $nr_target. Once targets are
+	 * balancing to fill donee CPUs up to $nr_target. Once targets are
 	 * calculated, find the donee CPUs.
 	 */
 	nr_target = DIV_ROUND_UP(nr_tasks, nr_cpus);
@@ -8856,7 +8863,7 @@ __bpf_kfunc_start_defs();
  * task is inserted.
  *
  * When called from ops.dispatch(), there are no restrictions on @p or @dsq_id
- * and this function can be called upto ops.dispatch_max_batch times to insert
+ * and this function can be called up to ops.dispatch_max_batch times to insert
  * multiple tasks. scx_bpf_dispatch_nr_slots() returns the number of the
  * remaining slots. scx_bpf_dsq_move_to_local() flushes the batch and resets the
  * counter.
@@ -8941,7 +8948,9 @@ struct scx_bpf_dsq_insert_vtime_args {
  *
  * @args->vtime ordering is according to time_before64() which considers
  * wrapping. A numerically larger vtime may indicate an earlier position in the
- * ordering and vice-versa.
+ * ordering and vice-versa. vtime is a rolling cursor and values used for
+ * ordering within a given DSQ should stay less than 2^63 apart for
+ * time_before64() ordering to remain well-defined.
  *
  * A DSQ can only be used as a FIFO or priority queue at any given time and this
  * function must not be called on a DSQ which already has one or more FIFO tasks
@@ -9573,14 +9582,8 @@ void scx_kick_cpu(struct scx_sched *sch, s32 cpu, u64 flags)
 	struct rq *this_rq;
 	unsigned long irq_flags;
 
-	/*
-	 * The per-cpu kick list is guarded only by local_irq_save(), which does
-	 * not mask NMIs, so kicking from NMI could corrupt it and is unsupported.
-	 */
-	if (unlikely(in_nmi())) {
-		scx_error(sch, "scx_bpf_kick_cpu() called from NMI");
+	if (!scx_kf_allowed_ctx(sch))
 		return;
-	}
 
 	local_irq_save(irq_flags);
 
@@ -9748,8 +9751,13 @@ __bpf_kfunc void scx_bpf_destroy_dsq(u64 dsq_id, const struct bpf_prog_aux *aux)
 
 	guard(rcu)();
 	sch = scx_prog_sched(aux);
-	if (sch)
-		destroy_dsq(sch, dsq_id);
+	if (unlikely(!sch))
+		return;
+
+	if (!scx_kf_allowed_ctx(sch))
+		return;
+
+	destroy_dsq(sch, dsq_id);
 }
 
 /**
@@ -9785,6 +9793,9 @@ __bpf_kfunc int bpf_iter_scx_dsq_new(struct bpf_iter_scx_dsq *it, u64 dsq_id,
 	sch = scx_prog_sched(aux);
 	if (unlikely(!sch))
 		return -ENODEV;
+
+	if (!scx_kf_allowed_ctx(sch))
+		return -EDEADLK;
 
 	if (flags & ~__SCX_DSQ_ITER_USER_FLAGS)
 		return -EINVAL;
@@ -9911,6 +9922,9 @@ __bpf_kfunc void scx_bpf_dsq_reenq(u64 dsq_id, u64 reenq_flags,
 		scx_error(sch, "invalid SCX_REENQ flags 0x%llx", reenq_flags);
 		return;
 	}
+
+	if (!scx_kf_allowed_ctx(sch))
+		return;
 
 	/* not specifying any filter bits is the same as %SCX_REENQ_ANY */
 	if (!(reenq_flags & __SCX_REENQ_FILTER_MASK))
@@ -10299,6 +10313,9 @@ __bpf_kfunc void scx_bpf_cpuperf_set(s32 cpu, u32 perf, const struct bpf_prog_au
 	if (unlikely(!sch))
 		return;
 
+	if (!scx_kf_allowed_ctx(sch))
+		return;
+
 	scx_cpuperf_set(sch, cpu, perf);
 }
 
@@ -10324,6 +10341,10 @@ __bpf_kfunc s32 scx_bpf_cidperf_set(s32 cid, u32 perf,
 	sch = scx_prog_sched(aux);
 	if (unlikely(!sch))
 		return -ENODEV;
+
+	if (!scx_kf_allowed_ctx(sch))
+		return -EDEADLK;
+
 	cpu = scx_cid_to_cpu(sch, cid);
 	if (cpu < 0)
 		return cpu;
