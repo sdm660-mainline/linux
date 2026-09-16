@@ -286,8 +286,8 @@ static void setup_memslot(size_t sz)
 static gpa_t alloc_64k(size_t nr)
 {
 	size_t pages_per_64k = vm_calc_num_guest_pages(vm->mode, SZ_64K);
-	gpa_t gpa = vm_phy_pages_alloc(vm, nr * pages_per_64k, gpa_base,
-				       TEST_MEMSLOT_INDEX);
+	gpa_t gpa = vm_phy_pages_alloc(vm, nr * pages_per_64k,
+				       MEM_REGION_TEST_EXTRA);
 
 	TEST_ASSERT(IS_ALIGNED(gpa, SZ_64K),
 		    "Allocation at 0x%lx is not 64K aligned, GITS_BASER cannot address it",
