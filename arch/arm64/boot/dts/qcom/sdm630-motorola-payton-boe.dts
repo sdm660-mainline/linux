@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2026, Fabricio Akio <fabricioakio@gmail.com>
+ */
+
+/dts-v1/;
+
+#include "sdm630-motorola-payton.dtsi"
+
+/ {
+	model = "Motorola Moto X4 (BOE)";
+	compatible = "motorola,payton-boe", "qcom,sdm630";
+	chassis-type = "handset";
+};
