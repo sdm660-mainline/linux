@@ -971,6 +971,7 @@ static struct clk_rcg2 mdp_clk_src = {
 		.parent_data = mmcc_xo_mmpll0_mmpll5_mmpll7_gpll0_gpll0_div,
 		.num_parents = ARRAY_SIZE(mmcc_xo_mmpll0_mmpll5_mmpll7_gpll0_gpll0_div),
 		.ops = &clk_rcg2_ops,
+		.flags = CLK_OPS_PARENT_ENABLE,
 	},
 };
 
