@@ -130,6 +130,38 @@
 	status = "okay";
 };
 
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	vdda-supply = <&vreg_l1a_1p225>;
+
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&panel_reset_active>;
+	pinctrl-1 = <&panel_reset_suspend>;
+
+	status = "okay";
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&vreg_l1b_0p925>;
+
+	status = "okay";
+};
+
+&mmss_smmu {
+	status = "okay";
+};
+
 &pm660l_gpios {
 	vol_up_default: vol-up-default-state {
 		pins = "gpio7";
@@ -139,6 +171,14 @@
 		input-enable;
 		output-disable;
 	};
+};
+
+&pm660l_wled {
+	qcom,cabc;
+	qcom,enabled-strings = <0 1 2>;
+	qcom,ovp-millivolt = <18100>;
+
+	status = "okay";
 };
 
 &pon_pwrkey {
@@ -215,6 +255,11 @@
 		vdd_s4-supply = <&vph_pwr>;
 		vdd_l8_l9_l10_l11_l12_l13_l14-supply = <&vreg_s4a_2p04>;
 
+		vreg_l1a_1p225: l1 {
+			regulator-min-microvolt = <1150000>;
+			regulator-max-microvolt = <1250000>;
+		};
+
 		vreg_s4a_2p04: s4 {
 			regulator-min-microvolt = <1805000>;
 			regulator-max-microvolt = <2040000>;
@@ -230,6 +275,11 @@
 			regulator-min-microvolt = <1780000>;
 			regulator-max-microvolt = <1950000>;
 			regulator-allow-set-load;
+		};
+
+		vreg_l11a_1p8: l11 {
+			regulator-min-microvolt = <1780000>;
+			regulator-max-microvolt = <1950000>;
 		};
 	};
 };
@@ -257,6 +307,22 @@
 &tlmm {
 	/* blsp_spi1 */
 	gpio-reserved-ranges = <0 4>;
+
+	panel_reset_active: panel-reset-active-state {
+		pins = "gpio53";
+		function = "gpio";
+
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	panel_reset_suspend: panel-reset-suspend-state {
+		pins = "gpio53";
+		function = "gpio";
+
+		drive-strength = <2>;
+		bias-pull-down;
+	};
 };
 
 &tz_mem {

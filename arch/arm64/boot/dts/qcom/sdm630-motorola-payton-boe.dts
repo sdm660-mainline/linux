@@ -12,3 +12,20 @@
 	compatible = "motorola,payton-boe", "qcom,sdm630";
 	chassis-type = "handset";
 };
+
+&mdss_dsi0 {
+	panel@0 {
+		compatible = "boe,td4300";
+		reg = <0>;
+
+		backlight = <&pm660l_wled>;
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		vddio-supply = <&vreg_l11a_1p8>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
