@@ -985,7 +985,8 @@ static struct clk_rcg2 pclk0_clk_src = {
 		.parent_data = mmcc_xo_dsi0pll_dsi1pll,
 		.num_parents = ARRAY_SIZE(mmcc_xo_dsi0pll_dsi1pll),
 		.ops = &clk_pixel_ops,
-		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE |
+			 CLK_OPS_PARENT_ENABLE,
 	},
 };
 
