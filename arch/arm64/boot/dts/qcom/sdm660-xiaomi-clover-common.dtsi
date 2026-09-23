@@ -273,6 +273,22 @@
 	};
 };
 
+&pm660_typec {
+	vdd-pdphy-supply = <&vreg_l7b_3p125>; /* already used by qusb2phy0 as vdda-phy-dpdm-supply */
+	status = "okay";
+	connector {
+		port {
+			pm660_typec_hs_in: endpoint {
+				remote-endpoint = <&usb_dwc3_hs_out>;
+			};
+		};
+	};
+};
+
+&pm660_vbus_vreg {
+	status = "okay";
+};
+
 &pon_pwrkey {
 	status = "okay";
 };
@@ -742,9 +758,15 @@
 	maximum-speed = "high-speed";
 	phys = <&qusb2phy0>;
 	phy-names = "usb2-phy";
-	dr_mode = "peripheral";
-
+	dr_mode = "otg";
+	usb-role-switch;
 	status = "okay";
+
+	port {
+		usb_dwc3_hs_out: endpoint {
+			remote-endpoint = <&pm660_typec_hs_in>;
+		};
+	};
 };
 
 &venus {
