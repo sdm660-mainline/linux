@@ -32,8 +32,9 @@ jobs:
       - name: Checkout linux source from git
         uses: actions/checkout@v7
         with:
-          fetch-depth: 100
-          fetch-tags: false
+          # changed-files action needs to know git history, fetch all history
+          fetch-depth: 0
+          fetch-tags: true
           clean: false
       - name: Get changed files
         id: changed-files
@@ -55,12 +56,26 @@ jobs:
           make O=.output ARCH=arm64 LLVM=1 LOCALVERSION= defconfig sdm660_defconfig
           make O=.output ARCH=arm64 LLVM=1 LOCALVERSION= savedefconfig
           cat .output/defconfig
-      - name: Update pmbootstrap and pmaports
+      - name: Update pmbootstrap
         if: steps.changed-files.outputs.any_changed == 'true'
         run: |
           git -C /opt/pmbootstrap pull
           git -C $(pmbootstrap config aports) fetch origin
           git -C $(pmbootstrap config aports) reset --hard origin/main
+          git -C $(pmbootstrap config aports) status
+      - name: Prepare some pmbootstrap config
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo -n "pmbootstrap version: "
+          pmbootstrap --version
+          pmbootstrap config ccache_size      5G
+          pmbootstrap config extra_space      256
+          pmbootstrap config ssh_keys         False
+          pmbootstrap config timezone         Europe/Moscow
+          pmbootstrap config device           qemu-amd64
+          pmbootstrap config kernel           lts
+          pmbootstrap config ui               console
+          pmbootstrap config service_manager  systemd
           pmbootstrap status
       - name: Run kconfigcheck
         if: steps.changed-files.outputs.any_changed == 'true'
