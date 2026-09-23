@@ -78,6 +78,18 @@ config DRM_PANEL_BOE_HIMAX8279D
 	  24 bit RGB per pixel. It provides a MIPI DSI interface to
 	  the host and has a built-in LED backlight.
 
+config DRM_PANEL_BOE_TD4300
+	tristate "BOE TD4300 DSI panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for the BOE TD4300 panel,
+	  a 5.2" 1080x1920 DSI video mode panel built around a Synaptics
+	  TD4300 touch and display driver integration controller. It is
+	  fitted to some Motorola Moto X4 (payton) smartphones; others carry
+	  a Tianma panel instead.
+
 config DRM_PANEL_BOE_TD4320
 	tristate "BOE TD4320 DSI panel"
 	depends on OF

@@ -971,6 +971,7 @@ static struct clk_rcg2 mdp_clk_src = {
 		.parent_data = mmcc_xo_mmpll0_mmpll5_mmpll7_gpll0_gpll0_div,
 		.num_parents = ARRAY_SIZE(mmcc_xo_mmpll0_mmpll5_mmpll7_gpll0_gpll0_div),
 		.ops = &clk_rcg2_ops,
+		.flags = CLK_OPS_PARENT_ENABLE,
 	},
 };
 
@@ -984,7 +985,8 @@ static struct clk_rcg2 pclk0_clk_src = {
 		.parent_data = mmcc_xo_dsi0pll_dsi1pll,
 		.num_parents = ARRAY_SIZE(mmcc_xo_dsi0pll_dsi1pll),
 		.ops = &clk_pixel_ops,
-		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE |
+			 CLK_OPS_PARENT_ENABLE,
 	},
 };
 
@@ -2064,6 +2066,7 @@ static struct clk_branch mdss_axi_clk = {
 		.hw.init = &(struct clk_init_data){
 			.name = "mdss_axi_clk",
 			.parent_hws = (const struct clk_hw *[]){ &axi_clk_src.clkr.hw },
+			.num_parents = 1,
 			.ops = &clk_branch2_ops,
 		},
 	},
