@@ -79,8 +79,6 @@
 			reusable;
 			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
 			alignment = <0x00 0x400000>;
-			phandle = <0x10d>;
-			linux,phandle = <0x10d>;
 		};
 
 		dfps_data_mem@9f7ff000 {
@@ -114,8 +112,6 @@
 			reusable;
 			alloc-ranges = <0x00 0x80000000 0x00 0x20000000>;
 			alignment = <0x00 0x400000>;
-			phandle = <0x11f>;
-			linux,phandle = <0x11f>;
 		};
 
 		secure_region {
@@ -123,8 +119,6 @@
 			reusable;
 			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
 			alignment = <0x00 0x400000>;
-			phandle = <0x135>;
-			linux,phandle = <0x135>;
 		};
 
 		splash_region@9d400000 {
@@ -146,8 +140,6 @@
 			reusable;
 			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
 			alignment = <0x00 0x400000>;
-			phandle = <0x134>;
-			linux,phandle = <0x134>;
 		};
 
 		/* subsys-pil-tz soc:qcom,kgsl-hyp: a508_zap:
