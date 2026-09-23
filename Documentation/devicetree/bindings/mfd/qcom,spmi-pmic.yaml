@@ -196,7 +196,9 @@ patternProperties:
 
   "^typec@[0-9a-f]+$":
     type: object
-    $ref: /schemas/usb/qcom,pmic-typec.yaml#
+    oneOf:
+      - $ref: /schemas/usb/qcom,pmic-typec.yaml#
+      - $ref: /schemas/usb/qcom,pmic-typec-gen1.yaml#
 
   "^usb-detect@[0-9a-f]+$":
     type: object
