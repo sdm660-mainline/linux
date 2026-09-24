@@ -63,23 +63,6 @@
 		regulator-boot-on;
 	};
 
-	/*
-	 * This is here until we have a driver for QPNP LCDB regulator.
-	 * It can emulate both positive LDO and negative NCP supplies for panel.
-	 */
-	lcdb_fixed: lcdb-regulator {
-		compatible = "regulator-fixed";
-		regulator-name = "lcdb";
-		/*
-		 * Actual range for LCDB is 4.0 - 6.0V, but
-		 * stock bootloader sets voltage to 5.4 V
-		 */
-		regulator-min-microvolt = <5400000>;
-		regulator-max-microvolt = <5400000>;
-		regulator-always-on;
-		regulator-boot-on;
-	};
-
 	gpio-keys {
 		compatible = "gpio-keys";
 
@@ -158,6 +141,23 @@
 		/* Path is relative to the qca/ subdir in lib/firmware. */
 		/* firmware-name = "crnv21.bin"; */ // default
 	};
+};
+
+/*
+ * Full range for LCDB is 4.0 - 6.0V, but stock bootloader sets
+ * voltage to very specific 5.4V and then downstream kernel never
+ * changes it, only turns regulator on/off following panel status.
+ */
+&lcdb_ldo {
+	regulator-boot-on;
+	regulator-min-microvolt = <5400000>;
+	regulator-max-microvolt = <5400000>;
+};
+
+&lcdb_ncp {
+	regulator-boot-on;
+	regulator-min-microvolt = <5400000>;
+	regulator-max-microvolt = <5400000>;
 };
 
 &mdss {
@@ -239,6 +239,10 @@
 		input-enable;
 		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
 	};
+};
+
+&pm660l_lcdb {
+	status = "okay";
 };
 
 &pm660l_lpg {
