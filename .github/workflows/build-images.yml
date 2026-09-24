@@ -1,4 +1,4 @@
-name: Build Linux kernel image and package
+name: Test container job
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -10,10 +10,96 @@ on:
       - v*-sdm660
   workflow_dispatch:
 jobs:
-  build-linux:
+  build-in-container:
     runs-on: [self-hosted, Linux, aarch64]
+    container:
+      image: minlexx/alpine-kbuilder:3.24
+      volumes:
+        - /home/runner/_pmbwork:/home/runner/_pmbwork
+      #env:
+      #  TEST_VAR: hello
     steps:
-      - name: Print debug info and do some pre-run checks
+      - name: Print runner debug info
+        run: |
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
+          echo "GITHUB_HEAD_REF: $GITHUB_HEAD_REF"
+          echo "GITHUB_REF: $GITHUB_REF"
+          (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
+          echo -n "whoami: " ; whoami
+          echo -n "groups: " ; groups
+      # GITHUB_BASE_REF: qcom-sdm660-7.2.y
+      # GITHUB_HEAD_REF: alexeymin/test-container-jobs
+      # GITHUB_REF: refs/pull/198/merge
+      - name: Update Alpine packages
+        run: |
+          sudo rm -f /etc/apk/interactive
+          sudo apk update && sudo apk upgrade -a
+      - name: Print tools/OS versions
+        run: |
+          echo -n "git version: "; git --version
+          echo -n "make version: "; make --version
+          echo -n "gcc version: "; gcc --version
+          echo -n "clang version: "; clang --version
+          echo -n "lld version: "; ld.lld --version
+          echo -n "pahole version: "; pahole --version
+          fastfetch
+      - name: Show env
+        run: env
+      # Impossible to use github-actions:
+      #  Error: JavaScript Actions in Alpine containers are only supported on
+      #         x64 Linux runners. Detected Linux Arm64
+      #  So fuck Github, fuck github actions
+      #- name: Checkout linux source from git
+      #  uses: actions/checkout@v7
+      #  with:
+      #    fetch-depth: 0
+      #    fetch-tags: true
+      #    clean: false
+      - name: Prepare repo and source branches
+        run: |
+          cd "${GITHUB_WORKSPACE}"
+          pwd
+          ls -la --color
+          git remote add origin https://github.com/sdm660-mainline/linux || true
+          echo "git remotes:"
+          git remote -vv
+          git fetch origin --tags --prune
+          git reset --hard
+          git checkout "${GITHUB_BASE_REF}"
+          git reset --hard
+          echo "git status:"
+          git status
+          git checkout "${GITHUB_HEAD_REF}"
+          git status
+      #- name: Clean build files (remove me)
+      #  run: |
+      #    make O=.output LLVM=1 LOCALVERSION= clean
+      - name: Prepare linux kernel .config with LLVM using sdm660_defconfig
+        run: |
+          mkdir -p .output
+          make O=.output LLVM=1 LOCALVERSION= -j$(nproc) defconfig sdm660_defconfig
+      - name: Build linux kernel (vmlinuz, vmlinuz.efi, dtbs, modules + Image.gz)
+        run: |
+          make O=.output LLVM=1 LOCALVERSION= -j$(nproc) all Image.gz
+      - name: Install modules into fake install prefix
+        run: |
+          make O=.output LLVM=1 LOCALVERSION= INSTALL_MOD_PATH=PREFIX INSTALL_MOD_STRIP=1 modules_install
+      - name: Size of build directory
+        run: du -hs .output
+      - name: Restore default branch
+        run: |
+          cd "${GITHUB_WORKSPACE}"
+          pwd
+          git reset --hard
+          git checkout "${GITHUB_BASE_REF}"
+          git branch -D "${GITHUB_HEAD_REF}"
+          git status
+  build-apk-package:
+    runs-on: [self-hosted, Linux, aarch64]
+    needs: [build-in-container]
+    steps:
+      - name: Print some debug info
         run: |
           echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
           echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
@@ -21,73 +107,57 @@ jobs:
           echo "GITHUB_REF: $GITHUB_REF"
           echo -n "whoami: " ; whoami
           echo -n "groups: " ; groups
-          echo -n "gcc version: "; gcc --version
-          echo -n "clang version: "; clang --version
-          echo -n "lld version: "; ld.lld --version
-      - name: Update ubuntu packages
+      - name: Update pmbootstrap
+        run: git -C /opt/pmbootstrap pull
+      - name: Check pmb workdir
         run: |
-          sudo apt update
-          sudo apt -y upgrade
-          sudo apt -y autoremove
-      - name: Checkout linux source from git
-        uses: actions/checkout@v7
+          ls -la --color /home/runner/_pmbwork
+      - name: Prepare common pmbootstrap config
+        run: |
+          echo -n "pmbootstrap version: "
+          pmbootstrap --version
+          pmbootstrap config work /home/runner/_pmbwork
+          pmbootstrap config aports /home/runner/_pmbwork/cache_git/pmaports
+          pmbootstrap config ccache_size 20G
+          pmbootstrap config extra_space 256
+          pmbootstrap config jobs 4
+          pmbootstrap config ui console
+      - name: Dump pmbootstrap config
+        run: pmbootstrap config
+      - name: Update pmaports
+        run: |
+          git -C $(pmbootstrap config aports) fetch origin
+          git -C $(pmbootstrap config aports) reset --hard origin/main
+          pmbootstrap status
+      - name: Clean pmbootstrap chroots (pmbootstrap zap)
+        run: |
+          pmbootstrap -y zap || tail -n200 /home/runner/_pmbwork/log.txt
+      - name: Clean previously built kernel packages
+        run: |
+          sudo rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+      - name: Print directories contents
+        run: |
+          cd $GITHUB_WORKSPACE
+          pwd
+          ls -la --color
+          echo "Contents of .output:"
+          ls -la --color .output/
+      - name: Package linux-postmarketos-qcom-sdm660 using build --envkernel
+        run: |
+          cd $GITHUB_WORKSPACE
+          pwd
+          pmbootstrap --details-to-stdout build --arch aarch64 --envkernel linux-postmarketos-qcom-sdm660
+      - name: Make small rootfs image with console ui (pmbootstrap install)
+        run: |
+          pmbootstrap install --no-fde --zap --no-firewall --password=147147 || tail -n200 /home/runner/_pmbwork/log.txt
+      - name: Cleanup pmbootstrap chroots
+        run: |
+          pmbootstrap shutdown
+      - uses: actions/upload-artifact@v7
         with:
-          fetch-depth: 0
-          fetch-tags: true
-          clean: false
-      - name: Prepare linux kernel .config using sdm660_defconfig
-        run: |
-          mkdir -p .output
-          make O=.output LOCALVERSION= defconfig sdm660_defconfig
-      - name: Build linux kernel (vmlinuz, vmlinuz.efi, dtbs, modules + Image.gz)
-        run: |
-          make O=.output LOCALVERSION= -j$(nproc) all Image.gz
-      - name: Install modules into fake install prefix
-        run: |
-          make O=.output LOCALVERSION= INSTALL_MOD_PATH=PREFIX INSTALL_MOD_STRIP=1 modules_install
-#  build-apk-package:
-#    runs-on: [self-hosted, Linux, aarch64]
-#    needs: [build-linux]
-#    steps:
-#      - name: Update pmbootstrap
-#        run: git -C /opt/pmbootstrap pull
-#      - name: Prepare common pmbootstrap config
-#        run: |
-#          echo -n "pmbootstrap version: "
-#          pmbootstrap --version
-#          pmbootstrap config work /home/runner/_pmbwork
-#          pmbootstrap config aports /home/runner/_pmbwork/cache_git/pmaports
-#          pmbootstrap config ccache_size 20G
-#          pmbootstrap config extra_space 256
-#          pmbootstrap config jobs 4
-#          pmbootstrap config ui console
-#      - name: Dump pmbootstrap config
-#        run: pmbootstrap config
-#      - name: Update pmaports
-#        run: |
-#          git -C $(pmbootstrap config aports) fetch origin
-#          git -C $(pmbootstrap config aports) reset --hard origin/main
-#          pmbootstrap status
-#      - name: Clean pmbootstrap chroots (pmbootstrap zap)
-#        run: |
-#          pmbootstrap -y zap || tail -n200 /home/runner/_pmbwork/log.txt
-#      - name: Clean previously built kernel packages
-#        run: |
-#          sudo rm -f /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
-#      - name: Package linux-postmarketos-qcom-sdm660 using build --envkernel
-#        run: |
-#          cd $GITHUB_WORKSPACE
-#          pwd
-#          pmbootstrap --details-to-stdout build --arch aarch64 --envkernel linux-postmarketos-qcom-sdm660
-#      - name: Make small rootfs image with console ui (pmbootstrap install)
-#        run: |
-#          pmbootstrap install --no-fde --zap --no-firewall --password=147147 || tail -n200 /home/runner/_pmbwork/log.txt
-#      - name: Cleanup pmbootstrap chroots
-#        run: |
-#          pmbootstrap shutdown
-#      - uses: actions/upload-artifact@v7
-#        with:
-#          name: Artifacts
-#          compression-level: 1
-#          path: |
-#            /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+          name: Artifacts
+          compression-level: 1
+          path: |
+            /home/runner/_pmbwork/packages/edge/aarch64/linux-postmarketos-qcom-sdm660-*.apk
+
+
