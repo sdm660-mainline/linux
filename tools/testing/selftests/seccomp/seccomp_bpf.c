@@ -307,6 +307,10 @@ struct seccomp_notif_addfd_big {
 #define SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV (1UL << 5)
 #endif
 
+#ifndef SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV
+#define SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV (1UL << 6)
+#endif
+
 #ifndef seccomp
 int seccomp(unsigned int op, unsigned int flags, void *args)
 {
@@ -4816,6 +4820,368 @@ static long get_proc_syscall(struct __test_metadata *_metadata, int pid)
 
 	free(line);
 	return ret;
+}
+
+
+static void notification_restart_handler(int sig)
+{
+	char c;
+	int saved_errno = errno;
+
+	if (write(handled, "s", 1) != 1 || read(handled, &c, 1) != 1)
+		_exit(1);
+	errno = saved_errno;
+}
+
+FIXTURE(notification_restart) {
+	int listener;
+	int sync[2];
+	pid_t pid;
+};
+
+FIXTURE_VARIANT(notification_restart) {
+	bool restart;
+	bool killable;
+};
+
+FIXTURE_VARIANT_ADD(notification_restart, neither) {
+	.restart = false, .killable = false,
+};
+FIXTURE_VARIANT_ADD(notification_restart, restart) {
+	.restart = true, .killable = false,
+};
+FIXTURE_VARIANT_ADD(notification_restart, killable) {
+	.restart = false, .killable = true,
+};
+FIXTURE_VARIANT_ADD(notification_restart, both) {
+	.restart = true, .killable = true,
+};
+
+FIXTURE_SETUP(notification_restart)
+{
+	unsigned int flags = SECCOMP_FILTER_FLAG_NEW_LISTENER;
+
+	self->pid = -1;
+	self->listener = -1;
+	self->sync[0] = self->sync[1] = -1;
+	ASSERT_EQ(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0), 0);
+	ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, self->sync), 0);
+	if (variant->restart)
+		flags |= SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV;
+	if (variant->killable)
+		flags |= SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV;
+	self->listener = user_notif_syscall(__NR_getppid, flags);
+	ASSERT_GE(self->listener, 0);
+}
+
+FIXTURE_TEARDOWN(notification_restart)
+{
+	if (self->pid > 0) {
+		kill(self->pid, SIGKILL);
+		waitpid(self->pid, NULL, 0);
+	}
+	close(self->listener);
+	close(self->sync[0]);
+	close(self->sync[1]);
+}
+
+static void notification_restart_child(struct __test_metadata *_metadata,
+				       struct _test_data_notification_restart *self)
+{
+	struct sigaction action = { .sa_handler = notification_restart_handler };
+	long result[2];
+
+	self->pid = fork();
+	ASSERT_GE(self->pid, 0);
+	if (self->pid)
+		return;
+
+	close(self->listener);
+	close(self->sync[0]);
+	handled = self->sync[1];
+	if (sigemptyset(&action.sa_mask) || sigaction(SIGUSR1, &action, NULL))
+		_exit(1);
+	result[0] = syscall(__NR_getppid);
+	result[1] = errno;
+	if (write(handled, result, sizeof(result)) != sizeof(result))
+		_exit(1);
+	_exit(0);
+}
+
+static void notification_pending(struct __test_metadata *_metadata, int fd)
+{
+	struct pollfd pfd = { .fd = fd, .events = POLLIN };
+
+	ASSERT_EQ(poll(&pfd, 1, 5000), 1);
+	ASSERT_TRUE(pfd.revents & POLLIN);
+}
+
+static void notification_signal(struct __test_metadata *_metadata,
+				struct _test_data_notification_restart *self)
+{
+	struct pollfd pfd = { .fd = self->sync[0], .events = POLLIN };
+	char c;
+
+	ASSERT_EQ(kill(self->pid, SIGUSR1), 0);
+	ASSERT_EQ(poll(&pfd, 1, 5000), 1);
+	ASSERT_EQ(read(self->sync[0], &c, 1), 1);
+	ASSERT_EQ(c, 's');
+	/* The handler holds the task until the abandoned request is checked. */
+	pfd.fd = self->listener;
+	ASSERT_EQ(poll(&pfd, 1, 0), 0);
+	ASSERT_EQ(write(self->sync[0], "r", 1), 1);
+}
+
+static void notification_result(struct __test_metadata *_metadata,
+				struct _test_data_notification_restart *self,
+				long value, int error)
+{
+	long result[2];
+	int status;
+
+	ASSERT_EQ(read(self->sync[0], result, sizeof(result)), sizeof(result));
+	EXPECT_EQ(result[0], value);
+	if (value == -1)
+		EXPECT_EQ(result[1], error);
+	ASSERT_EQ(waitpid(self->pid, &status, 0), self->pid);
+	self->pid = -1;
+	ASSERT_TRUE(WIFEXITED(status));
+	EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST_F(notification_restart, before_receive)
+{
+	struct seccomp_notif req = {};
+	struct seccomp_notif_resp resp = {};
+	int i;
+
+	notification_restart_child(_metadata, self);
+	for (i = 0; i < 3; i++) {
+		notification_pending(_metadata, self->listener);
+		notification_signal(_metadata, self);
+		if (!variant->restart) {
+			notification_result(_metadata, self, -1, EINTR);
+			return;
+		}
+	}
+	notification_pending(_metadata, self->listener);
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+	resp.id = req.id;
+	resp.flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
+	notification_result(_metadata, self, getpid(), 0);
+}
+
+TEST_F(notification_restart, failed_receive)
+{
+	struct seccomp_notif_resp resp = {};
+	struct seccomp_notif req = {};
+	void *buf;
+
+	buf = mmap(NULL, sizeof(req), PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	ASSERT_NE(buf, MAP_FAILED);
+	notification_restart_child(_metadata, self);
+	notification_pending(_metadata, self->listener);
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_RECV, buf), -1);
+	ASSERT_EQ(errno, EFAULT);
+	ASSERT_EQ(munmap(buf, sizeof(req)), 0);
+	notification_signal(_metadata, self);
+	if (!variant->restart) {
+		notification_result(_metadata, self, -1, EINTR);
+		return;
+	}
+	notification_pending(_metadata, self->listener);
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+	resp.id = req.id;
+	resp.error = -EAGAIN;
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
+	notification_result(_metadata, self, -1, EAGAIN);
+}
+
+TEST_F(notification_restart, after_receive)
+{
+	struct seccomp_notif req = {};
+	struct seccomp_notif_resp resp = {};
+	char c;
+
+	notification_restart_child(_metadata, self);
+	notification_pending(_metadata, self->listener);
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+	if (!variant->killable) {
+		notification_signal(_metadata, self);
+		notification_result(_metadata, self, -1, EINTR);
+		ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_ID_VALID, &req.id), -1);
+		EXPECT_EQ(errno, ENOENT);
+		return;
+	}
+	ASSERT_EQ(kill(self->pid, SIGUSR1), 0);
+	/* Either ordering of signal delivery and reply must preserve the response. */
+	resp.id = req.id;
+	resp.val = USER_NOTIF_MAGIC;
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
+	ASSERT_EQ(read(self->sync[0], &c, 1), 1);
+	ASSERT_EQ(c, 's');
+	ASSERT_EQ(write(self->sync[0], "r", 1), 1);
+	notification_result(_metadata, self, USER_NOTIF_MAGIC, 0);
+}
+
+TEST_F(notification_restart, fork_and_close)
+{
+	struct sigaction action = { .sa_handler = notification_restart_handler };
+	struct sock_filter filter[] = {
+		BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+#ifdef __NR_fork
+		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_fork, 0, 1),
+		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
+#endif
+#ifdef __NR_clone
+		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_clone, 0, 1),
+		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
+#endif
+#ifdef __NR_clone3
+		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_clone3, 0, 1),
+		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
+#endif
+		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_close, 0, 1),
+		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
+		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+	};
+	struct sock_fprog prog = { .len = ARRAY_SIZE(filter), .filter = filter };
+	char control[CMSG_SPACE(sizeof(int))] = {};
+	char c = 'f';
+	struct iovec iov = { .iov_base = &c, .iov_len = 1 };
+	struct msghdr msg = {
+		.msg_iov = &iov, .msg_iovlen = 1,
+		.msg_control = control, .msg_controllen = sizeof(control),
+	};
+	struct cmsghdr *cmsg;
+	/*
+	 * glibc's fork() blocks all signals across clone(), so the
+	 * notification wait could not be interrupted: call clone3()
+	 * directly instead.
+	 */
+	struct __clone_args args = { .exit_signal = SIGCHLD };
+	unsigned int flags = SECCOMP_FILTER_FLAG_NEW_LISTENER;
+	int i, fd, listener, status;
+	long result[2] = {};
+	pid_t child;
+
+	if (__NR_clone3 < 0)
+		SKIP(return, "Test not built with clone3 support");
+	/* Some container profiles reject clone3() with ENOSYS. */
+	if (sys_clone3(NULL, 0) == -1 && errno == ENOSYS)
+		SKIP(return, "clone3() is not available");
+
+	if (variant->restart)
+		flags |= SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV;
+	if (variant->killable)
+		flags |= SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV;
+	ASSERT_EQ(close(self->listener), 0);
+	self->listener = -1;
+	self->pid = fork();
+	ASSERT_GE(self->pid, 0);
+	if (!self->pid) {
+		close(self->sync[0]);
+		handled = self->sync[1];
+		ASSERT_EQ(sigemptyset(&action.sa_mask), 0);
+		ASSERT_EQ(sigaction(SIGUSR1, &action, NULL), 0);
+		fd = open("/dev/null", O_RDONLY);
+		ASSERT_GE(fd, 0);
+		listener = seccomp(SECCOMP_SET_MODE_FILTER, flags, &prog);
+		ASSERT_GE(listener, 0);
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(listener));
+		memcpy(CMSG_DATA(cmsg), &listener, sizeof(listener));
+		ASSERT_EQ(sendmsg(handled, &msg, 0), 1);
+
+		child = sys_clone3(&args, sizeof(args));
+		if (!child)
+			_exit(0);
+		if (variant->restart) {
+			ASSERT_GT(child, 0);
+			ASSERT_EQ(waitpid(child, &status, 0), child);
+			ASSERT_TRUE(WIFEXITED(status));
+			ASSERT_EQ(WEXITSTATUS(status), 0);
+			ASSERT_EQ(waitpid(-1, &status, WNOHANG), -1);
+			ASSERT_EQ(errno, ECHILD);
+			ASSERT_EQ(close(fd), 0);
+			ASSERT_EQ(fcntl(fd, F_GETFD), -1);
+			ASSERT_EQ(errno, EBADF);
+		} else {
+			ASSERT_EQ(child, -1);
+			ASSERT_EQ(errno, EINTR);
+			ASSERT_EQ(close(fd), -1);
+			ASSERT_EQ(errno, EINTR);
+			ASSERT_GE(fcntl(fd, F_GETFD), 0);
+		}
+
+		ASSERT_EQ(sys_clone3(&args, sizeof(args)), -1);
+		ASSERT_EQ(errno, EAGAIN);
+		ASSERT_EQ(write(handled, result, sizeof(result)), sizeof(result));
+		_exit(0);
+	}
+	ASSERT_EQ(recvmsg(self->sync[0], &msg, 0), 1);
+	ASSERT_FALSE(msg.msg_flags & MSG_CTRUNC);
+	cmsg = CMSG_FIRSTHDR(&msg);
+	ASSERT_NE(cmsg, NULL);
+	ASSERT_EQ(cmsg->cmsg_level, SOL_SOCKET);
+	ASSERT_EQ(cmsg->cmsg_type, SCM_RIGHTS);
+	ASSERT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(listener)));
+	memcpy(&self->listener, CMSG_DATA(cmsg), sizeof(self->listener));
+
+	for (i = 0; i < 3; i++) {
+		struct seccomp_notif req = {};
+		struct seccomp_notif_resp resp = {};
+
+		notification_pending(_metadata, self->listener);
+		if (i < 2 || variant->restart) {
+			notification_signal(_metadata, self);
+			if (!variant->restart)
+				continue;
+			notification_pending(_metadata, self->listener);
+		}
+		ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+		EXPECT_EQ(req.pid, self->pid);
+		resp.id = req.id;
+		if (i == 2)
+			resp.error = -EAGAIN;
+		else
+			resp.flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+		ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
+	}
+	notification_result(_metadata, self, 0, 0);
+}
+
+TEST_F(notification_restart, fatal_signal)
+{
+	int status;
+
+	notification_restart_child(_metadata, self);
+	notification_pending(_metadata, self->listener);
+	ASSERT_EQ(kill(self->pid, SIGKILL), 0);
+	ASSERT_EQ(waitpid(self->pid, &status, 0), self->pid);
+	self->pid = -1;
+	ASSERT_TRUE(WIFSIGNALED(status));
+	EXPECT_EQ(WTERMSIG(status), SIGKILL);
+}
+
+TEST_F(notification_restart, listener_closed)
+{
+	notification_restart_child(_metadata, self);
+	notification_pending(_metadata, self->listener);
+	ASSERT_EQ(close(self->listener), 0);
+	self->listener = -1;
+	notification_result(_metadata, self, -1, ENOSYS);
+}
+
+TEST(user_notification_restart_requires_listener)
+{
+	ASSERT_EQ(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0), 0);
+	EXPECT_EQ(user_notif_syscall(__NR_getppid,
+				   SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV), -1);
+	EXPECT_EQ(errno, EINVAL);
 }
 
 /* Ensure non-fatal signals prior to receive are unmodified */
