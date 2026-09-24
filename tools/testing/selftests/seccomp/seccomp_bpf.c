@@ -4302,6 +4302,65 @@ TEST(user_notification_addfd)
 	close(memfd);
 }
 
+TEST(user_notification_addfd_opath)
+{
+	struct seccomp_notif req = {};
+	struct seccomp_notif_addfd addfd = {};
+	struct seccomp_notif_resp resp = {};
+	pid_t pid;
+	int listener, pathfd, fd, status;
+
+	pathfd = open("/dev/null", O_PATH | O_CLOEXEC);
+	ASSERT_GE(pathfd, 0);
+	ASSERT_EQ(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0), 0);
+	listener = user_notif_syscall(__NR_getppid,
+				      SECCOMP_FILTER_FLAG_NEW_LISTENER);
+	ASSERT_GE(listener, 0);
+
+	pid = fork();
+	ASSERT_GE(pid, 0);
+	if (pid == 0) {
+		int flags;
+		char byte;
+
+		close(pathfd);
+		fd = syscall(__NR_getppid);
+		if (fd < 0)
+			_exit(1);
+		flags = fcntl(fd, F_GETFL);
+		if (flags < 0 || !(flags & O_PATH))
+			_exit(2);
+		flags = fcntl(fd, F_GETFD);
+		if (flags < 0 || !(flags & FD_CLOEXEC))
+			_exit(3);
+		errno = 0;
+		if (read(fd, &byte, 1) != -1 || errno != EBADF)
+			_exit(4);
+		_exit(0);
+	}
+
+	ASSERT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+	addfd.id = req.id;
+	addfd.flags = SECCOMP_ADDFD_FLAG_SEND;
+	addfd.srcfd = pathfd;
+	addfd.newfd_flags = O_CLOEXEC;
+	fd = ioctl(listener, SECCOMP_IOCTL_NOTIF_ADDFD, &addfd);
+	if (fd < 0) {
+		resp.id = req.id;
+		resp.error = -errno;
+		TH_LOG("ADDFD failed with errno %d", -resp.error);
+		ASSERT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
+	}
+
+	ASSERT_EQ(waitpid(pid, &status, 0), pid);
+	EXPECT_GE(fd, 0);
+	EXPECT_EQ(true, WIFEXITED(status));
+	if (WIFEXITED(status))
+		EXPECT_EQ(0, WEXITSTATUS(status));
+	close(pathfd);
+	close(listener);
+}
+
 TEST(user_notification_addfd_rlimit)
 {
 	pid_t pid;
