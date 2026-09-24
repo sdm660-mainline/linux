@@ -1743,7 +1743,7 @@ static long seccomp_notify_addfd(struct seccomp_filter *filter,
 	if (addfd.newfd && !(addfd.flags & SECCOMP_ADDFD_FLAG_SETFD))
 		return -EINVAL;
 
-	kaddfd.file = fget(addfd.srcfd);
+	kaddfd.file = fget_raw(addfd.srcfd);
 	if (!kaddfd.file)
 		return -EBADF;
 
