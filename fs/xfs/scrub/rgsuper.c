@@ -46,6 +46,7 @@ int
 xchk_rgsuperblock(
 	struct xfs_scrub	*sc)
 {
+	struct xfs_buf		*bp = NULL;
 	xfs_rgnumber_t		rgno = sc->sm->sm_agno;
 	unsigned int		flags;
 	int			error;
@@ -78,9 +79,17 @@ xchk_rgsuperblock(
 		return error;
 
 	/*
-	 * Since we already validated the rt superblock at mount time, we don't
-	 * need to check its contents again.  All we need is to cross-reference.
+	 * Read the rt super from disk in case it's been corrupted since mount
+	 * time.  Crashing with a bad rt super may prevent remount, so we want
+	 * to fix these things ASAP.
 	 */
+	error = xfs_buf_read_uncached(sc->mp->m_rtdev_targp, XFS_RTSB_DADDR,
+			sc->mp->m_sb.sb_blocksize >> BBSHIFT, &bp,
+			&xfs_rtsb_buf_ops);
+	if (!xchk_process_rt_error(sc, 0, 0, &error))
+		return error;
+	xfs_buf_relse(bp);
+
 	xchk_rgsuperblock_xref(sc);
 	return 0;
 }
