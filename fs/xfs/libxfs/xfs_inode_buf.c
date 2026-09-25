@@ -20,8 +20,6 @@
 #include "xfs_health.h"
 #include "xfs_metafile.h"
 
-#include <linux/iversion.h>
-
 /*
  * If we are doing readahead on an inode buffer, we might be in log recovery
  * reading an inode allocation buffer that hasn't yet been replayed, and hence
