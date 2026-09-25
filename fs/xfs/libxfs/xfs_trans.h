@@ -6,8 +6,6 @@
 #ifndef	__XFS_TRANS_H__
 #define	__XFS_TRANS_H__
 
-/* kernel only transaction subsystem defines */
-
 struct xlog;
 struct xlog_format_buf;
 struct xfs_buf;
