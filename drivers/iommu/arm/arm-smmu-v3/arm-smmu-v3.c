@@ -40,6 +40,11 @@ module_param(disable_msipolling, bool, 0444);
 MODULE_PARM_DESC(disable_msipolling,
 	"Disable MSI-based polling for CMD_SYNC completion.");
 
+static unsigned int cmdq_max_n_shift = CMDQ_MAX_SZ_SHIFT;
+module_param(cmdq_max_n_shift, uint, 0444);
+MODULE_PARM_DESC(cmdq_max_n_shift,
+	"Cap on the command queue depth, as log2 of the number of entries. Defaults to the hardware maximum; the queue never shrinks below one page.");
+
 static const struct iommu_ops arm_smmu_ops;
 static struct iommu_dirty_ops arm_smmu_dirty_ops;
 
@@ -4423,6 +4428,37 @@ static struct iommu_dirty_ops arm_smmu_dirty_ops = {
 };
 
 /* Probing and initialisation functions */
+
+/**
+ * arm_smmu_queue_max_n_shift() - pick the log2 depth of a queue
+ * @hw_max_n_shift: log2 depth the hardware advertises in IDR1
+ * @ent_sz_shift: log2 of the queue entry size in bytes
+ * @limit_n_shift: log2 depth to cap the queue at
+ *
+ * @limit_n_shift is floored at one page, because coherent DMA is page
+ * granular: a shallower queue occupies the same memory as one that fills the
+ * page, and arm_smmu_init_one_queue() stops shrinking at a page too.
+ */
+static u32 arm_smmu_queue_max_n_shift(u32 hw_max_n_shift, u32 ent_sz_shift,
+				      u32 limit_n_shift)
+{
+	u32 floor_n_shift = PAGE_SHIFT - ent_sz_shift;
+
+	limit_n_shift = max(limit_n_shift, floor_n_shift);
+	return min(hw_max_n_shift, limit_n_shift);
+}
+
+/*
+ * Command queues are also allocated by the Tegra241 CMDQV for its VCMDQs, which
+ * need the same depth decision.
+ */
+u32 arm_smmu_cmdq_max_n_shift(u32 hw_max_n_shift)
+{
+	/* Capped to ensure natural alignment */
+	return arm_smmu_queue_max_n_shift(hw_max_n_shift, CMDQ_ENT_SZ_SHIFT,
+					  min(CMDQ_MAX_SZ_SHIFT, cmdq_max_n_shift));
+}
+
 int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
 			    struct arm_smmu_queue *q, void __iomem *page,
 			    unsigned long prod_off, unsigned long cons_off,
@@ -5173,8 +5209,8 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 	}
 
 	/* Queue sizes, capped to ensure natural alignment */
-	smmu->cmdq.q.llq.max_n_shift = min_t(u32, CMDQ_MAX_SZ_SHIFT,
-					     FIELD_GET(IDR1_CMDQS, reg));
+	smmu->cmdq.q.llq.max_n_shift =
+		arm_smmu_cmdq_max_n_shift(FIELD_GET(IDR1_CMDQS, reg));
 	if (smmu->cmdq.q.llq.max_n_shift <= ilog2(CMDQ_BATCH_ENTRIES)) {
 		/*
 		 * We don't support splitting up batches, so one batch of
