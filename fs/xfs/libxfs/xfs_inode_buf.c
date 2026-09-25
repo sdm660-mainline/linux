@@ -14,7 +14,6 @@
 #include "xfs_inode.h"
 #include "xfs_errortag.h"
 #include "xfs_error.h"
-#include "xfs_icache.h"
 #include "xfs_trans.h"
 #include "xfs_ialloc.h"
 #include "xfs_dir2.h"
