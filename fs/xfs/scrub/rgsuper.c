@@ -91,12 +91,28 @@ xrep_rgsuperblock(
 	struct xfs_scrub	*sc)
 {
 	struct xfs_buf		*sb_bp;
+	struct xfs_buf		*rtsb_bp;
+	int			error;
 
 	ASSERT(rtg_rgno(sc->sr.rtg) == 0);
 
 	sb_bp = xfs_trans_getsb(sc->tp);
 	xfs_log_sb(sc->tp);
-	xfs_log_rtsb(sc->tp, sb_bp);
-	return 0;
+	rtsb_bp = xfs_log_rtsb(sc->tp, sb_bp);
+	if (!rtsb_bp)
+		return 0;
+
+	/* synchronous transaction to flush/release the buffer log item */
+	xfs_trans_set_sync(sc->tp);
+	error = xrep_trans_commit(sc);
+	if (error)
+		return error;
+
+	/* write the rt super out immediately */
+	xfs_buf_lock(rtsb_bp);
+	xfs_buf_hold(rtsb_bp);
+	error = xfs_bwrite(rtsb_bp);
+	xfs_buf_relse(rtsb_bp);
+	return error;
 }
 #endif /* CONFIG_XFS_ONLINE_REPAIR */
