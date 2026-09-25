@@ -43,7 +43,7 @@ MODULE_PARM_DESC(disable_msipolling,
 static unsigned int cmdq_max_n_shift = CMDQ_MAX_SZ_SHIFT;
 module_param(cmdq_max_n_shift, uint, 0444);
 MODULE_PARM_DESC(cmdq_max_n_shift,
-	"Cap on the command queue depth, as log2 of the number of entries. Defaults to the hardware maximum; the queue never shrinks below one page.");
+	"Cap on the command queue depth, as log2 of the number of entries. Defaults to the hardware maximum; the queue never shrinks below one page. A kdump kernel always uses one page.");
 
 static const struct iommu_ops arm_smmu_ops;
 static struct iommu_dirty_ops arm_smmu_dirty_ops;
@@ -4435,6 +4435,8 @@ static struct iommu_dirty_ops arm_smmu_dirty_ops = {
  * @ent_sz_shift: log2 of the queue entry size in bytes
  * @limit_n_shift: log2 depth to cap the queue at
  *
+ * A kdump capture kernel gets one page worth of entries whatever the limit.
+ *
  * @limit_n_shift is floored at one page, because coherent DMA is page
  * granular: a shallower queue occupies the same memory as one that fills the
  * page, and arm_smmu_init_one_queue() stops shrinking at a page too.
@@ -4444,8 +4446,25 @@ static u32 arm_smmu_queue_max_n_shift(u32 hw_max_n_shift, u32 ent_sz_shift,
 {
 	u32 floor_n_shift = PAGE_SHIFT - ent_sz_shift;
 
+	if (is_kdump_kernel())
+		return min(hw_max_n_shift, floor_n_shift);
+
 	limit_n_shift = max(limit_n_shift, floor_n_shift);
 	return min(hw_max_n_shift, limit_n_shift);
+}
+
+static inline u32 arm_smmu_evtq_max_n_shift(u32 hw_max_n_shift)
+{
+	/* Capped to ensure natural alignment */
+	return arm_smmu_queue_max_n_shift(hw_max_n_shift, EVTQ_ENT_SZ_SHIFT,
+					  EVTQ_MAX_SZ_SHIFT);
+}
+
+static inline u32 arm_smmu_priq_max_n_shift(u32 hw_max_n_shift)
+{
+	/* Capped to ensure natural alignment */
+	return arm_smmu_queue_max_n_shift(hw_max_n_shift, PRIQ_ENT_SZ_SHIFT,
+					  PRIQ_MAX_SZ_SHIFT);
 }
 
 /*
@@ -5208,7 +5227,6 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 		return -ENXIO;
 	}
 
-	/* Queue sizes, capped to ensure natural alignment */
 	smmu->cmdq.q.llq.max_n_shift =
 		arm_smmu_cmdq_max_n_shift(FIELD_GET(IDR1_CMDQS, reg));
 	if (smmu->cmdq.q.llq.max_n_shift <= ilog2(CMDQ_BATCH_ENTRIES)) {
@@ -5223,10 +5241,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 		return -ENXIO;
 	}
 
-	smmu->evtq.q.llq.max_n_shift = min_t(u32, EVTQ_MAX_SZ_SHIFT,
-					     FIELD_GET(IDR1_EVTQS, reg));
-	smmu->priq.q.llq.max_n_shift = min_t(u32, PRIQ_MAX_SZ_SHIFT,
-					     FIELD_GET(IDR1_PRIQS, reg));
+	smmu->evtq.q.llq.max_n_shift =
+		arm_smmu_evtq_max_n_shift(FIELD_GET(IDR1_EVTQS, reg));
+	smmu->priq.q.llq.max_n_shift =
+		arm_smmu_priq_max_n_shift(FIELD_GET(IDR1_PRIQS, reg));
 
 	/* SID/SSID sizes */
 	smmu->ssid_bits = FIELD_GET(IDR1_SSIDSIZE, reg);
