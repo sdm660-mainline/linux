@@ -89,6 +89,15 @@
 			io-channel-names = "usbin_i", "usbin_v";
 
 			status = "disabled";
+
+			/* power supplier for USB host */
+			pm660_vbus_vreg: vbus {
+				regulator-name = "pm660-vbus";
+				regulator-min-microvolt = <5000000>;
+				regulator-max-microvolt = <5000000>;
+
+				status = "disabled";
+			};
 		};
 
 		pm660_typec: typec@1300 {
