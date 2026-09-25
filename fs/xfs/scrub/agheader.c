@@ -56,8 +56,7 @@ xchk_superblock_xref(
 	xchk_xref_is_only_owned_by(sc, agbno, 1, &XFS_RMAP_OINFO_FS);
 	xchk_xref_is_not_shared(sc, agbno, 1);
 	xchk_xref_is_not_cow_staging(sc, agbno, 1);
-
-	/* scrub teardown will take care of sc->sa for us */
+	xchk_ag_free(sc, &sc->sa);
 }
 
 /*
