@@ -21559,6 +21559,13 @@ F:	drivers/pinctrl/mediatek/pinctrl-rt2880.c
 F:	drivers/pinctrl/mediatek/pinctrl-rt305x.c
 F:	drivers/pinctrl/mediatek/pinctrl-rt3883.c
 
+PIN CONTROLLER - MEDIATEK MT6735
+M:	Yassine Oudjana <y.oudjana@protonmail.com>
+L:	linux-mediatek@lists.infradead.org (moderated for non-subscribers)
+S:	Maintained
+F:	Documentation/devicetree/bindings/pinctrl/mediatek,mt6779-pinctrl.yaml
+F:	include/dt-bindings/pinctrl/mediatek,mt6735-pinfunc.h
+
 PIN CONTROLLER - MICROCHIP AT91
 M:	Ludovic Desroches <ludovic.desroches@microchip.com>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
