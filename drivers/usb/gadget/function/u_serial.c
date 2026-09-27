@@ -1055,6 +1055,7 @@ static void gs_console_disconnect(struct gs_port *port)
 	struct gs_console *cons = port->console;
 	struct usb_request *req;
 	struct usb_ep *ep;
+	bool was_queued;
 
 	if (!cons)
 		return;
@@ -1063,6 +1064,8 @@ static void gs_console_disconnect(struct gs_port *port)
 
 	req = cons->req;
 	ep = cons->console.data;
+	/* A non-zero length marks the request as queued. */
+	was_queued = req && req->length;
 	cons->req = NULL;
 
 	spin_unlock(&cons->lock);
@@ -1070,7 +1073,8 @@ static void gs_console_disconnect(struct gs_port *port)
 	if (!req)
 		return;
 
-	usb_ep_dequeue(ep, req);
+	if (was_queued)
+		usb_ep_dequeue(ep, req);
 	gs_free_req(ep, req);
 }
 
