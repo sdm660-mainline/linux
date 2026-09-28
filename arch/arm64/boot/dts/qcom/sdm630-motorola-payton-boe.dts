@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2026, Fabricio Akio <fabricioakio@gmail.com>
+ */
+
+/dts-v1/;
+
+#include "sdm630-motorola-payton.dtsi"
+
+/ {
+	model = "Motorola Moto X4 (BOE)";
+	compatible = "motorola,payton-boe", "qcom,sdm630";
+	chassis-type = "handset";
+};
+
+&blsp_i2c3 {
+	status = "okay";
+
+	touchscreen@20 {
+		compatible = "syna,rmi4-i2c";
+		reg = <0x20>;
+
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_LEVEL_LOW>;
+		panel = <&panel>;
+
+		pinctrl-0 = <&ts_int_default>;
+		pinctrl-names = "default";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rmi4-f01@1 {
+			reg = <0x01>;
+		};
+
+		rmi4-f12@12 {
+			reg = <0x12>;
+			syna,sensor-type = <1>;
+		};
+	};
+};
+
+&mdss_dsi0 {
+	panel: panel@0 {
+		compatible = "boe,td4300";
+		reg = <0>;
+
+		backlight = <&pm660l_wled>;
+		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		vddio-supply = <&vreg_l11a_1p8>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&tlmm {
+	ts_int_default: ts-int-default-state {
+		pins = "gpio67";
+		function = "gpio";
+
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+};
