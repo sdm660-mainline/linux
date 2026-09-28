@@ -1404,6 +1404,24 @@ static void aer_recover_work_func(struct work_struct *work)
 static DEFINE_SPINLOCK(aer_recover_ring_lock);
 static DECLARE_WORK(aer_recover_work, aer_recover_work_func);
 
+/**
+ * aer_recover_queue - queue an AER error record reported by firmware
+ * @domain: PCI domain (segment) of the device that reported the error
+ * @bus: bus number of the device that reported the error
+ * @devfn: encoded device and function number, as returned by PCI_DEVFN()
+ * @severity: AER_CORRECTABLE, AER_NONFATAL or AER_FATAL
+ * @aer_regs: snapshot of the device's AER Capability registers
+ *
+ * Queue an error record received from firmware through APEI GHES.  The
+ * record is processed later from a workqueue, which logs the error and,
+ * for uncorrectable errors, attempts recovery of the device.
+ *
+ * Takes ownership of @aer_regs, which must have been allocated from
+ * ghes_estatus_pool with a size of sizeof(struct aer_capability_regs).
+ * The buffer is freed with ghes_estatus_pool_region_free() by the work
+ * item that processes the record, or immediately if the queue is full.
+ * The caller must not access or free @aer_regs after this call.
+ */
 void aer_recover_queue(int domain, unsigned int bus, unsigned int devfn,
 		       int severity, struct aer_capability_regs *aer_regs)
 {
