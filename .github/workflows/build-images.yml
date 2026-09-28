@@ -1,4 +1,4 @@
-name: Build Linux kernel image and package
+name: Build Linux kernel
 on:
   pull_request:
     types: [opened, synchronize, reopened]

@@ -1,4 +1,4 @@
-name: Device tree validation
+name: 'Device tree, bindings checks'
 on:
   pull_request:
     types: [opened, synchronize, reopened]
