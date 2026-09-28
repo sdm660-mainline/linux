@@ -50,6 +50,7 @@ jobs:
             echo "  $file was changed"
           done
       - name: Prepare linux kernel config for LLVM using sdm660_defconfig
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: |
           mkdir -p .output
           rm -f .output/.config .output/defconfig
