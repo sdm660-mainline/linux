@@ -5041,10 +5041,21 @@ static int __cold dpaa2_dpseci_setup(struct fsl_mc_device *ls_dev)
 	dev_info(dev, "dpseci v%d.%d\n", priv->major_ver, priv->minor_ver);
 
 	if (DPSECI_VER(priv->major_ver, priv->minor_ver) > DPSECI_VER(5, 3)) {
-		err = dpseci_reset(priv->mc_io, 0, ls_dev->mc_handle);
+		int enabled;
+
+		err = dpseci_is_enabled(priv->mc_io, 0, ls_dev->mc_handle,
+					&enabled);
 		if (err) {
-			dev_err(dev, "dpseci_reset() failed\n");
+			dev_err(dev, "dpseci_is_enabled() failed\n");
 			goto err_get_vers;
+		}
+
+		if (enabled) {
+			err = dpseci_reset(priv->mc_io, 0, ls_dev->mc_handle);
+			if (err) {
+				dev_err(dev, "dpseci_reset() failed\n");
+				goto err_get_vers;
+			}
 		}
 	}
 
