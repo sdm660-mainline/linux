@@ -685,4 +685,22 @@ struct hv_input_flush_device_domain {
 	u32 reserved;
 } __packed;
 
+union hv_iommu_flush_va {	/* HV_IOMMU_GVA_RANGE */
+	u64 as_uint64;
+	struct {
+		u64 page_mask_shift : 6;
+		u64 reserved : 6;
+		u64 page_number : 52;
+	};
+} __packed;
+
+/* HV_INPUT_FLUSH_DEVICE_DOMAIN_LIST */
+struct hv_input_flush_device_domain_list {
+	struct hv_input_device_domain device_domain;
+#define HV_FLUSH_DEVICE_DOMAIN_LIST_IOMMU_FORMAT BIT(0)
+	u32 flags;
+	u32 reserved;
+	union hv_iommu_flush_va iova_list[];
+} __packed;
+
 #endif /* _HV_HVHDK_MINI_H */

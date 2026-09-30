@@ -383,11 +383,82 @@ static void hv_iommu_flush_iotlb_all(struct iommu_domain *domain)
 	hv_flush_device_domain(to_hv_iommu_domain(domain));
 }
 
+/*
+ * Calculate the minimal power-of-two aligned range that covers [start, end]
+ * (end is inclusive). Returns a single (page_number, page_mask_shift)
+ * descriptor that may over-flush when the range is not naturally aligned.
+ */
+static void
+hv_iommu_calc_flush_range(unsigned long start, unsigned long end,
+			  union hv_iommu_flush_va *va)
+{
+	unsigned long aligned_start;
+	unsigned int sz_lg2;
+
+	sz_lg2 = max(fls_long(start ^ end), HV_HYP_PAGE_SHIFT);
+
+	/*
+	 * A valid IOVA range shall not span bit 63. Use the maximum mask
+	 * so the host can safely perform a full flush.
+	 */
+	if (WARN_ON_ONCE(sz_lg2 == BITS_PER_LONG))
+		aligned_start = 0;
+	else
+		aligned_start =
+			start & GENMASK(BITS_PER_LONG - 1, sz_lg2);
+
+	va->page_number = aligned_start >> HV_HYP_PAGE_SHIFT;
+	va->page_mask_shift = sz_lg2 - HV_HYP_PAGE_SHIFT;
+}
+
+static void hv_flush_device_domain_list(struct hv_iommu_domain *hv_domain,
+					struct iommu_iotlb_gather *iotlb_gather)
+{
+	u64 status;
+	unsigned long flags;
+	struct hv_input_flush_device_domain_list *input;
+
+	local_irq_save(flags);
+
+	input = *this_cpu_ptr(hyperv_pcpu_input_arg);
+	/* Clear the fixed header and the single range entry. */
+	memset(input, 0, struct_size(input, iova_list, 1));
+
+	input->device_domain = hv_domain->device_domain;
+	input->flags |= HV_FLUSH_DEVICE_DOMAIN_LIST_IOMMU_FORMAT;
+	hv_iommu_calc_flush_range(iotlb_gather->start, iotlb_gather->end,
+				  &input->iova_list[0]);
+
+	status = hv_do_rep_hypercall(HVCALL_FLUSH_DEVICE_DOMAIN_LIST,
+				     1, 0, input, NULL);
+
+	if (WARN_ONCE(!hv_result_success(status),
+		      "HVCALL_FLUSH_DEVICE_DOMAIN_LIST failed: %#llx (%s)\n",
+		      status, hv_result_to_string(status))) {
+		/* Page-selective flush failed, fall back to full flush. */
+		struct hv_input_flush_device_domain *flush_all = (void *)input;
+
+		memset(flush_all, 0, sizeof(*flush_all));
+		flush_all->device_domain = hv_domain->device_domain;
+		status = hv_do_hypercall(HVCALL_FLUSH_DEVICE_DOMAIN,
+					 flush_all, NULL);
+		WARN(!hv_result_success(status),
+		     "HVCALL_FLUSH_DEVICE_DOMAIN fallback also failed: %#llx (%s)\n",
+		     status, hv_result_to_string(status));
+	}
+
+	local_irq_restore(flags);
+}
+
 static void hv_iommu_iotlb_sync(struct iommu_domain *domain,
 				struct iommu_iotlb_gather *iotlb_gather)
 {
-	hv_flush_device_domain(to_hv_iommu_domain(domain));
+	hv_flush_device_domain_list(to_hv_iommu_domain(domain), iotlb_gather);
 
+	/*
+	 * The hypercall also invalidates non-leaf page-walk caches, so
+	 * detached page-table pages can now be freed.
+	 */
 	iommu_put_pages_list(&iotlb_gather->freelist);
 }
 
@@ -439,6 +510,7 @@ static struct iommu_domain *hv_iommu_domain_alloc_paging(struct device *dev)
 
 	cfg.common.hw_max_vasz_lg2 = hv_iommu_device->max_iova_width;
 	cfg.common.hw_max_oasz_lg2 = 52;
+	cfg.common.features |= BIT(PT_FEAT_FLUSH_RANGE);
 	/*
 	 * Hyper-V S1 domains use a 4-level root for IOVA widths up to
 	 * 48 bits. A 5-level root is used only for wider apertures when
