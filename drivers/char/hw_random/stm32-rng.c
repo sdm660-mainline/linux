@@ -569,18 +569,11 @@ static int stm32_rng_probe(struct platform_device *ofdev)
 		return dev_err_probe(dev, -EINVAL, "Failed to get clocks: %d\n", ret);
 
 	if (priv->data->nb_clock == 2) {
-		const char *id = priv->clk_bulk[1].id;
-		struct clk *clk = priv->clk_bulk[1].clk;
-
 		if (!priv->clk_bulk[0].id || !priv->clk_bulk[1].id)
 			return dev_err_probe(dev, -EINVAL, "Missing clock name\n");
 
-		if (strcmp(priv->clk_bulk[0].id, "core")) {
-			priv->clk_bulk[1].id = priv->clk_bulk[0].id;
-			priv->clk_bulk[1].clk = priv->clk_bulk[0].clk;
-			priv->clk_bulk[0].id = id;
-			priv->clk_bulk[0].clk = clk;
-		}
+		if (strcmp(priv->clk_bulk[0].id, "core"))
+			swap(priv->clk_bulk[0], priv->clk_bulk[1]);
 	}
 
 	pm_runtime_set_autosuspend_delay(dev, 100);
