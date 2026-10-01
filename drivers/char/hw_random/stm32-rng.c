@@ -277,7 +277,7 @@ static uint stm32_rng_clock_freq_restrain(struct hwrng *rng)
 	while ((clock_rate >> clock_div) > priv->data->max_clock_rate)
 		clock_div++;
 
-	pr_debug("RNG clk rate : %lu\n", clk_get_rate(priv->clk_bulk[0].clk) >> clock_div);
+	pr_debug("RNG clk rate: %lu\n", clock_rate >> clock_div);
 
 	return clock_div;
 }
