@@ -1009,12 +1009,6 @@ static inline int dmaengine_slave_config(struct dma_chan *chan,
 	return -ENOSYS;
 }
 
-static inline bool is_slave_direction(enum dma_transfer_direction direction)
-{
-	return (direction == DMA_MEM_TO_DEV) || (direction == DMA_DEV_TO_MEM) ||
-	       (direction == DMA_DEV_TO_DEV);
-}
-
 static inline struct dma_async_tx_descriptor *
 dmaengine_prep_config_single(struct dma_chan *chan, dma_addr_t buf, size_t len,
 			     enum dma_transfer_direction dir,
@@ -2087,14 +2081,6 @@ dmaengine_desc_set_callback(struct dma_async_tx_descriptor *tx,
 
 /* --- DMA device --- */
 
-int dma_async_device_register(struct dma_device *device);
-int dmaenginem_async_device_register(struct dma_device *device);
-void dma_async_device_unregister(struct dma_device *device);
-int dma_async_device_channel_register(struct dma_device *device,
-				      struct dma_chan *chan,
-				      const char *name);
-void dma_async_device_channel_unregister(struct dma_device *device,
-					 struct dma_chan *chan);
 void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
 #define dma_request_channel(mask, x, y) \
 	__dma_request_channel(&(mask), x, y, NULL)
@@ -2123,23 +2109,6 @@ static inline struct dma_chan
 		return NULL;
 
 	return dma_request_channel(mask, fn, fn_param);
-}
-
-static inline char *
-dmaengine_get_direction_text(enum dma_transfer_direction dir)
-{
-	switch (dir) {
-	case DMA_DEV_TO_MEM:
-		return "DEV_TO_MEM";
-	case DMA_MEM_TO_DEV:
-		return "MEM_TO_DEV";
-	case DMA_MEM_TO_MEM:
-		return "MEM_TO_MEM";
-	case DMA_DEV_TO_DEV:
-		return "DEV_TO_DEV";
-	default:
-		return "invalid";
-	}
 }
 
 static inline struct device *dmaengine_chan_dev(struct dma_chan *chan)
