@@ -156,7 +156,7 @@ end:
  */
 static int stm32_rng_conceal_seed_error_sw_reset(struct stm32_rng_private *priv)
 {
-	unsigned int i = 0;
+	unsigned int i;
 	u32 sr = readl_relaxed(priv->base + RNG_SR);
 
 	writel_relaxed(sr & ~RNG_SR_SEIS, priv->base + RNG_SR);
@@ -187,7 +187,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 {
 	struct stm32_rng_private *priv = container_of(rng, struct stm32_rng_private, rng);
 	unsigned int i = 0;
-	int retval = 0, err = 0;
+	int retval, err;
 	u32 sr;
 
 	retval = pm_runtime_resume_and_get(priv->dev);
@@ -264,7 +264,7 @@ static uint stm32_rng_clock_freq_restrain(struct hwrng *rng)
 {
 	struct stm32_rng_private *priv =
 	    container_of(rng, struct stm32_rng_private, rng);
-	unsigned long clock_rate = 0;
+	unsigned long clock_rate;
 	uint clock_div = 0;
 
 	clock_rate = clk_get_rate(priv->clk_bulk[0].clk);
