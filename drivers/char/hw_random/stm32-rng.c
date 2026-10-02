@@ -528,14 +528,13 @@ static int stm32_rng_probe(struct platform_device *ofdev)
 	struct device *dev = &ofdev->dev;
 	struct device_node *np = ofdev->dev.of_node;
 	struct stm32_rng_private *priv;
-	struct resource *res;
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
-	priv->base = devm_platform_get_and_ioremap_resource(ofdev, 0, &res);
+	priv->base = devm_platform_ioremap_resource(ofdev, 0);
 	if (IS_ERR(priv->base))
 		return PTR_ERR(priv->base);
 
