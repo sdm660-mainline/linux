@@ -157,7 +157,12 @@ static int pmi8998_fg_get_capacity(struct pmi8998_fg_chip *chip, int *val)
 	if (cap[0] != cap[1])
 		cap[0] = cap[0] < cap[1] ? cap[0] : cap[1];
 
-	*val = DIV_ROUND_CLOSEST((cap[0] - 1) * 98, 0xff - 2) + 1;
+	if (cap[0] == 0xff)
+		*val = 100;
+	else if (cap[0] == 0)
+		*val = 0;
+	else
+		*val = DIV_ROUND_CLOSEST((cap[0] - 1) * 98, 0xff - 2) + 1;
 
 	return 0;
 }
