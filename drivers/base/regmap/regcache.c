@@ -22,6 +22,8 @@ static const struct regcache_ops *cache_types[] = {
 	&regcache_flat_ops,
 };
 
+static int regcache_default_sync(struct regmap *map, unsigned int min, unsigned int max);
+
 static int regcache_defaults_cmp(const void *a, const void *b)
 {
 	const struct reg_default *x = a;
@@ -141,6 +143,17 @@ static void regcache_locked_exit(struct regmap *map)
 	dev_dbg(map->dev, "Destroying %s cache\n", map->cache_ops->name);
 	guard(regmap)(map);
 	map->cache_ops->exit(map);
+}
+
+static int __regcache_sync(struct regmap *map, unsigned int min, unsigned int max)
+{
+	if (!map->cache_dirty)
+		return 0;
+
+	if (map->cache_ops->sync)
+		return map->cache_ops->sync(map, min, max);
+
+	return regcache_default_sync(map, min, max);
 }
 
 int regcache_init(struct regmap *map, const struct regmap_config *config)
@@ -461,11 +474,7 @@ int regcache_sync(struct regmap *map)
 	}
 	map->cache_bypass = false;
 
-	if (map->cache_ops->sync)
-		sync_ret = map->cache_ops->sync(map, 0, map->max_register);
-	else
-		sync_ret = regcache_default_sync(map, 0, map->max_register);
-
+	sync_ret = __regcache_sync(map, 0, map->max_register);
 	if (sync_ret == 0)
 		map->cache_dirty = false;
 
@@ -545,17 +554,10 @@ int regcache_sync_region(struct regmap *map, unsigned int min,
 
 	trace_regcache_sync(map, name, "start region");
 
-	if (!map->cache_dirty)
-		goto out;
-
 	map->async = true;
 
-	if (map->cache_ops->sync)
-		ret = map->cache_ops->sync(map, min, max);
-	else
-		ret = regcache_default_sync(map, min, max);
+	ret = __regcache_sync(map, min, max);
 
-out:
 	/* Restore the bypass state */
 	map->cache_bypass = bypass;
 	map->async = false;
