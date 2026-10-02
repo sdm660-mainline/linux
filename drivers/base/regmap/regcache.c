@@ -121,6 +121,28 @@ static void regcache_hw_exit(struct regmap *map)
 		kfree(map->reg_defaults_raw);
 }
 
+static int regcache_locked_op(struct regmap *map,
+			      int (*op)(struct regmap *map),
+			      const char *action)
+{
+	if (!op)
+		return 0;
+
+	dev_dbg(map->dev, "%s %s cache\n", action, map->cache_ops->name);
+	guard(regmap)(map);
+	return op(map);
+}
+
+static void regcache_locked_exit(struct regmap *map)
+{
+	if (!map->cache_ops->exit)
+		return;
+
+	dev_dbg(map->dev, "Destroying %s cache\n", map->cache_ops->name);
+	guard(regmap)(map);
+	map->cache_ops->exit(map);
+}
+
 int regcache_init(struct regmap *map, const struct regmap_config *config)
 {
 	bool sort_defaults = false;
@@ -222,15 +244,9 @@ int regcache_init(struct regmap *map, const struct regmap_config *config)
 		map->max_register_is_set = true;
 	}
 
-	if (map->cache_ops->init) {
-		dev_dbg(map->dev, "Initializing %s cache\n",
-			map->cache_ops->name);
-		map->lock(map->lock_arg);
-		ret = map->cache_ops->init(map);
-		map->unlock(map->lock_arg);
-		if (ret)
-			goto err_free_reg_defaults;
-	}
+	ret = regcache_locked_op(map, map->cache_ops->init, "Initializing");
+	if (ret)
+		goto err_free_reg_defaults;
 
 	/*
 	 * Some devices such as PMICs don't have cache defaults,
@@ -243,12 +259,8 @@ int regcache_init(struct regmap *map, const struct regmap_config *config)
 			goto err_exit;
 	}
 
-	if (map->cache_ops->populate &&
-	    (map->num_reg_defaults || map->reg_default_cb)) {
-		dev_dbg(map->dev, "Populating %s cache\n", map->cache_ops->name);
-		map->lock(map->lock_arg);
-		ret = map->cache_ops->populate(map);
-		map->unlock(map->lock_arg);
+	if (map->num_reg_defaults || map->reg_default_cb) {
+		ret = regcache_locked_op(map, map->cache_ops->populate, "Populating");
 		if (ret)
 			goto err_free;
 	}
@@ -257,12 +269,7 @@ int regcache_init(struct regmap *map, const struct regmap_config *config)
 err_free:
 	regcache_hw_exit(map);
 err_exit:
-	if (map->cache_ops->exit) {
-		dev_dbg(map->dev, "Destroying %s cache\n", map->cache_ops->name);
-		map->lock(map->lock_arg);
-		map->cache_ops->exit(map);
-		map->unlock(map->lock_arg);
-	}
+	regcache_locked_exit(map);
 err_free_reg_defaults:
 	kfree(map->reg_defaults);
 
@@ -277,13 +284,7 @@ void regcache_exit(struct regmap *map)
 	BUG_ON(!map->cache_ops);
 
 	regcache_hw_exit(map);
-
-	if (map->cache_ops->exit) {
-		dev_dbg(map->dev, "Destroying %s cache\n",
-			map->cache_ops->name);
-		scoped_guard(regmap, map)
-			map->cache_ops->exit(map);
-	}
+	regcache_locked_exit(map);
 
 	kfree(map->reg_defaults);
 }
