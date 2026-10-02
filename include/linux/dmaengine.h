@@ -2122,12 +2122,31 @@ static inline struct device *dmaengine_chan_dev(struct dma_chan *chan)
 	return &chan->chan_dev->device;
 }
 
+/*
+ * dmaengine_get_provider_device() - Get DMA engine provider device. Typical
+ *				     use is to find a DMA channel by filter.
+ * @chan: DMA channel
+ *
+ * Return: Pointer to the DMA engine provider device.
+ */
+static inline struct device *dmaengine_get_provider_device(struct dma_chan *chan)
+{
+	return chan->device->dev;
+}
+
+/*
+ * dmaengine_get_dma_device() - Get DMA device used for DMA mapping. Some
+ *				DMA engines provide per-channel iommu mapping.
+ * @chan: DMA channel
+ *
+ * Return: Pointer to the device used for DMA mapping.
+ */
 static inline struct device *dmaengine_get_dma_device(struct dma_chan *chan)
 {
 	if (chan->chan_dev->chan_dma_dev)
 		return dmaengine_chan_dev(chan);
 
-	return chan->device->dev;
+	return dmaengine_get_provider_device(chan);
 }
 
 #endif /* DMAENGINE_H */
