@@ -346,9 +346,9 @@ static int pmi8998_fg_get_property(struct power_supply *psy,
 				val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
 				break;
 			}
-			if (temp < 0)
+			if (temp > 0)
 				val->intval = POWER_SUPPLY_STATUS_CHARGING;
-			else if (temp > 0)
+			else if (temp < 0)
 				val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
 			else
 				val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
