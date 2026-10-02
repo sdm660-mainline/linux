@@ -553,6 +553,14 @@ static int pmi8998_fg_notifier_call(struct notifier_block *nb, unsigned long val
 	return NOTIFY_OK;
 }
 
+static void pmi8998_fg_unregister_notifier(void *data)
+{
+	struct pmi8998_fg_chip *chip = data;
+
+	power_supply_unreg_notifier(&chip->nb);
+	cancel_delayed_work_sync(&chip->status_changed_work);
+}
+
 static int pmi8998_fg_probe(struct platform_device *pdev)
 {
 	struct power_supply_config supply_config = {};
@@ -665,6 +673,12 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 				"Failed to register notifier: %d\n", ret);
 			return ret;
 		}
+
+		ret = devm_add_action_or_reset(chip->dev,
+					       pmi8998_fg_unregister_notifier,
+					       chip);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
