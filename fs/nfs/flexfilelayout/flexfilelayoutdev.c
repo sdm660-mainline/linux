@@ -392,7 +392,7 @@ retry:
  * device error so that the server can tell which class of I/O the client
  * was unable to send to the mirror.
  *
- * Returns a pointer to a connected DS object on success or NULL on failure.
+ * Returns a pointer to a connected DS object on success or an ERR_PTR value on failure.
  */
 struct nfs4_pnfs_ds *
 nfs4_ff_layout_prepare_ds(struct pnfs_layout_segment *lseg,
