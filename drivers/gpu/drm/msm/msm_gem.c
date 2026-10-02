@@ -23,6 +23,8 @@
 #include "msm_gpu.h"
 #include "msm_kms.h"
 
+MODULE_IMPORT_NS("DMA_BUF");
+
 static void update_device_mem(struct msm_drm_private *priv, ssize_t size)
 {
 	uint64_t total_mem = atomic64_add_return(size, &priv->total_mem);
@@ -337,6 +339,9 @@ static vm_fault_t msm_gem_fault(struct vm_fault *vmf)
 	pgoff_t pgoff;
 	int err;
 	vm_fault_t ret;
+
+	if (drm_WARN_ON_ONCE(obj->dev, drm_gem_is_imported(obj)))
+		return VM_FAULT_SIGBUS;
 
 	/*
 	 * vm_ops.open/drm_gem_mmap_obj and close get and put
@@ -1125,6 +1130,25 @@ static void msm_gem_free_object(struct drm_gem_object *obj)
 static int msm_gem_object_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
+
+	if (drm_gem_is_imported(obj)) {
+		int ret;
+
+		/* Reset both vm_ops and vm_private_data, so we don't end up with
+		 * vm_ops pointing to our implementation if the dma-buf backend
+		 * doesn't set those fields.
+		 */
+		vma->vm_private_data = NULL;
+		vma->vm_ops = NULL;
+
+		ret = dma_buf_mmap(obj->dma_buf, vma, 0);
+
+		/* Drop the reference drm_gem_mmap_obj() acquired.*/
+		if (!ret)
+			drm_gem_object_put(obj);
+
+		return ret;
+	}
 
 	vm_flags_set(vma, VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP);
 	vma->vm_page_prot = msm_gem_pgprot(msm_obj, vma_get_page_prot(vma));
