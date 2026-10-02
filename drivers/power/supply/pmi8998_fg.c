@@ -654,8 +654,8 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	/* Optional: Get charger power supply for status checking */
-	chip->chg_psy = power_supply_get_by_reference(dev_fwnode(chip->dev),
-						    "power-supplies");
+	chip->chg_psy = devm_power_supply_get_by_reference(chip->dev,
+							   "power-supplies");
 	if (IS_ERR(chip->chg_psy)) {
 		ret = PTR_ERR(chip->chg_psy);
 		dev_warn(chip->dev, "Failed to get charger supply: %d\n", ret);
