@@ -38,10 +38,9 @@ static ssize_t regmap_name_read_file(struct file *file,
 {
 	struct regmap *map = file->private_data;
 	const char *name = "nodev";
+	char *buf __free(kfree) = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	int ret;
-	char *buf;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -49,14 +48,10 @@ static ssize_t regmap_name_read_file(struct file *file,
 		name = map->dev->driver->name;
 
 	ret = snprintf(buf, PAGE_SIZE, "%s\n", name);
-	if (ret >= PAGE_SIZE) {
-		kfree(buf);
+	if (ret >= PAGE_SIZE)
 		return ret;
-	}
 
-	ret = simple_read_from_buffer(user_buf, count, ppos, buf, ret);
-	kfree(buf);
-	return ret;
+	return simple_read_from_buffer(user_buf, count, ppos, buf, ret);
 }
 
 static const struct file_operations regmap_name_fops = {
