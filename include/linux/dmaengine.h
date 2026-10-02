@@ -2060,6 +2060,31 @@ static inline int dmaengine_desc_free(struct dma_async_tx_descriptor *desc)
 	return desc->desc_free(desc);
 }
 
+/**
+ * dmaengine_desc_set_callback - set the callback, callback_result and
+ *                               parameter on a descriptor
+ * @tx: the descriptor to set the callback on
+ * @cb: the plain completion callback, or NULL
+ * @cb_result: the result-bearing completion callback, or NULL
+ * @cb_param: the parameter to pass to the callback
+ *
+ * Sets the completion callbacks and their shared parameter on a DMA
+ * transaction descriptor. Use this helper instead of assigning the fields
+ * directly to ensure all three related fields are updated consistently.
+ * Only one of @cb and @cb_result should be non-NULL; if both are provided
+ * @cb_result takes precedence in drivers that support it.
+ */
+static inline void
+dmaengine_desc_set_callback(struct dma_async_tx_descriptor *tx,
+			    dma_async_tx_callback cb,
+			    dma_async_tx_callback_result cb_result,
+			    void *cb_param)
+{
+	tx->callback = cb;
+	tx->callback_result = cb_result;
+	tx->callback_param = cb_param;
+}
+
 /* --- DMA device --- */
 
 int dma_async_device_register(struct dma_device *device);
