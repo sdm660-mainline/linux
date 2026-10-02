@@ -294,6 +294,7 @@ void regcache_exit(struct regmap *map)
 	regcache_locked_exit(map);
 
 	kfree(map->reg_defaults);
+	map->reg_defaults = NULL;
 }
 
 /**
