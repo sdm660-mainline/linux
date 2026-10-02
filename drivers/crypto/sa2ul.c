@@ -1388,7 +1388,6 @@ static int sa_sha_run(struct ahash_request *req)
 
 static int sa_sha_setup(struct sa_tfm_ctx *ctx, struct  algo_data *ad)
 {
-	int bs = crypto_shash_blocksize(ctx->shash);
 	int cmdl_len;
 	struct sa_cmdl_cfg cfg;
 
@@ -1396,7 +1395,6 @@ static int sa_sha_setup(struct sa_tfm_ctx *ctx, struct  algo_data *ad)
 	ad->auth_eng.eng_id = SA_ENG_ID_AM1;
 	ad->auth_eng.sc_size = SA_CTX_AUTH_TYPE2_SZ;
 
-	memset(ctx->authkey, 0, bs);
 	memset(&cfg, 0, sizeof(cfg));
 	cfg.aalg = ad->aalg_id;
 	cfg.enc_eng_id = ad->enc_eng.eng_id;
@@ -1439,12 +1437,6 @@ static int sa_sha_cra_init_alg(struct crypto_tfm *tfm, const char *alg_base)
 		return ret;
 
 	if (alg_base) {
-		ctx->shash = crypto_alloc_shash(alg_base, 0, 0);
-		if (IS_ERR(ctx->shash)) {
-			dev_err(sa_k3_dev, "base driver %s couldn't be loaded\n",
-				alg_base);
-			return PTR_ERR(ctx->shash);
-		}
 		/* for fallback */
 		ctx->fallback.ahash =
 			crypto_alloc_ahash(alg_base, 0, CRYPTO_ALG_ASYNC);
@@ -1599,7 +1591,6 @@ static void sa_sha_cra_exit(struct crypto_tfm *tfm)
 	if (crypto_tfm_alg_type(tfm) == CRYPTO_ALG_TYPE_AHASH)
 		sa_free_ctx_info(&ctx->enc, data);
 
-	crypto_free_shash(ctx->shash);
 	crypto_free_ahash(ctx->fallback.ahash);
 }
 
