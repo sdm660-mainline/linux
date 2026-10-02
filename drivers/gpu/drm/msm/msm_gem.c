@@ -193,6 +193,9 @@ static struct page **get_pages(struct drm_gem_object *obj)
 
 	msm_gem_assert_locked(obj);
 
+	if (drm_WARN_ON_ONCE(obj->dev, drm_gem_is_imported(obj)))
+		return ERR_PTR(-EINVAL);
+
 	if (!msm_obj->pages) {
 		struct drm_device *dev = obj->dev;
 		struct page **p;
@@ -285,6 +288,9 @@ int msm_gem_make_resident_locked(struct drm_gem_object *obj, unsigned madv)
 	int err = check_madv_locked(obj, madv);
 	if (err)
 		return err;
+
+	if (is_resident(to_msm_bo(obj)))
+		return 0;
 
 	struct page **pages = get_pages(obj);
 	if (IS_ERR(pages))
