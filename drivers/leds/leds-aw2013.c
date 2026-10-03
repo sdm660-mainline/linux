@@ -395,7 +395,7 @@ static int aw20xx_probe_dt(struct aw20xx *chip)
 
 		led->cdev.brightness_set_blocking = aw20xx_brightness_set;
 		led->cdev.blink_set = aw20xx_blink_set;
-
+		chip->num_leds = i + 1;
 		ret = devm_led_classdev_register_ext(&chip->client->dev,
 						     &led->cdev, &init_data);
 		if (ret < 0)
@@ -407,7 +407,6 @@ static int aw20xx_probe_dt(struct aw20xx *chip)
 	if (!count)
 		return -EINVAL;
 
-	chip->num_leds = i;
 
 	return 0;
 }
