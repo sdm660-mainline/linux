@@ -834,8 +834,18 @@ struct arm_smmu_tlbi {
 	unsigned int iopte_size;
 	/* Base Translation Granule of the page table */
 	u8 tgsz_lg2;
-	bool has_cont;
 	bool leaf_only;
+
+	struct {
+		bool use_full_inv;
+		u16 num;
+	} single;
+
+	struct {
+		bool use_full_inv;
+		u8 num_cmds;
+		struct arm_smmu_cmd cmds[2];
+	} range;
 };
 
 struct arm_smmu_evtq {
