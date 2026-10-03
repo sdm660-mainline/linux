@@ -193,14 +193,12 @@ static int aw2013_chip_init(struct aw2013 *chip)
 	return ret;
 }
 
-static void aw2013_chip_disable(struct aw2013 *chip)
+static void aw2013_chip_poweroff(struct aw2013 *chip)
 {
 	int ret;
 
 	if (!chip->enabled)
 		return;
-
-	regmap_write(chip->regmap, AW2013_GCR, 0);
 
 	ret = regulator_bulk_disable(ARRAY_SIZE(chip->regulators),
 				     chip->regulators);
@@ -211,6 +209,16 @@ static void aw2013_chip_disable(struct aw2013 *chip)
 	}
 
 	chip->enabled = false;
+}
+
+static void aw2013_chip_disable(struct aw2013 *chip)
+{
+	if (!chip->enabled)
+		return;
+
+	regmap_write(chip->regmap, AW2013_GCR, 0);
+
+	aw2013_chip_poweroff(chip);
 }
 
 static int aw2013_chip_enable(struct aw2013 *chip)
@@ -231,7 +239,7 @@ static int aw2013_chip_enable(struct aw2013 *chip)
 
 	ret = aw2013_chip_init(chip);
 	if (ret)
-		aw2013_chip_disable(chip);
+		aw2013_chip_poweroff(chip);
 
 	return ret;
 }
@@ -253,9 +261,12 @@ static int aw2013_brightness_set(struct led_classdev *cdev,
 	struct aw2013_led *led = container_of(cdev, struct aw2013_led, cdev);
 	int ret, num;
 
+	if (!led->chip->enabled && brightness == 0)
+		return 0;
+
 	mutex_lock(&led->chip->mutex);
 
-	if (aw2013_chip_in_use(led->chip)) {
+	if (!led->chip->enabled) {
 		ret = aw2013_chip_enable(led->chip);
 		if (ret)
 			goto error;
@@ -284,7 +295,12 @@ static int aw2013_brightness_set(struct led_classdev *cdev,
 	if (!aw2013_chip_in_use(led->chip))
 		aw2013_chip_disable(led->chip);
 
+	mutex_unlock(&led->chip->mutex);
+
+	return ret;
+
 error:
+	aw2013_chip_poweroff(led->chip);
 	mutex_unlock(&led->chip->mutex);
 
 	return ret;
