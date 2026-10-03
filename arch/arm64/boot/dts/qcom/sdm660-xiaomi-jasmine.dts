@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2022, Joe Mason <buddyjojo06@outlook.com>
+ */
+
+/dts-v1/;
+
+#include "sdm660.dtsi"
+#include "sdm660-xiaomi-common.dtsi"
+
+/ {
+	model = "Xiaomi Mi A2";
+	compatible = "xiaomi,jasmine", "qcom,sdm660";
+	chassis-type = "handset";
+
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <3000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4400000>;
+	};
+};
+
+&blsp_i2c1 {
+	status = "okay";
+
+	touchscreen@1 {
+		compatible = "novatek,nt36672a-ts";
+		reg = <0x1>;
+		iovcc-supply = <&vreg_l11a_1p8>;
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-0 = <&ts_active>;
+		pinctrl-names = "default";
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2160>;
+	};
+};
+
+&framebuffer_mem {
+	reg = <0x0 0x9d400000 0x0 0x23ff000>;
+};
+
+&framebuffer0 {
+	width = <1080>;
+	height = <2160>;
+	stride = <(1080 * 4)>;
+
+	status = "okay";
+};
+
+&gpio_hall_sensor {
+	status = "disabled";
+};
+
+&pm660_charger {
+	monitored-battery = <&battery>;
+};
+
+&tlmm {
+	gpio-reserved-ranges = <8 4>; /* Fingerprint SPI */
+
+	ts_active: ts-active-state {
+		pins = "gpio66", "gpio67";
+		function = "gpio";
+		drive-strength = <16>;
+		bias-pull-up;
+	};
+};
+
+&vreg_l16a_2p7 {
+	regulator-always-on;
+};
+
+&vreg_l2b_2p95 {
+	regulator-max-microvolt = <2696000>;
+};
+
+&vreg_l3b_3p3 {
+	regulator-always-on;
+};
+
+&vreg_l5b_2p95 {
+	regulator-system-load = <800000>;
+};
