@@ -2054,9 +2054,6 @@ static int mpam_save_mbwu_state(void *arg)
 		ret = mpam_read_monsel_reg(msc, CFG_MBWU_CTL, &cur_ctl);
 		if (ret)
 			return ret;
-		ret = mpam_write_monsel_reg(msc, CFG_MBWU_CTL, 0);
-		if (ret)
-			return ret;
 
 		cfg->mon = i;
 		cfg->pmg = FIELD_GET(MSMON_CFG_x_FLT_PMG, cur_flt);
@@ -2087,6 +2084,10 @@ static int mpam_save_mbwu_state(void *arg)
 			 */
 			mbwu_state->correction = val;
 		}
+
+		ret = mpam_write_monsel_reg(msc, CFG_MBWU_CTL, 0);
+		if (ret)
+			return ret;
 
 		mpam_mon_sel_unlock(msc);
 	}
