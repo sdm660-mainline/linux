@@ -225,7 +225,7 @@ static void get_stats_counter(struct msm_ringbuffer *ring, u32 counter,
 	OUT_PKT7(ring, CP_REG_TO_MEM, 3);
 	OUT_RING(ring, CP_REG_TO_MEM_0_REG(counter) |
 		CP_REG_TO_MEM_0_CNT(2) |
-		CP_REG_TO_MEM_0_64B);
+		CP_REG_TO_MEM_0_IS_64B);
 	OUT_RING(ring, lower_32_bits(iova));
 	OUT_RING(ring, upper_32_bits(iova));
 }
