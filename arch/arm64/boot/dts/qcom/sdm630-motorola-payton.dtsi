@@ -163,6 +163,16 @@
 	status = "okay";
 };
 
+&pm660_charger {
+	monitored-battery = <&battery>;
+
+	status = "okay";
+};
+
+&pm660_rradc {
+	status = "okay";
+};
+
 &pm660l_gpios {
 	vol_up_default: vol-up-default-state {
 		pins = "gpio7";
