@@ -253,7 +253,7 @@ static int aw20xx_brightness_set(struct led_classdev *cdev,
 
 	mutex_lock(&led->chip->mutex);
 
-	if (aw20xx_chip_in_use(led->chip)) {
+	if (!led->chip->enabled) {
 		ret = aw20xx_chip_enable(led->chip);
 		if (ret)
 			goto error;
