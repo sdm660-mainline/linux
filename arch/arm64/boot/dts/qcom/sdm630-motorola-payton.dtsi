@@ -169,6 +169,13 @@
 	status = "okay";
 };
 
+&pm660_fg {
+	monitored-battery = <&battery>;
+	power-supplies = <&pm660_charger>;
+
+	status = "okay";
+};
+
 &pm660_rradc {
 	status = "okay";
 };
