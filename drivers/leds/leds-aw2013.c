@@ -398,6 +398,8 @@ static int aw2013_probe_dt(struct aw2013 *chip)
 		led->cdev.brightness_set_blocking = aw2013_brightness_set;
 		led->cdev.blink_set = aw2013_blink_set;
 
+		chip->num_leds = i + 1;
+
 		ret = devm_led_classdev_register_ext(&chip->client->dev,
 						     &led->cdev, &init_data);
 		if (ret < 0)
@@ -408,8 +410,6 @@ static int aw2013_probe_dt(struct aw2013 *chip)
 
 	if (!count)
 		return -EINVAL;
-
-	chip->num_leds = i;
 
 	return 0;
 }
