@@ -200,7 +200,7 @@
 			pwr_cpu_sleep_0: cpu-sleep-0-0 {
 				compatible = "arm,idle-state";
 				idle-state-name = "pwr-retention";
-				arm,psci-suspend-param = <0x40000002>;
+				arm,psci-suspend-param = <0x00000002>;
 				entry-latency-us = <338>;
 				exit-latency-us = <423>;
 				min-residency-us = <200>;
@@ -219,7 +219,7 @@
 			perf_cpu_sleep_0: cpu-sleep-1-0 {
 				compatible = "arm,idle-state";
 				idle-state-name = "perf-retention";
-				arm,psci-suspend-param = <0x40000002>;
+				arm,psci-suspend-param = <0x00000002>;
 				entry-latency-us = <154>;
 				exit-latency-us = <87>;
 				min-residency-us = <200>;
