@@ -135,6 +135,14 @@ static int aw20xx_chip_init(struct aw20xx *chip)
 {
 	int i, ret;
 
+
+	ret = regmap_write(chip->regmap, AW20XX_RSTR, AW20XX_RSTR_RESET);
+	if (ret) {
+		dev_err(&chip->client->dev, "Failed to reset the chip: %d\n",
+			ret);
+		return ret;
+	}
+
 	ret = regmap_write(chip->regmap, AW20XX_GCR, AW20XX_GCR_ENABLE);
 	if (ret) {
 		dev_err(&chip->client->dev, "Failed to enable the chip: %d\n",
@@ -364,8 +372,6 @@ static int aw20xx_probe_dt(struct aw20xx *chip)
 	count = of_get_available_child_count(np);
 	if (!count || count > AW20XX_MAX_LEDS)
 		return -EINVAL;
-
-	regmap_write(chip->regmap, AW20XX_RSTR, AW20XX_RSTR_RESET);
 
 	for_each_available_child_of_node_scoped(np, child) {
 		struct led_init_data init_data = {};
