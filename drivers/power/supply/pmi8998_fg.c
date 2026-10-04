@@ -157,7 +157,12 @@ static int pmi8998_fg_get_capacity(struct pmi8998_fg_chip *chip, int *val)
 	if (cap[0] != cap[1])
 		cap[0] = cap[0] < cap[1] ? cap[0] : cap[1];
 
-	*val = DIV_ROUND_CLOSEST((cap[0] - 1) * 98, 0xff - 2) + 1;
+	if (cap[0] == 0xff)
+		*val = 100;
+	else if (cap[0] == 0)
+		*val = 0;
+	else
+		*val = DIV_ROUND_CLOSEST((cap[0] - 1) * 98, 0xff - 2) + 1;
 
 	return 0;
 }
@@ -346,9 +351,9 @@ static int pmi8998_fg_get_property(struct power_supply *psy,
 				val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
 				break;
 			}
-			if (temp < 0)
+			if (temp > 0)
 				val->intval = POWER_SUPPLY_STATUS_CHARGING;
-			else if (temp > 0)
+			else if (temp < 0)
 				val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
 			else
 				val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
@@ -524,8 +529,8 @@ static int pmi8998_fg_notifier_call(struct notifier_block *nb, unsigned long val
 						POWER_SUPPLY_PROP_STATUS, &propval);
 		if (ret)
 			chip->status = POWER_SUPPLY_STATUS_UNKNOWN;
-
-		chip->status = propval.intval;
+		else
+			chip->status = propval.intval;
 
 		power_supply_changed(chip->batt_psy);
 
@@ -546,6 +551,14 @@ static int pmi8998_fg_notifier_call(struct notifier_block *nb, unsigned long val
 	}
 
 	return NOTIFY_OK;
+}
+
+static void pmi8998_fg_unregister_notifier(void *data)
+{
+	struct pmi8998_fg_chip *chip = data;
+
+	power_supply_unreg_notifier(&chip->nb);
+	cancel_delayed_work_sync(&chip->status_changed_work);
 }
 
 static int pmi8998_fg_probe(struct platform_device *pdev)
@@ -641,8 +654,8 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	/* Optional: Get charger power supply for status checking */
-	chip->chg_psy = power_supply_get_by_reference(dev_fwnode(chip->dev),
-						    "power-supplies");
+	chip->chg_psy = devm_power_supply_get_by_reference(chip->dev,
+							   "power-supplies");
 	if (IS_ERR(chip->chg_psy)) {
 		ret = PTR_ERR(chip->chg_psy);
 		dev_warn(chip->dev, "Failed to get charger supply: %d\n", ret);
@@ -660,6 +673,12 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 				"Failed to register notifier: %d\n", ret);
 			return ret;
 		}
+
+		ret = devm_add_action_or_reset(chip->dev,
+					       pmi8998_fg_unregister_notifier,
+					       chip);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
