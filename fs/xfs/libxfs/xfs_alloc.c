@@ -2439,17 +2439,22 @@ xfs_alloc_longest_free_extent(
 
 /*
  * Compute the minimum length of the AGFL in the given AG.  If @pag is NULL,
- * return the largest possible minimum length.
+ * return the largest possible minimum length. The base calculation accounts
+ * for a single full split per btree. @extra_levels adds additional split
+ * levels to compute the prospective AGFL requirement increase for
+ * multi-allocation transactions.
  */
-unsigned int
-xfs_alloc_min_freelist(
+static unsigned int
+__xfs_alloc_min_freelist(
 	struct xfs_mount	*mp,
-	struct xfs_perag	*pag)
+	struct xfs_perag	*pag,
+	unsigned int		extra_levels)
 {
 	/* AG btrees have at least 1 level. */
 	const unsigned int	bno_level = pag ? pag->pagf_bno_level : 1;
 	const unsigned int	cnt_level = pag ? pag->pagf_cnt_level : 1;
 	const unsigned int	rmap_level = pag ? pag->pagf_rmap_level : 1;
+	const unsigned int	levels = 1 + extra_levels;
 	unsigned int		min_free;
 
 	ASSERT(mp->m_alloc_maxlevels > 0);
@@ -2476,13 +2481,23 @@ xfs_alloc_min_freelist(
 	 */
 
 	/* space needed by-bno freespace btree */
-	min_free = min(bno_level + 1, mp->m_alloc_maxlevels) * 2 - 2;
+	min_free = min(bno_level + levels, mp->m_alloc_maxlevels) * 2 - 2;
 	/* space needed by-size freespace btree */
-	min_free += min(cnt_level + 1, mp->m_alloc_maxlevels) * 2 - 2;
+	min_free += min(cnt_level + levels, mp->m_alloc_maxlevels) * 2 - 2;
 	/* space needed reverse mapping used space btree */
-	if (xfs_has_rmapbt(mp))
-		min_free += min(rmap_level + 1, mp->m_rmap_maxlevels) * 2 - 2;
+	if (xfs_has_rmapbt(mp)) {
+		min_free += min(rmap_level + levels,
+				mp->m_rmap_maxlevels) * 2 - 2;
+	}
 	return min_free;
+}
+
+unsigned int
+xfs_alloc_min_freelist(
+	struct xfs_mount	*mp,
+	struct xfs_perag	*pag)
+{
+	return __xfs_alloc_min_freelist(mp, pag, 0);
 }
 
 /*
