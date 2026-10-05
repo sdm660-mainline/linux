@@ -1014,6 +1014,9 @@ static int gmc_v12_0_sw_init(struct amdgpu_ip_block *ip_block)
 
 	amdgpu_vm_manager_init(adev);
 
+	if (adev->vm_manager.npa_vmid)
+		adev->vm_manager.vmid_uq_mask_mmhub &= ~BIT(adev->vm_manager.npa_vmid);
+
 	r = amdgpu_gmc_ras_sw_init(adev);
 	if (r)
 		return r;
