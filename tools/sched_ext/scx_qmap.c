@@ -162,7 +162,9 @@ static void format_cid_ranges(struct qmap_arena *qa, s32 owner, char *buf, size_
 /* partition summary + one row per sched: weight, cpus, dispatch rate, cids */
 static void print_hier(struct qmap_arena *qa, struct hier_prev *prev, u64 own_cgid)
 {
-	char ranges[128], who[16];
+	/* worst case, no ranges: a comma and up to six digits per cid */
+	static char ranges[SCX_QMAP_MAX_CPUS * 7];
+	char who[16];
 	const char *rr = "-";
 	double secs;
 	u32 i;
