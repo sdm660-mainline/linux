@@ -1606,6 +1606,18 @@ dmaengine_get_fill_align(struct dma_chan *chan)
 }
 
 /**
+ * dmaengine_get_cap_mask - get capability mask of a DMA channel
+ * @chan: DMA channel
+ *
+ * Return a pointer to the capability mask of the DMA device backing @chan.
+ */
+static inline const dma_cap_mask_t *
+dmaengine_get_cap_mask(struct dma_chan *chan)
+{
+	return &chan->device->cap_mask;
+}
+
+/**
  * dmaengine_is_copy_aligned - test copy alignment
  * @chan: DMA channel
  * @off1: first buffer offset
@@ -1828,6 +1840,19 @@ static inline int
 __dma_has_cap(enum dma_transaction_type tx_type, dma_cap_mask_t *srcp)
 {
 	return test_bit(tx_type, srcp->bits);
+}
+
+/**
+ * dmaengine_has_cap - test whether a DMA channel supports a transaction type
+ * @chan: DMA channel
+ * @tx_type: transaction type to test
+ *
+ * Return true if @chan supports @tx_type, false otherwise.
+ */
+static inline bool
+dmaengine_has_cap(struct dma_chan *chan, enum dma_transaction_type tx_type)
+{
+	return dma_has_cap(tx_type, chan->device->cap_mask);
 }
 
 #define for_each_dma_cap_mask(cap, mask) \
