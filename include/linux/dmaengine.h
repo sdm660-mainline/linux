@@ -1558,6 +1558,54 @@ static inline bool is_dma_fill_aligned(struct dma_device *dev, size_t off1,
 }
 
 /**
+ * dmaengine_get_copy_align - get copy alignment requirement of a DMA channel
+ * @chan: DMA channel
+ *
+ * Return the copy alignment requirement of @chan as a power-of-2 exponent.
+ */
+static inline enum dmaengine_alignment
+dmaengine_get_copy_align(struct dma_chan *chan)
+{
+	return chan->device->copy_align;
+}
+
+/**
+ * dmaengine_get_xor_align - get xor alignment requirement of a DMA channel
+ * @chan: DMA channel
+ *
+ * Return the xor alignment requirement of @chan as a power-of-2 exponent.
+ */
+static inline enum dmaengine_alignment
+dmaengine_get_xor_align(struct dma_chan *chan)
+{
+	return chan->device->xor_align;
+}
+
+/**
+ * dmaengine_get_pq_align - get pq alignment requirement of a DMA channel
+ * @chan: DMA channel
+ *
+ * Return the pq alignment requirement of @chan as a power-of-2 exponent.
+ */
+static inline enum dmaengine_alignment
+dmaengine_get_pq_align(struct dma_chan *chan)
+{
+	return chan->device->pq_align;
+}
+
+/**
+ * dmaengine_get_fill_align - get fill alignment requirement of a DMA channel
+ * @chan: DMA channel
+ *
+ * Return the fill alignment requirement of @chan as a power-of-2 exponent.
+ */
+static inline enum dmaengine_alignment
+dmaengine_get_fill_align(struct dma_chan *chan)
+{
+	return chan->device->fill_align;
+}
+
+/**
  * dmaengine_is_copy_aligned - test copy alignment
  * @chan: DMA channel
  * @off1: first buffer offset
