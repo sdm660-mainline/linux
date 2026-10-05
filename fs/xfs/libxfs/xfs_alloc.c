@@ -2445,7 +2445,7 @@ xfs_alloc_longest_free_extent(
  * multi-allocation transactions.
  */
 static unsigned int
-__xfs_alloc_min_freelist(
+__xfs_alloc_freelist(
 	struct xfs_mount	*mp,
 	struct xfs_perag	*pag,
 	unsigned int		extra_levels)
@@ -2492,12 +2492,21 @@ __xfs_alloc_min_freelist(
 	return min_free;
 }
 
-unsigned int
-xfs_alloc_min_freelist(
+/*
+ * Compute the minimum and maximum length of the AGFL in the given AG. The max
+ * value in this context refers to the max requirement the AG might see in a
+ * multi-alloc transaction. If @pag is NULL, return the largest possible values.
+ */
+void
+xfs_alloc_freelist(
 	struct xfs_mount	*mp,
-	struct xfs_perag	*pag)
+	struct xfs_perag	*pag,
+	unsigned int		*min_free,
+	unsigned int		*max_free)
 {
-	return __xfs_alloc_min_freelist(mp, pag, 0);
+	*min_free = __xfs_alloc_freelist(mp, pag, 0);
+	if (max_free)
+		*max_free = __xfs_alloc_freelist(mp, pag, 1);
 }
 
 /*
@@ -2849,7 +2858,7 @@ xfs_alloc_fix_freelist(
 	struct xfs_buf		*agflbp = NULL;
 	struct xfs_alloc_arg	targs;	/* local allocation arguments */
 	xfs_agblock_t		bno;	/* freelist block */
-	xfs_extlen_t		need;	/* total blocks needed in freelist */
+	xfs_extlen_t		min_free;/* total blocks needed in freelist */
 	int			error = 0;
 
 	/* deferred ops (AGFL block frees) require permanent transactions */
@@ -2877,8 +2886,8 @@ xfs_alloc_fix_freelist(
 		goto out_agbp_relse;
 	}
 
-	need = xfs_alloc_min_freelist(mp, pag);
-	if (!xfs_alloc_space_available(args, need, alloc_flags |
+	xfs_alloc_freelist(mp, pag, &min_free, NULL);
+	if (!xfs_alloc_space_available(args, min_free, alloc_flags |
 			XFS_ALLOC_FLAG_CHECK))
 		goto out_agbp_relse;
 
@@ -2901,8 +2910,8 @@ xfs_alloc_fix_freelist(
 		xfs_agfl_reset(tp, agbp, pag);
 
 	/* If there isn't enough total space or single-extent, reject it. */
-	need = xfs_alloc_min_freelist(mp, pag);
-	if (!xfs_alloc_space_available(args, need, alloc_flags))
+	xfs_alloc_freelist(mp, pag, &min_free, NULL);
+	if (!xfs_alloc_space_available(args, min_free, alloc_flags))
 		goto out_agbp_relse;
 
 	if (IS_ENABLED(CONFIG_XFS_DEBUG) && args->alloc_minlen_only) {
@@ -2944,7 +2953,7 @@ xfs_alloc_fix_freelist(
 	else
 		targs.oinfo = XFS_RMAP_OINFO_AG;
 	while (!(alloc_flags & XFS_ALLOC_FLAG_NOSHRINK) &&
-			pag->pagf_flcount > need) {
+			pag->pagf_flcount > min_free) {
 		error = xfs_alloc_get_freelist(pag, tp, agbp, &bno, 0);
 		if (error)
 			goto out_agbp_relse;
@@ -2978,9 +2987,9 @@ xfs_alloc_fix_freelist(
 		goto out_agbp_relse;
 
 	/* Make the freelist longer if it's too short. */
-	while (pag->pagf_flcount < need) {
+	while (pag->pagf_flcount < min_free) {
 		targs.agbno = 0;
-		targs.maxlen = need - pag->pagf_flcount;
+		targs.maxlen = min_free - pag->pagf_flcount;
 		targs.resv = XFS_AG_RESV_AGFL;
 
 		/* Allocate as many blocks as possible at once. */

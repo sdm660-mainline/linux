@@ -3074,6 +3074,7 @@ xfs_ialloc_calc_rootino(
 {
 	struct xfs_ino_geometry	*igeo = M_IGEO(mp);
 	xfs_agblock_t		first_bno;
+	unsigned int		min_free;
 
 	/*
 	 * Pre-calculate the geometry of AG 0.  We know what it looks like
@@ -3092,7 +3093,8 @@ xfs_ialloc_calc_rootino(
 	first_bno += 1;
 
 	/* ...the initial AGFL... */
-	first_bno += xfs_alloc_min_freelist(mp, NULL);
+	xfs_alloc_freelist(mp, NULL, &min_free, NULL);
+	first_bno += min_free;
 
 	/* ...the free inode btree root... */
 	if (xfs_has_finobt(mp))
