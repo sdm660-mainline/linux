@@ -1104,12 +1104,9 @@ xrep_iunlink_reload_next(
 	if (VFS_I(ip)->i_nlink != 0) {
 		error = xrep_iunlink_store_next(ragi, agino, NULLAGINO);
 		if (error)
-			return error;
+			goto rele;
 
 		error = xrep_iunlink_store_prev(ragi, agino, LINKED_AGINO);
-		if (error)
-			return error;
-
 		goto rele;
 	}
 
@@ -1123,7 +1120,7 @@ xrep_iunlink_reload_next(
 	 */
 rele:
 	xchk_irele(sc, ip);
-	return 0;
+	return error;
 }
 
 /*
