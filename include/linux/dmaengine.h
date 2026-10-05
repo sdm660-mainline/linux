@@ -1557,6 +1557,70 @@ static inline bool is_dma_fill_aligned(struct dma_device *dev, size_t off1,
 	return dmaengine_check_align(dev->fill_align, off1, off2, len);
 }
 
+/**
+ * dmaengine_is_copy_aligned - test copy alignment
+ * @chan: DMA channel
+ * @off1: first buffer offset
+ * @off2: second buffer offset
+ * @len: transfer length
+ *
+ * Return true if off1, off2 and len satisfy the copy alignment requirement of
+ * the DMA channel, false otherwise.
+ */
+static inline bool dmaengine_is_copy_aligned(struct dma_chan *chan, size_t off1,
+					     size_t off2, size_t len)
+{
+	return dmaengine_check_align(chan->device->copy_align, off1, off2, len);
+}
+
+/**
+ * dmaengine_is_xor_aligned - test xor alignment
+ * @chan: DMA channel
+ * @off1: first buffer offset
+ * @off2: second buffer offset
+ * @len: transfer length
+ *
+ * Return true if off1, off2 and len satisfy the xor alignment requirement of
+ * the DMA channel, false otherwise.
+ */
+static inline bool dmaengine_is_xor_aligned(struct dma_chan *chan, size_t off1,
+					    size_t off2, size_t len)
+{
+	return dmaengine_check_align(chan->device->xor_align, off1, off2, len);
+}
+
+/**
+ * dmaengine_is_pq_aligned - test pq alignment
+ * @chan: DMA channel
+ * @off1: first buffer offset
+ * @off2: second buffer offset
+ * @len: transfer length
+ *
+ * Return true if off1, off2 and len satisfy the pq alignment requirement of
+ * the DMA channel, false otherwise.
+ */
+static inline bool dmaengine_is_pq_aligned(struct dma_chan *chan, size_t off1,
+					   size_t off2, size_t len)
+{
+	return dmaengine_check_align(chan->device->pq_align, off1, off2, len);
+}
+
+/**
+ * dmaengine_is_fill_aligned - test fill alignment
+ * @chan: DMA channel
+ * @off1: first buffer offset
+ * @off2: second buffer offset
+ * @len: transfer length
+ *
+ * Return true if off1, off2 and len satisfy the fill alignment requirement of
+ * the DMA channel, false otherwise.
+ */
+static inline bool dmaengine_is_fill_aligned(struct dma_chan *chan, size_t off1,
+					     size_t off2, size_t len)
+{
+	return dmaengine_check_align(chan->device->fill_align, off1, off2, len);
+}
+
 static inline void
 dma_set_maxpq(struct dma_device *dma, int maxpq, int has_pq_continue)
 {
