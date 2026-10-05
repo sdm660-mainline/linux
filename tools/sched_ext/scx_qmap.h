@@ -163,6 +163,17 @@ struct qmap_arena {
 	u64 alloc_ts;			/* last accounting timestamp */
 	u64 alloc_window_ns;		/* total accounted time, the alloc denominator */
 
+	/*
+	 * The per-cid fields are written only by that cid's notifications and
+	 * read by flush_alloc() for the snapshot userspace displays.
+	 */
+	s32 cid_sched[SCX_QMAP_MAX_CPUS]; /* per cid: owner id of the sched running there */
+	u64 cid_sched_since[SCX_QMAP_MAX_CPUS]; /* when that last changed */
+	u64 used_ns[MAX_SUB_SCHEDS];	/* per child slot, closed intervals */
+	u64 self_used_ns;
+	u64 used_snap_ns[MAX_SUB_SCHEDS]; /* used_ns[] plus the intervals open at the flush */
+	u64 self_used_snap_ns;
+
 	/* bpf-internal cmasks (embedded, see struct qmap_cmask) */
 	struct qmap_cmask self_cids;	/* cids this node runs its own tasks on */
 	struct qmap_cmask avail_cids;	/* cids with caps in effect on the cpu */
