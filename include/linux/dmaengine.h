@@ -1253,6 +1253,21 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_memcpy(
 }
 
 /**
+ * dmaengine_get_max_xor - get the maximum number of XOR sources for a channel
+ * @chan: DMA channel
+ *
+ * Returns the maximum number of source buffers supported by the XOR engine
+ * behind @chan, or 0 if the channel does not support XOR operations.
+ */
+static inline unsigned int dmaengine_get_max_xor(struct dma_chan *chan)
+{
+	if (!chan || !chan->device)
+		return 0;
+
+	return chan->device->max_xor;
+}
+
+/**
  * dmaengine_prep_dma_xor - prepare a DMA XOR operation
  * @chan: the channel to use for this operation
  * @dst: destination buffer address
