@@ -1252,6 +1252,122 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_memcpy(
 						    len, flags);
 }
 
+/**
+ * dmaengine_prep_dma_xor - prepare a DMA XOR operation
+ * @chan: the channel to use for this operation
+ * @dst: destination buffer address
+ * @src: array of source buffer addresses
+ * @src_cnt: number of source buffers
+ * @len: length in bytes of each source and destination buffer
+ * @flags: DMA engine flags (e.g. DMA_PREP_INTERRUPT)
+ *
+ * Prepare an XOR parity generation transaction.  The engine computes:
+ *   dst = src[0] XOR src[1] XOR ... XOR src[src_cnt - 1]
+ *
+ * Returns a descriptor on success, or NULL if the channel does not support
+ * this operation or the request could not be queued.
+ */
+static inline struct dma_async_tx_descriptor *
+dmaengine_prep_dma_xor(struct dma_chan *chan, dma_addr_t dst, dma_addr_t *src,
+		       unsigned int src_cnt, size_t len, unsigned long flags)
+{
+	if (!chan || !chan->device || !chan->device->device_prep_dma_xor)
+		return NULL;
+
+	return chan->device->device_prep_dma_xor(chan, dst, src,
+						 src_cnt, len, flags);
+}
+
+/**
+ * dmaengine_prep_dma_xor_val - prepare a DMA XOR zero-sum validation operation
+ * @chan: the channel to use for this operation
+ * @src: array of source buffer addresses
+ * @src_cnt: number of source buffers
+ * @len: length in bytes of each source buffer
+ * @result: output flag set to SUM_CHECK_P_RESULT if the XOR of all sources
+ *          is non-zero (i.e. parity error), cleared otherwise
+ * @flags: DMA engine flags (e.g. DMA_PREP_INTERRUPT)
+ *
+ * Prepare an XOR zero-sum validation transaction.  The engine XORs all
+ * source buffers and checks whether the result is zero.  The outcome is
+ * written to @result on completion.
+ *
+ * Returns a descriptor on success, or NULL if the channel does not support
+ * this operation or the request could not be queued.
+ */
+static inline struct dma_async_tx_descriptor *
+dmaengine_prep_dma_xor_val(struct dma_chan *chan, dma_addr_t *src,
+			   unsigned int src_cnt, size_t len,
+			   enum sum_check_flags *result, unsigned long flags)
+{
+	if (!chan || !chan->device || !chan->device->device_prep_dma_xor_val)
+		return NULL;
+
+	return chan->device->device_prep_dma_xor_val(chan, src, src_cnt,
+						     len, result, flags);
+}
+
+/**
+ * dmaengine_prep_dma_pq - prepare a DMA PQ (RAID-6 P+Q) operation
+ * @chan: the channel to use for this operation
+ * @dst: array of two destination addresses: dst[0] for P, dst[1] for Q
+ * @src: array of source buffer addresses
+ * @src_cnt: number of source buffers
+ * @scf: array of scaling coefficients, one per source buffer
+ * @len: length in bytes of each source and destination buffer
+ * @flags: DMA engine flags (e.g. DMA_PREP_INTERRUPT)
+ *
+ * Prepare a P+Q parity generation transaction.  The engine computes:
+ *   P = XOR of all source buffers
+ *   Q = Galois field sum of (scf[i] * src[i]) over all sources
+ *
+ * Returns a descriptor on success, or NULL if the channel does not support
+ * this operation or the request could not be queued.
+ */
+static inline struct dma_async_tx_descriptor *
+dmaengine_prep_dma_pq(struct dma_chan *chan, dma_addr_t *dst, dma_addr_t *src,
+		      unsigned int src_cnt, const unsigned char *scf,
+		      size_t len, unsigned long flags)
+{
+	if (!chan || !chan->device || !chan->device->device_prep_dma_pq)
+		return NULL;
+
+	return chan->device->device_prep_dma_pq(chan, dst, src,
+						src_cnt, scf, len, flags);
+}
+
+/**
+ * dmaengine_prep_dma_pq_val - prepare a DMA PQ validation operation
+ * @chan: the channel to use for this operation
+ * @pq: array of two addresses holding existing P and Q parity buffers
+ * @src: array of source buffer addresses
+ * @src_cnt: number of source buffers
+ * @scf: array of scaling coefficients, one per source buffer
+ * @len: length in bytes of each buffer
+ * @pqres: output flags indicating P and/or Q check results (SUM_CHECK_P_VALID,
+ *         SUM_CHECK_Q_VALID)
+ * @flags: DMA engine flags (e.g. DMA_PREP_INTERRUPT)
+ *
+ * Prepare a PQ validation transaction.  The engine recomputes P and Q from the
+ * source buffers and compares them against the existing parity stored at @pq.
+ * The result of each comparison is reported through @pqres.
+ *
+ * Returns a descriptor on success, or NULL if the channel does not support
+ * this operation or the request could not be queued.
+ */
+static inline struct dma_async_tx_descriptor *
+dmaengine_prep_dma_pq_val(struct dma_chan *chan, dma_addr_t *pq, dma_addr_t *src,
+			  unsigned int src_cnt, const unsigned char *scf,
+			  size_t len, enum sum_check_flags *pqres, unsigned long flags)
+{
+	if (!chan || !chan->device || !chan->device->device_prep_dma_pq_val)
+		return NULL;
+
+	return chan->device->device_prep_dma_pq_val(chan, pq, src,
+						    src_cnt, scf, len,
+						    pqres, flags);
+}
+
 static inline bool dmaengine_is_metadata_mode_supported(struct dma_chan *chan,
 		enum dma_desc_metadata_mode mode)
 {
@@ -1604,6 +1720,24 @@ __dma_has_cap(enum dma_transaction_type tx_type, dma_cap_mask_t *srcp)
 
 #define for_each_dma_cap_mask(cap, mask) \
 	for_each_set_bit(cap, mask.bits, DMA_TX_TYPE_END)
+
+/**
+ * dmaengine_prep_dma_interrupt() - Prepare a DMA interrupt descriptor.
+ * @chan: The channel to be used for this descriptor
+ * @flags: DMA engine flags
+ *
+ * Returns a descriptor for an interrupt transaction, or NULL if the
+ * channel does not support DMA_INTERRUPT.
+ */
+static inline struct dma_async_tx_descriptor *
+dmaengine_prep_dma_interrupt(struct dma_chan *chan, unsigned long flags)
+{
+	if (!chan || !chan->device || !chan->device->device_prep_dma_interrupt ||
+	    !dma_has_cap(DMA_INTERRUPT, chan->device->cap_mask))
+		return NULL;
+
+	return chan->device->device_prep_dma_interrupt(chan, flags);
+}
 
 /**
  * dma_async_issue_pending - flush pending transactions to HW
