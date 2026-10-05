@@ -12,6 +12,16 @@ maintainers:
 allOf:
   - $ref: i3c.yaml#
 
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: altr,agilex5-dw-i3c-master
+    then:
+      properties:
+        resets:
+          maxItems: 1
+
 properties:
   compatible:
     oneOf:
@@ -39,7 +49,7 @@ properties:
     maxItems: 1
 
   resets:
-    maxItems: 1
+    maxItems: 2
 
   power-domains:
     maxItems: 1
