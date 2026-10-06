@@ -75,24 +75,4 @@ examples:
         };
     };
 
-  - |
-    #include <dt-bindings/interrupt-controller/arm-gic.h>
-    #include <dt-bindings/clock/nuvoton,ma35d1-clk.h>
-    #include <dt-bindings/reset/nuvoton,ma35d1-reset.h>
-
-    soc {
-        #address-cells = <2>;
-        #size-cells = <2>;
-
-        spi@40600000 {
-            compatible = "nuvoton,ma35d1-spi";
-            reg = <0 0x40600000 0 0x10000>;
-            interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-            clocks = <&clk SPI0_GATE>;
-            resets = <&sys MA35D1_RESET_SPI0>;
-
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-    };
 ...
