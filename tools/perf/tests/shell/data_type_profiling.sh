@@ -8,8 +8,8 @@ set -e
 # data type profiling manifestation
 
 # Values in testtypes and testprogs should match
-testtypes=("# data-type: struct Buf" "# data-type: struct buf")
-testprogs=("perf test -w code_with_type" "perf test -w datasym")
+testtypes=("# data-type: struct Buf" "# data-type: struct buf" "# data-type: struct net_conn")
+testprogs=("perf test -w code_with_type" "perf test -w datasym" "perf test -w false_sharing")
 
 err=0
 perfdata=$(mktemp /tmp/__perf_test.perf.data.XXXXX)
@@ -59,6 +59,9 @@ test_basic_annotate() {
 
     "xC")
     index=1 ;;
+
+    "xFS")
+    index=2 ;;
   esac
 
   # Under 'set -e' a bare failing command aborts the script through the EXIT
@@ -114,6 +117,8 @@ test_basic_annotate Basic Rust
 test_basic_annotate Pipe Rust
 test_basic_annotate Basic C
 test_basic_annotate Pipe C
+test_basic_annotate Basic FS
+test_basic_annotate Pipe FS
 
 cleanup
 exit $err

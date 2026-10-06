@@ -175,6 +175,7 @@ static struct test_workload *workloads[] = {
 	&workload__context_switch_loop,
 	&workload__deterministic,
 	&workload__callchain,
+	&workload__false_sharing,
 
 #ifdef HAVE_RUST_SUPPORT
 	&workload__code_with_type,
