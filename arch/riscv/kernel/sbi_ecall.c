@@ -9,7 +9,7 @@ long __sbi_base_ecall(int fid)
 {
 	struct sbiret ret;
 
-	ret = sbi_ecall(SBI_EXT_BASE, fid, 0, 0, 0, 0, 0, 0);
+	ret = sbi_ecall(SBI_EXT_BASE, fid);
 	if (!ret.error)
 		return ret.value;
 	else
