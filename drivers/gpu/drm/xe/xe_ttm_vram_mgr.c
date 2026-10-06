@@ -886,11 +886,11 @@ static struct xe_vram_region *xe_ttm_vram_addr_to_region(struct xe_device *xe, u
 }
 
 /**
- * xe_ttm_vram_handle_addr_fault - Handle vram physical address error flaged
+ * xe_ttm_vram_handle_addr_fault - Handle vram physical address error flagged
  * @xe: pointer to parent device
  * @addr: physical faulty address
  *
- * Handle the physcial faulty address error on specific tile.
+ * Handle the physical faulty address error on specific tile.
  *
  * Returns 0 for success, negative error code otherwise as follow:
  * * %-EIO - critical BO or address outside any VRAM region; next action is reset.
@@ -953,7 +953,7 @@ EXPORT_SYMBOL(xe_ttm_vram_handle_addr_fault);
  * debugfs interface for testing page offlining.
  *
  * Note: Executing this test will permanently retire the allocated
- * memory tracking pages. The driver must be rebinded (unbind and bind)
+ * memory tracking pages. The driver must be rebound (unbind and bind)
  * post-test execution to reclaim the reserved space, as these pages
  * cannot be freed or reclaimed dynamically while the current instance
  * remains active.
