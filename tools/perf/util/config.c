@@ -31,6 +31,7 @@
 #include "callchain.h"
 #include "debug.h"
 #include "header.h"
+#include "mutex.h"
 #include "path.h"
 #include "srcline.h"
 #include "unwind.h"
@@ -371,10 +372,8 @@ static int perf_parse_long(const char *value, long *ret)
 
 static void bad_config(const char *name)
 {
-	if (config_file_name)
-		pr_warning("bad config value for '%s' in %s, ignoring...\n", name, config_file_name);
-	else
-		pr_warning("bad config value for '%s', ignoring...\n", name);
+	/* config_file_name is owned by the parsing thread, under config_mutex. */
+	pr_warning("bad config value for '%s', ignoring...\n", name);
 }
 
 int perf_config_u64(u64 *dest, const char *name, const char *value)
@@ -550,11 +549,18 @@ int perf_default_config(const char *var, const char *value,
 	return 0;
 }
 
+/* Parsing and rewriting share the static parser state. */
+static DEFINE_MUTEX(config_mutex);
+
+/* Serializes whole perf_config__set_variable() updates. */
+static DEFINE_MUTEX(config_update_mutex);
+
 static int perf_config_from_file(config_fn_t fn, const char *filename, void *data)
 {
 	int ret;
 	FILE *f = fopen(filename, "r");
 
+	mutex_lock(&config_mutex);
 	ret = -1;
 	if (f) {
 		config_file = f;
@@ -565,21 +571,24 @@ static int perf_config_from_file(config_fn_t fn, const char *filename, void *dat
 		fclose(f);
 		config_file_name = NULL;
 	}
+	mutex_unlock(&config_mutex);
 	return ret;
+}
+
+/* system_path() allocates, so it is computed once. */
+static const char *etc_perfconfig;
+
+static void perf_etc_perfconfig__init(void)
+{
+	etc_perfconfig = system_path(ETC_PERFCONFIG);
+	if (!etc_perfconfig)
+		etc_perfconfig = ETC_PERFCONFIG;
 }
 
 const char *perf_etc_perfconfig(void)
 {
-	static const char *system_wide;
-
-	if (!system_wide)
-		/*
-		 * ETC_PERFCONFIG is absolute, so its unresolved path is
-		 * the same string, better than the callers crashing.
-		 */
-		system_wide = system_path(ETC_PERFCONFIG) ?: ETC_PERFCONFIG;
-
-	return system_wide;
+	DO_ONCE(perf_etc_perfconfig__init);
+	return etc_perfconfig;
 }
 
 static int perf_env_bool(const char *k, int def)
@@ -637,19 +646,18 @@ out_free:
 	return NULL;
 }
 
+/* home_perfconfig() allocates and warns, so it is computed once. */
+static const char *home_config;
+
+static void perf_home_perfconfig__init(void)
+{
+	home_config = home_perfconfig();
+}
+
 const char *perf_home_perfconfig(void)
 {
-	static const char *config;
-	static bool failed;
-
-	if (failed || config)
-		return config;
-
-	config = home_perfconfig();
-	if (!config)
-		failed = true;
-
-	return config;
+	DO_ONCE(perf_home_perfconfig__init);
+	return home_config;
 }
 
 static struct perf_config_section *find_section(struct list_head *sections,
@@ -790,8 +798,15 @@ out_free:
 int perf_config_set__collect(struct perf_config_set *set, const char *file_name,
 			     const char *var, const char *value)
 {
+	int ret;
+
+	mutex_lock(&config_mutex);
 	config_file_name = file_name;
-	return collect_config(var, value, set);
+	ret = collect_config(var, value, set);
+	/* Don't leave the static parser state pointing at the caller's buffer. */
+	config_file_name = NULL;
+	mutex_unlock(&config_mutex);
+	return ret;
 }
 
 static int perf_config_set__init(struct perf_config_set *set)
@@ -838,6 +853,10 @@ struct perf_config_set *perf_config_set__load_file(const char *file)
 	return set;
 }
 
+/* Not config_mutex: building the set parses the config files, which takes it. */
+static DEFINE_MUTEX(config_set_mutex);
+
+/* Called with config_set_mutex held. */
 static int perf_config__init(void)
 {
 	if (config_set == NULL)
@@ -878,16 +897,26 @@ out:
 
 int perf_config(config_fn_t fn, void *data)
 {
-	if (config_set == NULL && perf_config__init())
-		return -1;
+	struct perf_config_set *set;
 
-	return perf_config_set(config_set, fn, data);
+	/* Not held across the dispatch: a callback can call perf_config() again. */
+	mutex_lock(&config_set_mutex);
+	if (perf_config__init()) {
+		mutex_unlock(&config_set_mutex);
+		return -1;
+	}
+	set = config_set;
+	mutex_unlock(&config_set_mutex);
+
+	return perf_config_set(set, fn, data);
 }
 
 void perf_config__exit(void)
 {
+	mutex_lock(&config_set_mutex);
 	perf_config_set__delete(config_set);
 	config_set = NULL;
+	mutex_unlock(&config_set_mutex);
 }
 
 int perf_config_set__write(struct perf_config_set *set,
@@ -898,9 +927,12 @@ int perf_config_set__write(struct perf_config_set *set,
 	int ret = 0;
 	FILE *fp;
 
+	mutex_lock(&config_mutex);
 	fp = fopen(file_name, "w");
-	if (!fp)
+	if (!fp) {
+		mutex_unlock(&config_mutex);
 		return -1;
+	}
 
 	if (fprintf(fp, "# this file is auto-generated.\n") < 0)
 		ret = -1;
@@ -922,6 +954,7 @@ int perf_config_set__write(struct perf_config_set *set,
 	}
 	if (fclose(fp) != 0)
 		ret = -1;
+	mutex_unlock(&config_mutex);
 
 	return ret;
 }
@@ -933,14 +966,20 @@ int perf_config_set__write(struct perf_config_set *set,
  */
 int perf_config__set_variable(const char *var, const char *value)
 {
-	char path[PATH_MAX];
-	char *user_config = mkpath(path, sizeof(path), "%s/.perfconfig", getenv("HOME"));
 	const char *config_filename;
 	bool system_config;
-	struct perf_config_set *set;
+	struct perf_config_set *set = NULL;
 	int ret = -1;
 
-	config_filename = config_exclusive_filename ?: user_config;
+	mutex_lock(&config_update_mutex);
+
+	/* Static: the parser publishes it as config_file_name. */
+	{
+		static char path[PATH_MAX];
+		char *user_config = mkpath(path, sizeof(path), "%s/.perfconfig", getenv("HOME"));
+
+		config_filename = config_exclusive_filename ?: user_config;
+	}
 
 	/* Rewriting the system wide file keeps its entries, or it is truncated. */
 	system_config = strcmp(config_filename, perf_etc_perfconfig()) == 0;
@@ -962,6 +1001,7 @@ int perf_config__set_variable(const char *var, const char *value)
 	ret = 0;
 out_err:
 	perf_config_set__delete(set);
+	mutex_unlock(&config_update_mutex);
 	return ret;
 }
 
