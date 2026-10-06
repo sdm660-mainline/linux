@@ -12,6 +12,7 @@
 #include "config.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -881,6 +882,81 @@ void perf_config__exit(void)
 {
 	perf_config_set__delete(config_set);
 	config_set = NULL;
+}
+
+int perf_config_set__write(struct perf_config_set *set,
+			   const char *file_name, bool system_config)
+{
+	struct perf_config_section *section = NULL;
+	struct perf_config_item *item = NULL;
+	int ret = 0;
+	FILE *fp;
+
+	fp = fopen(file_name, "w");
+	if (!fp)
+		return -1;
+
+	if (fprintf(fp, "# this file is auto-generated.\n") < 0)
+		ret = -1;
+
+	/* overwrite configvariables */
+	perf_config_sections__for_each_entry(&set->sections, section) {
+		if (!system_config && section->from_system_config)
+			continue;
+		if (fprintf(fp, "[%s]\n", section->name) < 0)
+			ret = -1;
+
+		perf_config_items__for_each_entry(&section->items, item) {
+			if (!system_config && item->from_system_config)
+				continue;
+			if (item->value &&
+			    fprintf(fp, "\t%s = %s\n", item->name, item->value) < 0)
+				ret = -1;
+		}
+	}
+	if (fclose(fp) != 0)
+		ret = -1;
+
+	return ret;
+}
+
+/*
+ * Set @var=@value in the config file perf is using: ~/.perfconfig or the
+ * file named by PERF_CONFIG.  Same rewrite 'perf config' does, comments
+ * are not preserved.
+ */
+int perf_config__set_variable(const char *var, const char *value)
+{
+	char path[PATH_MAX];
+	char *user_config = mkpath(path, sizeof(path), "%s/.perfconfig", getenv("HOME"));
+	const char *config_filename;
+	bool system_config;
+	struct perf_config_set *set;
+	int ret = -1;
+
+	config_filename = config_exclusive_filename ?: user_config;
+
+	/* Rewriting the system wide file keeps its entries, or it is truncated. */
+	system_config = strcmp(config_filename, perf_etc_perfconfig()) == 0;
+
+	set = perf_config_set__new();
+	if (!set)
+		goto out_err;
+
+	if (perf_config_set__collect(set, config_filename, var, value) < 0) {
+		pr_err("Failed to add '%s=%s'\n", var, value);
+		goto out_err;
+	}
+
+	if (perf_config_set__write(set, config_filename, system_config) < 0) {
+		pr_err("Failed to set the configs on %s\n", config_filename);
+		goto out_err;
+	}
+
+	ret = 0;
+out_err:
+	perf_config_set__delete(set);
+	return ret;
 }
 
 static void perf_config_item__delete(struct perf_config_item *item)
