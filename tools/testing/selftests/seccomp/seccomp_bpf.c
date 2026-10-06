@@ -4916,20 +4916,27 @@ FIXTURE_VARIANT_ADD(notification_restart, both) {
 	.restart = true, .killable = true,
 };
 
-FIXTURE_SETUP(notification_restart)
+static unsigned int
+notification_restart_flags(const FIXTURE_VARIANT(notification_restart) *variant)
 {
 	unsigned int flags = SECCOMP_FILTER_FLAG_NEW_LISTENER;
 
+	if (variant->restart)
+		flags |= SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV;
+	if (variant->killable)
+		flags |= SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV;
+	return flags;
+}
+
+FIXTURE_SETUP(notification_restart)
+{
 	self->pid = -1;
 	self->listener = -1;
 	self->sync[0] = self->sync[1] = -1;
 	ASSERT_EQ(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0), 0);
 	ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, self->sync), 0);
-	if (variant->restart)
-		flags |= SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV;
-	if (variant->killable)
-		flags |= SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV;
-	self->listener = user_notif_syscall(__NR_getppid, flags);
+	self->listener = user_notif_syscall(__NR_getppid,
+					    notification_restart_flags(variant));
 	ASSERT_GE(self->listener, 0);
 }
 
@@ -4944,27 +4951,48 @@ FIXTURE_TEARDOWN(notification_restart)
 	close(self->sync[1]);
 }
 
-static void notification_restart_child(struct __test_metadata *_metadata,
-				       struct _test_data_notification_restart *self)
+/*
+ * Fork the notifying child with SIGUSR1 handled. Returns true in the
+ * child, which sends its result with notification_report().
+ */
+static bool notification_restart_fork(struct __test_metadata *_metadata,
+				      struct _test_data_notification_restart *self)
 {
 	struct sigaction action = { .sa_handler = notification_restart_handler };
-	long result[2];
 
 	self->pid = fork();
 	ASSERT_GE(self->pid, 0);
 	if (self->pid)
-		return;
+		return false;
 
-	close(self->listener);
 	close(self->sync[0]);
 	handled = self->sync[1];
 	if (sigemptyset(&action.sa_mask) || sigaction(SIGUSR1, &action, NULL))
 		_exit(1);
-	result[0] = syscall(__NR_getppid);
-	result[1] = errno;
+	return true;
+}
+
+/* Send the child's syscall result to notification_result(), and exit. */
+static __noreturn void notification_report(long ret, int err)
+{
+	long result[2] = { ret, err };
+
 	if (write(handled, result, sizeof(result)) != sizeof(result))
 		_exit(1);
 	_exit(0);
+}
+
+static void notification_restart_child(struct __test_metadata *_metadata,
+				       struct _test_data_notification_restart *self)
+{
+	long ret;
+
+	if (!notification_restart_fork(_metadata, self))
+		return;
+
+	close(self->listener);
+	ret = syscall(__NR_getppid);
+	notification_report(ret, errno);
 }
 
 static void notification_pending(struct __test_metadata *_metadata, int fd)
@@ -5084,28 +5112,17 @@ TEST_F(notification_restart, after_receive)
 	notification_result(_metadata, self, USER_NOTIF_MAGIC, 0);
 }
 
-TEST_F(notification_restart, fork_and_close)
+/*
+ * Fork a child that installs its own filter notifying on @nr, so that the
+ * test process is not mediated, and receive the child's listener. Returns
+ * true in the child.
+ */
+static bool
+notification_restart_filtered(struct __test_metadata *_metadata,
+			      struct _test_data_notification_restart *self,
+			      const FIXTURE_VARIANT(notification_restart) *variant,
+			      int nr)
 {
-	struct sigaction action = { .sa_handler = notification_restart_handler };
-	struct sock_filter filter[] = {
-		BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
-#ifdef __NR_fork
-		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_fork, 0, 1),
-		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
-#endif
-#ifdef __NR_clone
-		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_clone, 0, 1),
-		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
-#endif
-#ifdef __NR_clone3
-		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_clone3, 0, 1),
-		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
-#endif
-		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_close, 0, 1),
-		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
-		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-	};
-	struct sock_fprog prog = { .len = ARRAY_SIZE(filter), .filter = filter };
 	char control[CMSG_SPACE(sizeof(int))] = {};
 	char c = 'f';
 	struct iovec iov = { .iov_base = &c, .iov_len = 1 };
@@ -5114,73 +5131,25 @@ TEST_F(notification_restart, fork_and_close)
 		.msg_control = control, .msg_controllen = sizeof(control),
 	};
 	struct cmsghdr *cmsg;
-	/*
-	 * glibc's fork() blocks all signals across clone(), so the
-	 * notification wait could not be interrupted: call clone3()
-	 * directly instead.
-	 */
-	struct __clone_args args = { .exit_signal = SIGCHLD };
-	unsigned int flags = SECCOMP_FILTER_FLAG_NEW_LISTENER;
-	int i, fd, listener, status;
-	long result[2] = {};
-	pid_t child;
+	int listener;
 
-	if (__NR_clone3 < 0)
-		SKIP(return, "Test not built with clone3 support");
-	/* Some container profiles reject clone3() with ENOSYS. */
-	if (sys_clone3(NULL, 0) == -1 && errno == ENOSYS)
-		SKIP(return, "clone3() is not available");
-
-	if (variant->restart)
-		flags |= SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV;
-	if (variant->killable)
-		flags |= SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV;
+	/* A filter chain may hold only one listener. */
 	ASSERT_EQ(close(self->listener), 0);
 	self->listener = -1;
-	self->pid = fork();
-	ASSERT_GE(self->pid, 0);
-	if (!self->pid) {
-		close(self->sync[0]);
-		handled = self->sync[1];
-		ASSERT_EQ(sigemptyset(&action.sa_mask), 0);
-		ASSERT_EQ(sigaction(SIGUSR1, &action, NULL), 0);
-		fd = open("/dev/null", O_RDONLY);
-		ASSERT_GE(fd, 0);
-		listener = seccomp(SECCOMP_SET_MODE_FILTER, flags, &prog);
-		ASSERT_GE(listener, 0);
+	if (notification_restart_fork(_metadata, self)) {
+		listener = user_notif_syscall(nr, notification_restart_flags(variant));
+		if (listener < 0)
+			_exit(1);
 		cmsg = CMSG_FIRSTHDR(&msg);
 		cmsg->cmsg_level = SOL_SOCKET;
 		cmsg->cmsg_type = SCM_RIGHTS;
 		cmsg->cmsg_len = CMSG_LEN(sizeof(listener));
 		memcpy(CMSG_DATA(cmsg), &listener, sizeof(listener));
-		ASSERT_EQ(sendmsg(handled, &msg, 0), 1);
-
-		child = sys_clone3(&args, sizeof(args));
-		if (!child)
-			_exit(0);
-		if (variant->restart) {
-			ASSERT_GT(child, 0);
-			ASSERT_EQ(waitpid(child, &status, 0), child);
-			ASSERT_TRUE(WIFEXITED(status));
-			ASSERT_EQ(WEXITSTATUS(status), 0);
-			ASSERT_EQ(waitpid(-1, &status, WNOHANG), -1);
-			ASSERT_EQ(errno, ECHILD);
-			ASSERT_EQ(close(fd), 0);
-			ASSERT_EQ(fcntl(fd, F_GETFD), -1);
-			ASSERT_EQ(errno, EBADF);
-		} else {
-			ASSERT_EQ(child, -1);
-			ASSERT_EQ(errno, EINTR);
-			ASSERT_EQ(close(fd), -1);
-			ASSERT_EQ(errno, EINTR);
-			ASSERT_GE(fcntl(fd, F_GETFD), 0);
-		}
-
-		ASSERT_EQ(sys_clone3(&args, sizeof(args)), -1);
-		ASSERT_EQ(errno, EAGAIN);
-		ASSERT_EQ(write(handled, result, sizeof(result)), sizeof(result));
-		_exit(0);
+		if (sendmsg(handled, &msg, 0) != 1)
+			_exit(1);
+		return true;
 	}
+
 	ASSERT_EQ(recvmsg(self->sync[0], &msg, 0), 1);
 	ASSERT_FALSE(msg.msg_flags & MSG_CTRUNC);
 	cmsg = CMSG_FIRSTHDR(&msg);
@@ -5189,28 +5158,97 @@ TEST_F(notification_restart, fork_and_close)
 	ASSERT_EQ(cmsg->cmsg_type, SCM_RIGHTS);
 	ASSERT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(listener)));
 	memcpy(&self->listener, CMSG_DATA(cmsg), sizeof(self->listener));
+	return false;
+}
 
-	for (i = 0; i < 3; i++) {
-		struct seccomp_notif req = {};
-		struct seccomp_notif_resp resp = {};
+/*
+ * Interrupt the child's notification before it is received. Without the
+ * restart flag the syscall fails with EINTR. With it, the restarted
+ * syscall is notified again, allowed to continue, and succeeds.
+ */
+static void
+notification_restart_interrupt(struct __test_metadata *_metadata,
+			       struct _test_data_notification_restart *self,
+			       const FIXTURE_VARIANT(notification_restart) *variant)
+{
+	struct seccomp_notif req = {};
+	struct seccomp_notif_resp resp = {};
 
-		notification_pending(_metadata, self->listener);
-		if (i < 2 || variant->restart) {
-			notification_signal(_metadata, self);
-			if (!variant->restart)
-				continue;
-			notification_pending(_metadata, self->listener);
-		}
-		ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
-		EXPECT_EQ(req.pid, self->pid);
-		resp.id = req.id;
-		if (i == 2)
-			resp.error = -EAGAIN;
-		else
-			resp.flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
-		ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
+	notification_pending(_metadata, self->listener);
+	notification_signal(_metadata, self);
+	if (!variant->restart) {
+		notification_result(_metadata, self, -1, EINTR);
+		return;
 	}
+	notification_pending(_metadata, self->listener);
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+	EXPECT_EQ(req.pid, self->pid);
+	resp.id = req.id;
+	resp.flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+	ASSERT_EQ(ioctl(self->listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
 	notification_result(_metadata, self, 0, 0);
+}
+
+/* A successful clone3() must have created exactly one child. */
+static __noreturn void notification_restart_clone_child(void)
+{
+	/*
+	 * glibc's fork() blocks all signals across clone(), so the
+	 * notification wait could not be interrupted: call clone3()
+	 * directly instead.
+	 */
+	struct __clone_args args = { .exit_signal = SIGCHLD };
+	int status;
+	long ret;
+
+	ret = sys_clone3(&args, sizeof(args));
+	if (ret == 0)
+		_exit(0);
+	if (ret > 0) {
+		if (waitpid(ret, &status, 0) != ret || !WIFEXITED(status) ||
+		    WEXITSTATUS(status) != 0)
+			_exit(2);
+		if (waitpid(-1, NULL, WNOHANG) != -1 || errno != ECHILD)
+			_exit(3);
+		ret = 0;
+	}
+	notification_report(ret, errno);
+}
+
+/* close() must release the descriptor exactly when it succeeds. */
+static __noreturn void notification_restart_close_child(void)
+{
+	int fd, err;
+	long ret;
+
+	fd = open("/dev/null", O_RDONLY);
+	if (fd < 0)
+		_exit(1);
+	ret = close(fd);
+	err = errno;
+	if ((fcntl(fd, F_GETFD) == -1) != (ret == 0))
+		_exit(2);
+	notification_report(ret, err);
+}
+
+TEST_F(notification_restart, clone)
+{
+	if (__NR_clone3 < 0)
+		SKIP(return, "Test not built with clone3 support");
+	/* Some container profiles reject clone3() with ENOSYS. */
+	if (sys_clone3(NULL, 0) == -1 && errno == ENOSYS)
+		SKIP(return, "clone3() is not available");
+
+	if (notification_restart_filtered(_metadata, self, variant, __NR_clone3))
+		notification_restart_clone_child();
+	notification_restart_interrupt(_metadata, self, variant);
+}
+
+TEST_F(notification_restart, close)
+{
+	if (notification_restart_filtered(_metadata, self, variant, __NR_close))
+		notification_restart_close_child();
+	notification_restart_interrupt(_metadata, self, variant);
 }
 
 TEST_F(notification_restart, fatal_signal)
