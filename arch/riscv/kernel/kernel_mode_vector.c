@@ -219,6 +219,7 @@ asmlinkage void riscv_v_context_nesting_end(struct pt_regs *regs)
 			__riscv_v_vstate_clean(regs);
 			riscv_preempt_v_reset_flags();
 		}
+		riscv_preempt_v_clear_dirty(current);
 	}
 }
 #else
