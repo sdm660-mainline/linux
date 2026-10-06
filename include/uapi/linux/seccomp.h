@@ -25,6 +25,7 @@
 #define SECCOMP_FILTER_FLAG_TSYNC_ESRCH		(1UL << 4)
 /* Received notifications wait in killable state (only respond to fatal signals) */
 #define SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV	(1UL << 5)
+/* Restart syscalls interrupted before their notification is received */
 #define SECCOMP_FILTER_FLAG_RESTART_BEFORE_RECV	(1UL << 6)
 
 /*

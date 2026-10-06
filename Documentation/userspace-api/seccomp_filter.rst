@@ -292,6 +292,14 @@ for calls such as ``close`` where callers do not retry on ``EINTR``.
 A failed notification receive that resets the notification to its initial
 state is also eligible for restart.
 
+Each restart withdraws the pending notification, so a supervisor woken by
+``poll()``, or blocked in ``ioctl(SECCOMP_IOCTL_NOTIF_RECV)``, may find
+nothing left to receive, and the ioctl then fails with ``ENOENT``. This
+already happens whenever a notifying process is interrupted before receipt,
+but with this flag it becomes routine under repeated signals. Supervisors
+should treat ``ENOENT`` from ``SECCOMP_IOCTL_NOTIF_RECV`` as a reason to wait
+again, not as an error.
+
 The flag requires ``SECCOMP_FILTER_FLAG_NEW_LISTENER`` and can be used with
 or without ``SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV``. Using both flags allows
 handlers to run before receipt and defers non-fatal signals during supervisor
