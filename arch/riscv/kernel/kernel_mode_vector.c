@@ -182,14 +182,6 @@ static int riscv_v_start_kernel_context(void)
 	get_cpu_vector_context();
 	__riscv_flush_vector_context();
 	put_cpu_vector_context();
-	/*
-	 *  A voluntary context switch caused by put_cpu_vector_context() can
-	 *  raise the NEED_RESTORE flag if preempt_v starts too early due to a
-	 *  failed risv_v_is_on() check.
-	 *
-	 *  This causes the next context_nesting_end pollute the v-reg from
-	 *  the stale context memory in kernel-mode vector.
-	 */
 	riscv_v_start(RISCV_PREEMPT_V);
 	return 0;
 }
