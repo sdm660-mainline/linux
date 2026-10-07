@@ -660,6 +660,9 @@ void snd_sof_pcm_init_elapsed_work(struct work_struct *work);
 #if IS_ENABLED(CONFIG_SND_SOC_SOF_COMPRESS)
 void snd_sof_compr_fragment_elapsed(struct snd_compr_stream *cstream);
 void snd_sof_compr_init_elapsed_work(struct work_struct *work);
+int snd_sof_compr_create_page_table(struct snd_soc_component *component,
+				    struct snd_compr_stream *cstream,
+				    unsigned char *dma_area, size_t size);
 #else
 static inline void snd_sof_compr_fragment_elapsed(struct snd_compr_stream *cstream) { }
 static inline void snd_sof_compr_init_elapsed_work(struct work_struct *work) { }
