@@ -313,6 +313,7 @@ config VIDEO_IMX471
 config VIDEO_IMX576
         tristate "Sony IMX576 sensor support"
         select V4L2_CCI_I2C
+	select VIDEO_CCS_PLL
         help
           This is a Video4Linux2 sensor driver for the Sony
           IMX576 camera.
