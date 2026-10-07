@@ -90,8 +90,13 @@ static inline unsigned int max_ser_phy_to_pad(struct max_ser *ser,
 
 static inline unsigned int max_ser_num_pads(struct max_ser *ser)
 {
-	return ser->ops->num_phys + MAX_SER_NUM_LINKS +
-	       (ser->ops->set_tpg ? 1 : 0);
+	return ser->ops->num_phys + MAX_SER_NUM_LINKS;
+	/*
+	 * TODO: once MEDIA_PAD_FL_INTERNAL is enabled in the uAPI we
+	 * can add the TPG pad:
+	 *	return ser->ops->num_phys + MAX_SER_NUM_LINKS +
+	 *		(ser->ops->set_tpg ? 1 : 0);
+	 */
 }
 
 static struct max_ser_phy *max_ser_pad_to_phy(struct max_ser *ser, u32 pad)
