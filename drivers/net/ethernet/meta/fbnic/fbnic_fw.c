@@ -60,8 +60,15 @@ static void fbnic_mbx_reset_desc_ring(struct fbnic_dev *fbd, int mbx_idx)
 	 */
 	switch (mbx_idx) {
 	case FBNIC_IPC_MBX_RX_IDX:
+		/* Clearing BME blocks the device from writing to the host
+		 * but leaves the requests parked in the write pipeline. The
+		 * write path only clears outstanding requests when both FLUSH
+		 * and FLUSH_MODE are set; FLUSH_MODE lets them drain without
+		 * landing on the host.
+		 */
 		wr32(fbd, FBNIC_PUL_OB_TLP_HDR_AW_CFG,
-		     FBNIC_PUL_OB_TLP_HDR_AW_CFG_FLUSH);
+		     FBNIC_PUL_OB_TLP_HDR_AW_CFG_FLUSH |
+		     FBNIC_PUL_OB_TLP_HDR_AW_CFG_FLUSH_MODE);
 		break;
 	case FBNIC_IPC_MBX_TX_IDX:
 		wr32(fbd, FBNIC_PUL_OB_TLP_HDR_AR_CFG,
@@ -284,6 +291,12 @@ static void fbnic_mbx_process_tx_msgs(struct fbnic_dev *fbd)
 		desc = __fbnic_mbx_rd_desc(fbd, FBNIC_IPC_MBX_TX_IDX, head);
 		if (!(desc & FBNIC_IPC_MBX_DESC_FW_CMPL))
 			break;
+
+		if (desc & FBNIC_IPC_MBX_DESC_FW_ERR) {
+			tx_mbx->resp_error++;
+			dev_warn_ratelimited(fbd->dev,
+					     "FW completed a Tx mailbox request with an error\n");
+		}
 
 		fbnic_mbx_unmap_and_free_msg(fbd, FBNIC_IPC_MBX_TX_IDX, head);
 
@@ -526,21 +539,20 @@ int fbnic_fw_xmit_ownership_msg(struct fbnic_dev *fbd, bool take_ownership)
 			goto free_message;
 	}
 
-	err = fbnic_mbx_map_tlv_msg(fbd, msg);
-	if (err)
-		goto free_message;
-
 	/* Initialize heartbeat, set last response to 1 second in the past
 	 * so that we will trigger a timeout if the firmware doesn't respond
 	 */
 	fbd->last_heartbeat_response = req_time - HZ;
-
 	fbd->last_heartbeat_request = req_time;
 
 	/* Set prev_firmware_time to 0 to avoid triggering firmware crash
 	 * detection until we receive the second uptime in a heartbeat resp.
 	 */
 	fbd->prev_firmware_time = 0;
+
+	err = fbnic_mbx_map_tlv_msg(fbd, msg);
+	if (err)
+		goto free_message;
 
 	/* Set heartbeat detection based on if we are taking ownership */
 	fbd->fw_heartbeat_enabled = take_ownership;
@@ -1667,6 +1679,13 @@ static void fbnic_mbx_process_rx_msgs(struct fbnic_dev *fbd)
 		if (!(desc & FBNIC_IPC_MBX_DESC_FW_CMPL))
 			break;
 
+		if (desc & FBNIC_IPC_MBX_DESC_FW_ERR) {
+			rx_mbx->resp_error++;
+			dev_warn_ratelimited(fbd->dev,
+					     "FW reported an error on an Rx mailbox message; dropping\n");
+			goto next_page;
+		}
+
 		dma_sync_single_for_cpu(fbd->dev, rx_mbx->buf_info[head].addr,
 					FBNIC_RX_PAGE_SIZE, DMA_FROM_DEVICE);
 
@@ -1734,7 +1753,9 @@ void fbnic_mbx_poll(struct fbnic_dev *fbd)
 int fbnic_mbx_poll_tx_ready(struct fbnic_dev *fbd)
 {
 	struct fbnic_fw_mbx *tx_mbx = &fbd->mbx[FBNIC_IPC_MBX_TX_IDX];
+	struct fbnic_fw_mbx *rx_mbx = &fbd->mbx[FBNIC_IPC_MBX_RX_IDX];
 	unsigned long timeout = jiffies + 10 * HZ + 1;
+	u64 tx_resp_error, rx_resp_error;
 	int err, i;
 
 	do {
@@ -1765,6 +1786,9 @@ int fbnic_mbx_poll_tx_ready(struct fbnic_dev *fbd)
 	 * mgmt.version once we get the actual version from the firmware
 	 * in the capabilities request message.
 	 */
+send_cap_req:
+	tx_resp_error = tx_mbx->resp_error;
+	rx_resp_error = rx_mbx->resp_error;
 	err = fbnic_fw_xmit_simple_msg(fbd, FBNIC_TLV_MSG_ID_HOST_CAP_REQ);
 	if (err)
 		goto clean_mbx;
@@ -1782,9 +1806,27 @@ int fbnic_mbx_poll_tx_ready(struct fbnic_dev *fbd)
 		msleep(20);
 		fbnic_mbx_poll(fbd);
 
+		/* A valid capabilities response ends the poll. Check it
+		 * before the FW_ERR retry below so a response parsed in the
+		 * same poll as an unrelated FW_ERR is not discarded.
+		 */
+		if (fbd->fw_cap.running.mgmt.version >= MIN_FW_VER_CODE)
+			break;
+
 		/* set err, but wait till mgmt.version check to report it */
-		if (!time_is_after_jiffies(timeout))
+		if (!time_is_after_jiffies(timeout)) {
 			err = -ETIMEDOUT;
+			continue;
+		}
+
+		/* The FW can flag our capabilities request (Tx) or its
+		 * response (Rx) with FW_ERR, in which case it produced no
+		 * usable response. The ring is not wedged, so re-issue the
+		 * request instead of spinning until the timeout.
+		 */
+		if (tx_mbx->resp_error != tx_resp_error ||
+		    rx_mbx->resp_error != rx_resp_error)
+			goto send_cap_req;
 	}
 
 	return 0;

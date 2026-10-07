@@ -139,15 +139,17 @@ static bool batadv_frag_insert_packet(struct batadv_orig_node *orig_node,
 				      struct sk_buff *skb,
 				      struct hlist_head *chain_out)
 {
-	struct batadv_frag_table_entry *chain;
-	struct batadv_frag_list_entry *frag_entry_new = NULL, *frag_entry_curr;
 	struct batadv_frag_list_entry *frag_entry_last = NULL;
+	struct batadv_frag_list_entry *frag_entry_new = NULL;
+	u16 hdr_size = sizeof(struct batadv_frag_packet);
+	struct batadv_frag_list_entry *frag_entry_curr;
 	struct batadv_frag_packet *frag_packet;
-	u8 bucket;
-	u16 seqno, hdr_size = sizeof(struct batadv_frag_packet);
+	struct batadv_frag_table_entry *chain;
 	bool overflow = false;
 	bool ret = false;
 	size_t data_len;
+	u8 bucket;
+	u16 seqno;
 
 	/* Linearize packet to avoid linearizing 16 packets in a row when doing
 	 * the later merge. Non-linear merge should be added to remove this
@@ -258,11 +260,12 @@ err:
 static struct sk_buff *
 batadv_frag_merge_packets(struct hlist_head *chain)
 {
-	struct batadv_frag_packet *packet;
+	int hdr_size = sizeof(struct batadv_frag_packet);
 	struct batadv_frag_list_entry *entry;
+	struct batadv_frag_packet *packet;
 	struct sk_buff *skb_out;
-	int size, hdr_size = sizeof(struct batadv_frag_packet);
 	bool dropped = false;
+	int size;
 
 	/* Remove first entry, as this is the destination for the rest of the
 	 * fragments.
@@ -348,8 +351,8 @@ static bool batadv_skb_is_frag(struct sk_buff *skb)
 bool batadv_frag_skb_buffer(struct sk_buff **skb,
 			    struct batadv_orig_node *orig_node_src)
 {
-	struct sk_buff *skb_out = NULL;
 	struct hlist_head head = HLIST_HEAD_INIT;
+	struct sk_buff *skb_out = NULL;
 	bool ret = false;
 
 	/* Add packet to buffer and table entry if merge is possible. */
@@ -386,6 +389,8 @@ out_err:
  * @skb: skb to forward
  * @recv_if: interface that the skb is received on
  * @orig_node_src: originator that the skb is received from
+ * @rx_result: set to NET_RX_SUCCESS when the fragment was forwarded and
+ *  NET_RX_DROP when it was dropped; only valid when true is returned
  *
  * Look up the next-hop of the fragments payload and check if the merged packet
  * will exceed the MTU towards the next-hop. If so, the fragment is forwarded
@@ -395,13 +400,14 @@ out_err:
  */
 bool batadv_frag_skb_fwd(struct sk_buff *skb,
 			 struct batadv_hard_iface *recv_if,
-			 struct batadv_orig_node *orig_node_src)
+			 struct batadv_orig_node *orig_node_src,
+			 int *rx_result)
 {
 	struct batadv_priv *bat_priv = netdev_priv(recv_if->mesh_iface);
 	struct batadv_neigh_node *neigh_node = NULL;
 	struct batadv_frag_packet *packet;
-	u16 total_size;
 	bool ret = false;
+	u16 total_size;
 
 	packet = (struct batadv_frag_packet *)skb->data;
 
@@ -414,12 +420,29 @@ bool batadv_frag_skb_fwd(struct sk_buff *skb,
 	 */
 	total_size = ntohs(packet->total_size);
 	if (total_size > neigh_node->if_incoming->net_dev->mtu) {
+		if (packet->ttl < 2) {
+			kfree_skb(skb);
+			*rx_result = NET_RX_DROP;
+			ret = true;
+			goto out;
+		}
+
+		if (skb_cow(skb, ETH_HLEN) < 0) {
+			kfree_skb(skb);
+			*rx_result = NET_RX_DROP;
+			ret = true;
+			goto out;
+		}
+
+		packet = (struct batadv_frag_packet *)skb->data;
+
 		batadv_inc_counter(bat_priv, BATADV_CNT_FRAG_FWD);
 		batadv_add_counter(bat_priv, BATADV_CNT_FRAG_FWD_BYTES,
 				   skb->len + ETH_HLEN);
 
 		packet->ttl--;
 		batadv_send_unicast_skb(skb, neigh_node);
+		*rx_result = NET_RX_SUCCESS;
 		ret = true;
 	}
 
@@ -448,10 +471,11 @@ static struct sk_buff *batadv_frag_create(struct net_device *net_dev,
 {
 	unsigned int ll_reserved = LL_RESERVED_SPACE(net_dev);
 	unsigned int tailroom = net_dev->needed_tailroom;
-	struct sk_buff *skb_fragment;
 	unsigned int header_size = sizeof(*frag_head);
-	unsigned int mtu = fragment_size + header_size;
+	struct sk_buff *skb_fragment;
+	unsigned int mtu;
 
+	mtu = fragment_size + header_size;
 	skb_fragment = dev_alloc_skb(ll_reserved + mtu + tailroom);
 	if (!skb_fragment)
 		goto err;
@@ -483,14 +507,17 @@ int batadv_frag_send_packet(struct sk_buff *skb,
 			    struct batadv_neigh_node *neigh_node)
 {
 	struct net_device *net_dev = neigh_node->if_incoming->net_dev;
-	struct batadv_priv *bat_priv;
 	struct batadv_hard_iface *primary_if = NULL;
 	struct batadv_frag_packet frag_header;
-	struct sk_buff *skb_fragment;
 	unsigned int mtu = net_dev->mtu;
-	unsigned int header_size = sizeof(frag_header);
-	unsigned int max_fragment_size, num_fragments;
+	unsigned int max_fragment_size;
+	struct batadv_priv *bat_priv;
+	struct sk_buff *skb_fragment;
+	unsigned int num_fragments;
+	unsigned int header_size;
 	int ret;
+
+	header_size = sizeof(frag_header);
 
 	/* To avoid merge and refragmentation at next-hops we never send
 	 * fragments larger than BATADV_FRAG_MAX_FRAG_SIZE
@@ -498,8 +525,10 @@ int batadv_frag_send_packet(struct sk_buff *skb,
 	mtu = min_t(unsigned int, mtu, BATADV_FRAG_MAX_FRAG_SIZE);
 	max_fragment_size = mtu - header_size;
 
-	if (skb->len == 0 || max_fragment_size == 0)
-		return -EINVAL;
+	if (skb->len == 0 || max_fragment_size == 0) {
+		ret = -EINVAL;
+		goto free_skb;
+	}
 
 	num_fragments = (skb->len - 1) / max_fragment_size + 1;
 	max_fragment_size = (skb->len - 1) / num_fragments + 1;
@@ -525,7 +554,7 @@ int batadv_frag_send_packet(struct sk_buff *skb,
 	 */
 	if (skb_has_frag_list(skb) && __skb_linearize(skb)) {
 		ret = -ENOMEM;
-		goto free_skb;
+		goto put_primary_if;
 	}
 
 	/* Create one header to be copied to all fragments */

@@ -1504,6 +1504,11 @@ static int hclge_configure(struct hclge_dev *hdev)
 	hdev->hw.mac.req_autoneg = AUTONEG_ENABLE;
 	hdev->hw.mac.req_duplex = DUPLEX_FULL;
 
+	/* When lane_num is 0, the firmware will automatically
+	 * select the appropriate lane_num based on the speed.
+	 */
+	hdev->hw.mac.req_lane_num = 0;
+
 	hclge_parse_link_mode(hdev, cfg.speed_ability);
 
 	hdev->hw.mac.max_speed = hclge_get_max_speed(cfg.speed_ability);
@@ -2579,8 +2584,11 @@ static int hclge_cfg_mac_speed_dup_h(struct hnae3_handle *handle, int speed,
 	if (ret)
 		return ret;
 
-	hdev->hw.mac.req_speed = (u32)speed;
-	hdev->hw.mac.req_duplex = duplex;
+	hdev->hw.mac.req_lane_num = lane_num;
+	if (speed != SPEED_UNKNOWN)
+		hdev->hw.mac.req_speed = (u32)speed;
+	if (duplex != DUPLEX_UNKNOWN)
+		hdev->hw.mac.req_duplex = duplex;
 
 	return 0;
 }
@@ -2611,6 +2619,7 @@ static int hclge_set_autoneg(struct hnae3_handle *handle, bool enable)
 {
 	struct hclge_vport *vport = hclge_get_vport(handle);
 	struct hclge_dev *hdev = vport->back;
+	int ret;
 
 	if (!hdev->hw.mac.support_autoneg) {
 		if (enable) {
@@ -2622,7 +2631,10 @@ static int hclge_set_autoneg(struct hnae3_handle *handle, bool enable)
 		}
 	}
 
-	return hclge_set_autoneg_en(hdev, enable);
+	ret = hclge_set_autoneg_en(hdev, enable);
+	if (!ret)
+		hdev->hw.mac.req_autoneg = enable;
+	return ret;
 }
 
 static int hclge_get_autoneg(struct hnae3_handle *handle)
@@ -2883,20 +2895,6 @@ static int hclge_mac_init(struct hclge_dev *hdev)
 
 	if (!test_bit(HCLGE_STATE_RST_HANDLING, &hdev->state))
 		hdev->hw.mac.duplex = HCLGE_MAC_FULL;
-
-	if (hdev->hw.mac.support_autoneg) {
-		ret = hclge_set_autoneg_en(hdev, hdev->hw.mac.autoneg);
-		if (ret)
-			return ret;
-	}
-
-	if (!hdev->hw.mac.autoneg) {
-		ret = hclge_cfg_mac_speed_dup_hw(hdev, hdev->hw.mac.req_speed,
-						 hdev->hw.mac.req_duplex,
-						 hdev->hw.mac.lane_num);
-		if (ret)
-			return ret;
-	}
 
 	mac->link = 0;
 
@@ -3285,8 +3283,8 @@ static int hclge_get_phy_link_ksettings(struct hnae3_handle *handle,
 }
 
 static int
-hclge_set_phy_link_ksettings(struct hnae3_handle *handle,
-			     const struct ethtool_link_ksettings *cmd)
+hclge_ethtool_ksettings_set(struct hnae3_handle *handle,
+			    const struct ethtool_link_ksettings *cmd)
 {
 	struct hclge_desc desc[HCLGE_PHY_LINK_SETTING_BD_NUM];
 	struct hclge_vport *vport = hclge_get_vport(handle);
@@ -3327,10 +3325,34 @@ hclge_set_phy_link_ksettings(struct hnae3_handle *handle,
 		return ret;
 	}
 
-	hdev->hw.mac.req_autoneg = cmd->base.autoneg;
-	hdev->hw.mac.req_speed = cmd->base.speed;
-	hdev->hw.mac.req_duplex = cmd->base.duplex;
 	linkmode_copy(hdev->hw.mac.advertising, cmd->link_modes.advertising);
+	return 0;
+}
+
+static int
+hclge_set_phy_link_ksettings(struct hnae3_handle *handle,
+			     const struct ethtool_link_ksettings *cmd)
+{
+	struct hclge_vport *vport = hclge_get_vport(handle);
+	struct hclge_dev *hdev = vport->back;
+	int ret = -ENODEV;
+
+	if (hnae3_dev_phy_imp_supported(hdev)) {
+		ret = hclge_ethtool_ksettings_set(handle, cmd);
+	} else if (handle->netdev->phydev) {
+		if (cmd->base.speed == SPEED_1000 &&
+		    cmd->base.autoneg == AUTONEG_DISABLE)
+			return -EINVAL;
+		ret = phy_ethtool_ksettings_set(handle->netdev->phydev, cmd);
+	}
+	if (ret)
+		return ret;
+
+	hdev->hw.mac.req_autoneg = cmd->base.autoneg;
+	if (cmd->base.speed != SPEED_UNKNOWN)
+		hdev->hw.mac.req_speed = cmd->base.speed;
+	if (cmd->base.duplex != DUPLEX_UNKNOWN)
+		hdev->hw.mac.req_duplex = cmd->base.duplex;
 
 	return 0;
 }
@@ -3500,6 +3522,122 @@ static int hclge_set_vf_link_state(struct hnae3_handle *handle, int vf,
 	}
 
 	return ret;
+}
+
+static int hclge_set_pfc_storm_para(struct hclge_dev *hdev,
+				    struct hnae3_pfc_storm_para *para)
+{
+	struct hclge_pfc_storm_para_cmd *para_cmd;
+	struct hclge_desc desc;
+	int ret;
+
+	if (hdev->ae_dev->dev_version < HNAE3_DEVICE_VERSION_V3)
+		return -EOPNOTSUPP;
+
+	hclge_cmd_setup_basic_desc(&desc, HCLGE_OPC_CFG_PAUSE_STORM_PARA,
+				   false);
+	para_cmd = (struct hclge_pfc_storm_para_cmd *)desc.data;
+	para_cmd->dir = cpu_to_le32(para->dir);
+	para_cmd->enable = cpu_to_le32(para->enable);
+	para_cmd->period_ms = cpu_to_le32(para->period_ms);
+	para_cmd->times = cpu_to_le32(para->times);
+	para_cmd->recovery_period_ms = cpu_to_le32(para->recovery_period_ms);
+
+	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
+	if (ret)
+		dev_err(&hdev->pdev->dev,
+			"failed to set pfc storm para, ret = %d\n", ret);
+	return ret;
+}
+
+static int hclge_get_pfc_storm_para(struct hclge_dev *hdev,
+				    struct hnae3_pfc_storm_para *para)
+{
+	struct hclge_pfc_storm_para_cmd *para_cmd;
+	struct hclge_desc desc;
+	int ret;
+
+	if (hdev->ae_dev->dev_version < HNAE3_DEVICE_VERSION_V3)
+		return -EOPNOTSUPP;
+
+	hclge_cmd_setup_basic_desc(&desc, HCLGE_OPC_CFG_PAUSE_STORM_PARA, true);
+	para_cmd = (struct hclge_pfc_storm_para_cmd *)desc.data;
+	para_cmd->dir = cpu_to_le32(para->dir);
+	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
+	if (ret) {
+		dev_err(&hdev->pdev->dev,
+			"failed to get pfc storm para, ret = %d\n", ret);
+		return ret;
+	}
+
+	para->enable = le32_to_cpu(para_cmd->enable);
+	para->period_ms = le32_to_cpu(para_cmd->period_ms);
+	para->times = le32_to_cpu(para_cmd->times);
+	para->recovery_period_ms = le32_to_cpu(para_cmd->recovery_period_ms);
+
+	return 0;
+}
+
+static int hclge_enable_pfc_storm_prevent(struct hclge_dev *hdev,
+					  int dir, bool enable)
+{
+	struct hnae3_pfc_storm_para para = {0};
+	int ret;
+
+	para.dir = dir;
+	ret = hclge_get_pfc_storm_para(hdev, &para);
+	if (ret)
+		return ret;
+
+	para.enable = enable;
+	return hclge_set_pfc_storm_para(hdev, &para);
+}
+
+static int hclge_set_pfc_prevention_tout(struct hnae3_handle *h, u16 times)
+{
+	struct hclge_vport *vport = hclge_get_vport(h);
+	struct hclge_dev *hdev = vport->back;
+	struct hnae3_pfc_storm_para para;
+	int ret;
+
+	if (times > HCLGE_MAX_PFC_PREVENTION_TOUT) {
+		dev_err(&hdev->pdev->dev,
+			"times %u should be no more than %u!\n",
+			times, HCLGE_MAX_PFC_PREVENTION_TOUT);
+		return -EINVAL;
+	}
+
+	para.dir = HCLGE_DIR_TX;
+	ret = hclge_get_pfc_storm_para(hdev, &para);
+	if (ret)
+		return ret;
+
+	para.enable = times ? 1 : 0;
+	para.times = (u32)times;
+	ret = hclge_set_pfc_storm_para(hdev, &para);
+	if (ret)
+		return ret;
+
+	hdev->pfc_prevention_tout = times;
+
+	return 0;
+}
+
+static int hclge_get_pfc_prevention_tout(struct hnae3_handle *h, u16 *times)
+{
+	struct hclge_vport *vport = hclge_get_vport(h);
+	struct hclge_dev *hdev = vport->back;
+	struct hnae3_pfc_storm_para para;
+	int ret;
+
+	para.dir = HCLGE_DIR_TX;
+	ret = hclge_get_pfc_storm_para(hdev, &para);
+	if (ret)
+		return ret;
+
+	*times = para.enable ? (u16)para.times : 0;
+
+	return 0;
 }
 
 static void hclge_set_reset_pending(struct hclge_dev *hdev,
@@ -4293,6 +4431,26 @@ static int hclge_reset_prepare(struct hclge_dev *hdev)
 		return ret;
 
 	return hclge_reset_prepare_wait(hdev);
+}
+
+static void hclge_restore_pfc_storm_prevention_tout(struct hclge_dev *hdev)
+{
+	struct hnae3_handle *handle = &hdev->vport[0].nic;
+	int ret;
+
+	ret = hclge_enable_pfc_storm_prevent(hdev, HCLGE_DIR_RX, false);
+	if (ret == -EOPNOTSUPP)
+		return;
+	else if (ret)
+		dev_warn(&hdev->pdev->dev,
+			 "failed to disable rx pfc storm prevent, ret = %d\n",
+			 ret);
+
+	ret = hclge_set_pfc_prevention_tout(handle, hdev->pfc_prevention_tout);
+	if (ret)
+		dev_warn(&hdev->pdev->dev,
+			 "failed to set tx pfc storm prevent, ret = %d\n",
+			 ret);
 }
 
 static int hclge_reset_rebuild(struct hclge_dev *hdev)
@@ -9256,6 +9414,32 @@ static int hclge_init_wol(struct hclge_dev *hdev)
 	return hclge_update_wol(hdev);
 }
 
+static void hclge_init_pfc_prevention_tout(struct hclge_dev *hdev)
+{
+	struct hnae3_handle *handle = &hdev->vport[0].nic;
+	u16 times;
+	int ret;
+
+	ret = hclge_enable_pfc_storm_prevent(hdev, HCLGE_DIR_RX, false);
+	if (ret == -EOPNOTSUPP)
+		return;
+	else if (ret)
+		dev_warn(&hdev->pdev->dev,
+			 "failed to disable rx pfc storm prevent, ret = %d\n",
+			 ret);
+
+	ret = hclge_get_pfc_prevention_tout(handle, &times);
+	if (ret) {
+		dev_warn(&hdev->pdev->dev,
+			 "failed to get tx pfc prevention timeout, ret = %d\n",
+			 ret);
+		times = HCLGE_DEFAULT_PFC_PREVENTION_TOUT;
+	}
+
+	hdev->pfc_prevention_tout = times;
+	hdev->pfc_prevention_tout_default = times;
+}
+
 static void hclge_get_wol(struct hnae3_handle *handle,
 			  struct ethtool_wolinfo *wol)
 {
@@ -9292,6 +9476,27 @@ static int hclge_set_wol(struct hnae3_handle *handle,
 		wol_info->wol_current_mode = 0;
 
 	return ret;
+}
+
+static int hclge_set_autoneg_speed_dup(struct hclge_dev *hdev)
+{
+	int ret;
+
+	if (hdev->hw.mac.support_autoneg) {
+		ret = hclge_set_autoneg_en(hdev, hdev->hw.mac.req_autoneg);
+		if (ret)
+			return ret;
+	}
+
+	if (!hdev->hw.mac.req_autoneg) {
+		ret = hclge_cfg_mac_speed_dup_hw(hdev, hdev->hw.mac.req_speed,
+						 hdev->hw.mac.req_duplex,
+						 hdev->hw.mac.req_lane_num);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 static int hclge_init_ae_dev(struct hnae3_ae_dev *ae_dev)
@@ -9455,6 +9660,16 @@ static int hclge_init_ae_dev(struct hnae3_ae_dev *ae_dev)
 	if (ret)
 		goto err_ptp_uninit;
 
+	if (hdev->hw.mac.media_type != HNAE3_MEDIA_TYPE_COPPER)
+		hdev->hw.mac.req_autoneg = hdev->hw.mac.autoneg;
+
+	ret = hclge_set_autoneg_speed_dup(hdev);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"failed to set autoneg speed duplex, ret = %d\n", ret);
+		goto err_ptp_uninit;
+	}
+
 	INIT_KFIFO(hdev->mac_tnl_log);
 
 	hclge_dcb_ops_set(hdev);
@@ -9489,6 +9704,8 @@ static int hclge_init_ae_dev(struct hnae3_ae_dev *ae_dev)
 	if (ret)
 		dev_warn(&pdev->dev,
 			 "failed to wake on lan init, ret = %d\n", ret);
+
+	hclge_init_pfc_prevention_tout(hdev);
 
 	ret = hclge_devlink_init(hdev);
 	if (ret)
@@ -9785,6 +10002,13 @@ static int hclge_reset_ae_dev(struct hnae3_ae_dev *ae_dev)
 		return ret;
 	}
 
+	ret = hclge_set_autoneg_speed_dup(hdev);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"failed to set autoneg speed duplex, ret = %d\n", ret);
+		return ret;
+	}
+
 	ret = hclge_tp_port_init(hdev);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to init tp port, ret = %d\n",
@@ -9882,6 +10106,8 @@ static int hclge_reset_ae_dev(struct hnae3_ae_dev *ae_dev)
 		dev_warn(&pdev->dev,
 			 "failed to update wol config, ret = %d\n", ret);
 
+	hclge_restore_pfc_storm_prevention_tout(hdev);
+
 	dev_info(&pdev->dev, "Reset done, %s driver initialization finished.\n",
 		 HCLGE_DRIVER_NAME);
 
@@ -9912,6 +10138,10 @@ static void hclge_uninit_ae_dev(struct hnae3_ae_dev *ae_dev)
 	hclge_config_mac_tnl_int(hdev, false);
 	hclge_config_nic_hw_error(hdev, false);
 	hclge_config_rocee_ras_interrupt(hdev, false);
+
+	/* Restore hw default values for the next initialization */
+	hclge_set_pfc_prevention_tout(&hdev->vport->nic,
+				      hdev->pfc_prevention_tout_default);
 
 	hclge_comm_cmd_uninit(hdev->ae_dev, &hdev->hw.hw);
 	hclge_misc_irq_uninit(hdev);
@@ -10475,6 +10705,8 @@ static const struct hnae3_ae_ops hclge_ops = {
 	.set_wol = hclge_set_wol,
 	.hwtstamp_get = hclge_ptp_get_cfg,
 	.hwtstamp_set = hclge_ptp_set_cfg,
+	.set_pfc_prevention_tout = hclge_set_pfc_prevention_tout,
+	.get_pfc_prevention_tout = hclge_get_pfc_prevention_tout,
 };
 
 static struct hnae3_ae_algo ae_algo = {

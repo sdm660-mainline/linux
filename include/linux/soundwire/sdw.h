@@ -11,8 +11,9 @@
 #include <linux/idr.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
+#include <linux/jiffies.h>
 #include <linux/lockdep_types.h>
-#include <linux/mod_devicetable.h>
+#include <linux/device-id/sdw.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
 #include <sound/sdca.h>
@@ -364,6 +365,10 @@ struct sdw_dpn_prop {
  * @commit_register_supported: is PCP_Commit register supported
  * @scp_int1_mask: SCP_INT1_MASK desired settings
  * @lane_maps: Lane mapping for the slave, only valid if lane_control_support is set
+ * @bra_block_alignment: If non-zero the length of data in a BRA frame must be
+ *			 a multiple of this number of bytes.
+ * @bra_max_data_per_frame: If non-zero the maximum data payload size (in bytes per
+ *			    frame excluding header, CRC, and footer) for this BRA Mode
  * @clock_reg_supported: the Peripheral implements the clock base and scale
  * registers introduced with the SoundWire 1.2 specification. SDCA devices
  * do not need to set this boolean property as the registers are required.
@@ -394,6 +399,8 @@ struct sdw_slave_prop {
 	u8 commit_register_supported;
 	u8 scp_int1_mask;
 	u8 lane_maps[SDW_MAX_LANES];
+	u32 bra_block_alignment;
+	u32 bra_max_data_per_frame;
 	bool clock_reg_supported;
 	bool use_domain_irq;
 };
@@ -836,6 +843,14 @@ struct sdw_defer {
  */
 #define SDW_BPT_MSG_MAX_BYTES  (1024 * 1024)
 
+/*
+ * According to mipi SoundWire DisCo Specification_v2-1,
+ * this maximum value shall not exceed 470.
+ * Note that the largest number of bytes accessible by a single BRA operation is limited to 470
+ * bytes when using lane 0, but goes up to 502 bytes when using one of the optional extra lanes.
+ */
+#define SDW_BRA_MAX_BYTES_PER_FRAME  470
+
 struct sdw_bpt_msg;
 
 /**
@@ -1093,8 +1108,6 @@ int sdw_slave_get_current_bank(struct sdw_slave *sdev);
 
 int sdw_slave_get_scale_index(struct sdw_slave *slave, u8 *base);
 
-int sdw_slave_wait_for_init(struct sdw_slave *slave, int timeout_ms);
-
 /* messaging and data APIs */
 int sdw_read(struct sdw_slave *slave, u32 addr);
 int sdw_write(struct sdw_slave *slave, u32 addr, u8 value);
@@ -1133,12 +1146,6 @@ static inline struct device *of_sdw_find_device_by_node(struct device_node *np)
 }
 
 static inline int sdw_slave_get_current_bank(struct sdw_slave *sdev)
-{
-	WARN_ONCE(1, "SoundWire API is disabled");
-	return -EINVAL;
-}
-
-static inline int sdw_slave_wait_for_init(struct sdw_slave *slave, int timeout_ms)
 {
 	WARN_ONCE(1, "SoundWire API is disabled");
 	return -EINVAL;
@@ -1206,5 +1213,34 @@ static inline int sdw_update_no_pm(struct sdw_slave *slave, u32 addr, u8 mask, u
 }
 
 #endif /* CONFIG_SOUNDWIRE */
+
+/**
+ * sdw_slave_wait_for_init - Wait for device initialisation
+ * @slave: Pointer to the SoundWire peripheral.
+ * @timeout_ms: Timeout in milliseconds.
+ *
+ * Wait for a peripheral device to enumerate and be initialised by the
+ * SoundWire core.
+ *
+ * Return: Zero on success, and a negative error code on failure.
+ */
+static inline int sdw_slave_wait_for_init(struct sdw_slave *slave, int timeout_ms)
+{
+	unsigned long time;
+
+	if (!slave)
+		return 0;
+
+	time = wait_for_completion_timeout(&slave->initialization_complete,
+					   msecs_to_jiffies(timeout_ms));
+	if (!time) {
+		dev_err(&slave->dev, "Initialization not complete\n");
+		return -ETIMEDOUT;
+	}
+
+	slave->unattach_request = 0;
+
+	return 0;
+}
 
 #endif /* __SOUNDWIRE_H */

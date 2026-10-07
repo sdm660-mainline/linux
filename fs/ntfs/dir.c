@@ -23,6 +23,13 @@
 __le16 I30[5] = { cpu_to_le16('$'), cpu_to_le16('I'),
 		cpu_to_le16('3'),	cpu_to_le16('0'), 0 };
 
+static inline u64 ntfs_check_mref(u64 mref)
+{
+	if (IS_ERR_MREF(mref))
+		return ERR_MREF(-EIO);
+	return mref;
+}
+
 /*
  * ntfs_lookup_inode_by_name - find an inode in a directory given its name
  * @dir_ni:	ntfs inode of the directory in which to search for the name
@@ -159,8 +166,8 @@ found_it:
 			 */
 			if (ie->key.file_name.file_name_type == FILE_NAME_DOS) {
 				if (!name) {
-					name = kmalloc(sizeof(struct ntfs_name),
-							GFP_NOFS);
+					name = kmalloc_obj(struct ntfs_name,
+							   GFP_NOFS);
 					if (!name) {
 						err = -ENOMEM;
 						goto err_out;
@@ -178,7 +185,7 @@ found_it:
 			mref = le64_to_cpu(ie->data.dir.indexed_file);
 			ntfs_attr_put_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
-			return mref;
+			return ntfs_check_mref(mref);
 		}
 		/*
 		 * For a case insensitive mount, we also perform a case
@@ -273,7 +280,7 @@ found_it:
 		if (name) {
 			ntfs_attr_put_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
-			return name->mref;
+			return ntfs_check_mref(name->mref);
 		}
 		ntfs_debug("Entry not found.");
 		err = -ENOENT;
@@ -394,8 +401,8 @@ found_it2:
 			 */
 			if (ie->key.file_name.file_name_type == FILE_NAME_DOS) {
 				if (!name) {
-					name = kmalloc(sizeof(struct ntfs_name),
-							GFP_NOFS);
+					name = kmalloc_obj(struct ntfs_name,
+							   GFP_NOFS);
 					if (!name) {
 						err = -ENOMEM;
 						goto unm_err_out;
@@ -413,7 +420,7 @@ found_it2:
 			mref = le64_to_cpu(ie->data.dir.indexed_file);
 			kfree(kaddr);
 			iput(ia_vi);
-			return mref;
+			return ntfs_check_mref(mref);
 		}
 		/*
 		 * For a case insensitive mount, we also perform a case
@@ -538,7 +545,7 @@ found_it2:
 	if (name) {
 		kfree(kaddr);
 		iput(ia_vi);
-		return name->mref;
+		return ntfs_check_mref(name->mref);
 	}
 	ntfs_debug("Entry not found.");
 	err = -ENOENT;
@@ -693,7 +700,7 @@ static int ntfs_ia_blocks_readahead(struct ntfs_inode *ia_ni, loff_t pos)
 	if (dir_start_index >= dir_end_index)
 		return 0;
 
-	dir_ra = kzalloc(sizeof(*dir_ra), GFP_NOFS);
+	dir_ra = kzalloc_obj(*dir_ra, GFP_NOFS);
 	if (!dir_ra)
 		return -ENOMEM;
 
@@ -770,7 +777,7 @@ static int ntfs_readdir(struct file *file, struct dir_context *actor)
 		return -ENOMEM;
 	}
 
-	ra = kzalloc(sizeof(struct file_ra_state), GFP_NOFS);
+	ra = kzalloc_obj(struct file_ra_state, GFP_NOFS);
 	if (!ra) {
 		kfree(name);
 		ntfs_index_ctx_put(ictx);
@@ -806,7 +813,7 @@ static int ntfs_readdir(struct file *file, struct dir_context *actor)
 			goto out;
 		}
 	} else if (!private) {
-		private = kzalloc(sizeof(struct ntfs_file_private), GFP_KERNEL);
+		private = kzalloc_obj(struct ntfs_file_private);
 		if (!private) {
 			err = -ENOMEM;
 			goto out;
@@ -942,7 +949,7 @@ nextdir:
 		}
 
 		if (!nir) {
-			nir = kzalloc(sizeof(struct ntfs_index_ra), GFP_KERNEL);
+			nir = kzalloc_obj(struct ntfs_index_ra);
 			if (nir) {
 				nir->start_index = index;
 				nir->count = 1;
@@ -959,13 +966,14 @@ filldir:
 			 */
 			private = file->private_data;
 			kfree(private->key);
-			private->key = kmalloc(le16_to_cpu(next->key_length), GFP_KERNEL);
+			private->key = kmemdup(&next->key.file_name,
+					le16_to_cpu(next->key_length),
+					GFP_KERNEL);
 			if (!private->key) {
 				err = -ENOMEM;
 				goto out;
 			}
 
-			memcpy(private->key, &next->key.file_name, le16_to_cpu(next->key_length));
 			private->key_length = next->key_length;
 			break;
 		}

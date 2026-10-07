@@ -107,7 +107,7 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 		return -EINVAL;
 	}
 
-	data = kzalloc(sizeof(*data), GFP_KERNEL);
+	data = kzalloc_obj(*data);
 	if (!data) {
 		snd_card_unref(compr->card);
 		return -ENOMEM;
@@ -119,7 +119,7 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 	data->stream.direction = dirn;
 	data->stream.private_data = compr->private_data;
 	data->stream.device = compr;
-	runtime = kzalloc(sizeof(*runtime), GFP_KERNEL);
+	runtime = kzalloc_obj(*runtime);
 	if (!runtime) {
 		kfree(data);
 		snd_card_unref(compr->card);
@@ -1083,15 +1083,18 @@ static int snd_compr_task_new(struct snd_compr_stream *stream, struct snd_compr_
 	   file descriptors are allocated before fd_install() */
 	if (!task->input || !task->input->file || !task->output || !task->output->file) {
 		retval = -EINVAL;
-		goto cleanup;
+		goto free_driver_task;
 	}
 	fd_i = get_unused_fd_flags(O_WRONLY|O_CLOEXEC);
-	if (fd_i < 0)
-		goto cleanup;
+	if (fd_i < 0) {
+		retval = fd_i;
+		goto free_driver_task;
+	}
 	fd_o = get_unused_fd_flags(O_RDONLY|O_CLOEXEC);
 	if (fd_o < 0) {
+		retval = fd_o;
 		put_unused_fd(fd_i);
-		goto cleanup;
+		goto free_driver_task;
 	}
 	/* keep dmabuf reference until freed with task free ioctl */
 	get_dma_buf(task->input);
@@ -1103,6 +1106,8 @@ static int snd_compr_task_new(struct snd_compr_stream *stream, struct snd_compr_
 	list_add_tail(&task->list, &stream->runtime->tasks);
 	stream->runtime->total_tasks++;
 	return 0;
+free_driver_task:
+	stream->ops->task_free(stream, task);
 cleanup:
 	snd_compr_task_free(task);
 	return retval;
@@ -1388,17 +1393,17 @@ static long snd_compr_ioctl_compat(struct file *file, unsigned int cmd,
 #endif
 
 static const struct file_operations snd_compr_file_ops = {
-		.owner =	THIS_MODULE,
-		.open =		snd_compr_open,
-		.release =	snd_compr_free,
-		.write =	snd_compr_write,
-		.read =		snd_compr_read,
-		.unlocked_ioctl = snd_compr_ioctl,
+		.owner		=	THIS_MODULE,
+		.open		=	snd_compr_open,
+		.release	=	snd_compr_free,
+		.write		=	snd_compr_write,
+		.read		=	snd_compr_read,
+		.unlocked_ioctl	=	snd_compr_ioctl,
 #ifdef CONFIG_COMPAT
-		.compat_ioctl = snd_compr_ioctl_compat,
+		.compat_ioctl	=	snd_compr_ioctl_compat,
 #endif
-		.mmap =		snd_compr_mmap,
-		.poll =		snd_compr_poll,
+		.mmap		=	snd_compr_mmap,
+		.poll		=	snd_compr_poll,
 };
 
 static int snd_compress_dev_register(struct snd_device *device)

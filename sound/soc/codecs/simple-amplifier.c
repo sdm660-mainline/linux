@@ -14,7 +14,6 @@
 #include <linux/gpio/consumer.h>
 #include <linux/math.h>
 #include <linux/minmax.h>
-#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
@@ -372,7 +371,7 @@ static unsigned int *simple_amp_alloc_tlv_ranges(const struct simple_amp_ranges 
 	unsigned int *t;
 	unsigned int i;
 
-	tlv = kzalloc_objs(*tlv, 2 + ranges->nb_ranges * 6, GFP_KERNEL);
+	tlv = kzalloc_objs(*tlv, 2 + ranges->nb_ranges * 6);
 	if (!tlv)
 		return NULL;
 

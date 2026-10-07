@@ -1200,9 +1200,11 @@ static int gfs2_iomap_end(struct inode *inode, loff_t pos, loff_t length,
 	return 0;
 }
 
+static DEFINE_IOMAP_ITER_NEXT_END(gfs2_iomap_next, gfs2_iomap_begin,
+				  gfs2_iomap_end);
+
 const struct iomap_ops gfs2_iomap_ops = {
-	.iomap_begin = gfs2_iomap_begin,
-	.iomap_end = gfs2_iomap_end,
+	.iomap_next = gfs2_iomap_next,
 };
 
 /**
@@ -1320,6 +1322,19 @@ static int gfs2_block_zero_range(struct inode *inode, loff_t from, loff_t length
 	length = min(length, inode->i_size - from);
 	return iomap_zero_range(inode, from, length, NULL, &gfs2_iomap_ops,
 			&gfs2_iomap_write_ops, NULL);
+}
+
+int gfs2_clear_beyond_eof(struct inode *inode, loff_t end)
+{
+	loff_t isize = i_size_read(inode);
+	unsigned int len = isize & ~PAGE_MASK;
+
+	if (!len || isize >= end)
+		return 0;
+	len = PAGE_SIZE - len;
+	if (end - isize < len)
+		len = end - isize;
+	return gfs2_block_zero_range(inode, isize, len);
 }
 
 #define GFS2_JTRUNC_REVOKES 8192
@@ -2095,6 +2110,12 @@ static int do_grow(struct inode *inode, u64 size)
 		if (error)
 			goto do_grow_qunlock;
 		unstuff = 1;
+	}
+
+	if (!unstuff) {
+		error = gfs2_clear_beyond_eof(inode, size);
+		if (error)
+			goto do_grow_qunlock;
 	}
 
 	error = gfs2_trans_begin(sdp, RES_DINODE + RES_STATFS + RES_RG_BIT +

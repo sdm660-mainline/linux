@@ -261,10 +261,13 @@ static int gpio_shared_of_traverse(struct device_node *curr)
 				con_id[con_id_len - suffix_len] = '\0';
 			}
 
-			ref = gpio_shared_make_ref(fwnode_handle_get(of_fwnode_handle(curr)),
-						   con_id, args.args[1]);
-			if (!ref)
+			struct fwnode_handle *curr_fwnode =
+				fwnode_handle_get(of_fwnode_handle(curr));
+			ref = gpio_shared_make_ref(curr_fwnode, con_id, args.args[1]);
+			if (!ref) {
+				fwnode_handle_put(curr_fwnode);
 				return -ENOMEM;
+			}
 
 			if (!list_empty(&entry->refs))
 				pr_debug("GPIO %u at %s is shared by multiple firmware nodes\n",
@@ -627,8 +630,7 @@ static void gpio_shared_release(struct kref *kref)
 
 	shared_desc = entry->shared_desc;
 	gpio_device_put(shared_desc->desc->gdev);
-	if (shared_desc->can_sleep)
-		mutex_destroy(&shared_desc->mutex);
+	mutex_destroy(&shared_desc->mutex);
 	kfree(shared_desc);
 	entry->shared_desc = NULL;
 }
@@ -659,11 +661,7 @@ gpiod_shared_desc_create(struct gpio_shared_entry *entry)
 	}
 
 	shared_desc->desc = &gdev->descs[entry->offset];
-	shared_desc->can_sleep = gpiod_cansleep(shared_desc->desc);
-	if (shared_desc->can_sleep)
-		mutex_init(&shared_desc->mutex);
-	else
-		spin_lock_init(&shared_desc->spinlock);
+	mutex_init(&shared_desc->mutex);
 
 	return shared_desc;
 }

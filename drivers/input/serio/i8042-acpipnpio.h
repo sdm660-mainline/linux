@@ -3,6 +3,7 @@
 #define _I8042_ACPIPNPIO_H
 
 #include <linux/acpi.h>
+#include <linux/seq_buf.h>
 
 #ifdef CONFIG_X86
 #include <asm/x86_init.h>
@@ -255,6 +256,13 @@ static const struct dmi_system_id i8042_dmi_quirk_table[] __initconst = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire A315-31"),
+		},
+		.driver_data = (void *)(SERIO_QUIRK_RESET_ALWAYS)
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire AG15-42P"),
 		},
 		.driver_data = (void *)(SERIO_QUIRK_RESET_ALWAYS)
 	},
@@ -662,6 +670,15 @@ static const struct dmi_system_id i8042_dmi_quirk_table[] __initconst = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "LIFEBOOK U728"),
 		},
 		.driver_data = (void *)(SERIO_QUIRK_NOAUX)
+	},
+	{
+		/* Fujitsu LIFEBOOK U7410 */
+		/* Mux mode also disturbs the EC keyboard, causing spurious ACKs */
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU CLIENT COMPUTING LIMITED"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "LIFEBOOK U7410"),
+		},
+		.driver_data = (void *)(SERIO_QUIRK_NOMUX)
 	},
 	{
 		/* Gigabyte M912 */
@@ -1479,17 +1496,21 @@ static char i8042_pnp_aux_name[32];
 
 static void i8042_pnp_id_to_string(struct pnp_id *id, char *dst, int dst_size)
 {
-	strscpy(dst, "PNP:", dst_size);
+	struct seq_buf sb;
+
+	seq_buf_init(&sb, dst, dst_size);
+	seq_buf_printf(&sb, "PNP:");
 
 	while (id) {
-		strlcat(dst, " ", dst_size);
-		strlcat(dst, id->id, dst_size);
+		seq_buf_printf(&sb, " %s", id->id);
 		id = id->next;
 	}
 }
 
 static int i8042_pnp_kbd_probe(struct pnp_dev *dev, const struct pnp_device_id *did)
 {
+	const char *name = pnp_dev_name(dev);
+
 	if (pnp_port_valid(dev, 0) && pnp_port_len(dev, 0) == 1)
 		i8042_pnp_data_reg = pnp_port_start(dev,0);
 
@@ -1499,11 +1520,8 @@ static int i8042_pnp_kbd_probe(struct pnp_dev *dev, const struct pnp_device_id *
 	if (pnp_irq_valid(dev,0))
 		i8042_pnp_kbd_irq = pnp_irq(dev, 0);
 
-	strscpy(i8042_pnp_kbd_name, did->id, sizeof(i8042_pnp_kbd_name));
-	if (strlen(pnp_dev_name(dev))) {
-		strlcat(i8042_pnp_kbd_name, ":", sizeof(i8042_pnp_kbd_name));
-		strlcat(i8042_pnp_kbd_name, pnp_dev_name(dev), sizeof(i8042_pnp_kbd_name));
-	}
+	scnprintf(i8042_pnp_kbd_name, sizeof(i8042_pnp_kbd_name), "%s%s%s",
+		  did->id, strlen(name) ? ":" : "", name);
 	i8042_pnp_id_to_string(dev->id, i8042_kbd_firmware_id,
 			       sizeof(i8042_kbd_firmware_id));
 	i8042_kbd_fwnode = dev_fwnode(&dev->dev);
@@ -1517,6 +1535,8 @@ static int i8042_pnp_kbd_probe(struct pnp_dev *dev, const struct pnp_device_id *
 
 static int i8042_pnp_aux_probe(struct pnp_dev *dev, const struct pnp_device_id *did)
 {
+	const char *name = pnp_dev_name(dev);
+
 	if (pnp_port_valid(dev, 0) && pnp_port_len(dev, 0) == 1)
 		i8042_pnp_data_reg = pnp_port_start(dev,0);
 
@@ -1526,11 +1546,8 @@ static int i8042_pnp_aux_probe(struct pnp_dev *dev, const struct pnp_device_id *
 	if (pnp_irq_valid(dev, 0))
 		i8042_pnp_aux_irq = pnp_irq(dev, 0);
 
-	strscpy(i8042_pnp_aux_name, did->id, sizeof(i8042_pnp_aux_name));
-	if (strlen(pnp_dev_name(dev))) {
-		strlcat(i8042_pnp_aux_name, ":", sizeof(i8042_pnp_aux_name));
-		strlcat(i8042_pnp_aux_name, pnp_dev_name(dev), sizeof(i8042_pnp_aux_name));
-	}
+	scnprintf(i8042_pnp_aux_name, sizeof(i8042_pnp_aux_name), "%s%s%s",
+		  did->id, strlen(name) ? ":" : "", name);
 	i8042_pnp_id_to_string(dev->id, i8042_aux_firmware_id,
 			       sizeof(i8042_aux_firmware_id));
 
@@ -1539,22 +1556,22 @@ static int i8042_pnp_aux_probe(struct pnp_dev *dev, const struct pnp_device_id *
 }
 
 static const struct pnp_device_id pnp_kbd_devids[] = {
-	{ .id = "PNP0300", .driver_data = 0 },
-	{ .id = "PNP0301", .driver_data = 0 },
-	{ .id = "PNP0302", .driver_data = 0 },
-	{ .id = "PNP0303", .driver_data = 0 },
-	{ .id = "PNP0304", .driver_data = 0 },
-	{ .id = "PNP0305", .driver_data = 0 },
-	{ .id = "PNP0306", .driver_data = 0 },
-	{ .id = "PNP0309", .driver_data = 0 },
-	{ .id = "PNP030a", .driver_data = 0 },
-	{ .id = "PNP030b", .driver_data = 0 },
-	{ .id = "PNP0320", .driver_data = 0 },
-	{ .id = "PNP0343", .driver_data = 0 },
-	{ .id = "PNP0344", .driver_data = 0 },
-	{ .id = "PNP0345", .driver_data = 0 },
-	{ .id = "CPQA0D7", .driver_data = 0 },
-	{ .id = "", },
+	{ .id = "PNP0300" },
+	{ .id = "PNP0301" },
+	{ .id = "PNP0302" },
+	{ .id = "PNP0303" },
+	{ .id = "PNP0304" },
+	{ .id = "PNP0305" },
+	{ .id = "PNP0306" },
+	{ .id = "PNP0309" },
+	{ .id = "PNP030a" },
+	{ .id = "PNP030b" },
+	{ .id = "PNP0320" },
+	{ .id = "PNP0343" },
+	{ .id = "PNP0344" },
+	{ .id = "PNP0345" },
+	{ .id = "CPQA0D7" },
+	{ }
 };
 MODULE_DEVICE_TABLE(pnp, pnp_kbd_devids);
 
@@ -1569,18 +1586,18 @@ static struct pnp_driver i8042_pnp_kbd_driver = {
 };
 
 static const struct pnp_device_id pnp_aux_devids[] = {
-	{ .id = "AUI0200", .driver_data = 0 },
-	{ .id = "FJC6000", .driver_data = 0 },
-	{ .id = "FJC6001", .driver_data = 0 },
-	{ .id = "PNP0f03", .driver_data = 0 },
-	{ .id = "PNP0f0b", .driver_data = 0 },
-	{ .id = "PNP0f0e", .driver_data = 0 },
-	{ .id = "PNP0f12", .driver_data = 0 },
-	{ .id = "PNP0f13", .driver_data = 0 },
-	{ .id = "PNP0f19", .driver_data = 0 },
-	{ .id = "PNP0f1c", .driver_data = 0 },
-	{ .id = "SYN0801", .driver_data = 0 },
-	{ .id = "", },
+	{ .id = "AUI0200" },
+	{ .id = "FJC6000" },
+	{ .id = "FJC6001" },
+	{ .id = "PNP0f03" },
+	{ .id = "PNP0f0b" },
+	{ .id = "PNP0f0e" },
+	{ .id = "PNP0f12" },
+	{ .id = "PNP0f13" },
+	{ .id = "PNP0f19" },
+	{ .id = "PNP0f1c" },
+	{ .id = "SYN0801" },
+	{ },
 };
 MODULE_DEVICE_TABLE(pnp, pnp_aux_devids);
 

@@ -3044,6 +3044,21 @@ static int emac_probe(struct platform_device *ofdev)
 	if (err)
 		goto err_gone;
 
+	if (emac_phy_supports_gige(dev->phy_mode)) {
+		ndev->netdev_ops = &emac_gige_netdev_ops;
+		dev->commac.ops = &emac_commac_sg_ops;
+	} else {
+		ndev->netdev_ops = &emac_netdev_ops;
+		dev->commac.ops = &emac_commac_ops;
+	}
+	ndev->ethtool_ops = &emac_ethtool_ops;
+
+	dev->emacp = devm_platform_ioremap_resource(ofdev, 0);
+	if (IS_ERR(dev->emacp)) {
+		err = PTR_ERR(dev->emacp);
+		goto err_gone;
+	}
+
 	/* Setup error IRQ handler */
 	dev->emac_irq = platform_get_irq(ofdev, 0);
 	if (dev->emac_irq < 0) {
@@ -3061,13 +3076,6 @@ static int emac_probe(struct platform_device *ofdev)
 
 	ndev->irq = dev->emac_irq;
 
-	dev->emacp = devm_platform_ioremap_resource(ofdev, 0);
-	if (IS_ERR(dev->emacp)) {
-		dev_err(&ofdev->dev, "can't map device registers");
-		err = PTR_ERR(dev->emacp);
-		goto err_gone;
-	}
-
 	/* Wait for dependent devices */
 	err = emac_wait_deps(dev);
 	if (err)
@@ -3077,7 +3085,6 @@ static int emac_probe(struct platform_device *ofdev)
 		dev->mdio_instance = platform_get_drvdata(dev->mdio_dev);
 
 	/* Register with MAL */
-	dev->commac.ops = &emac_commac_ops;
 	dev->commac.dev = dev;
 	dev->commac.tx_chan_mask = MAL_CHAN_MASK(dev->mal_tx_chan);
 	dev->commac.rx_chan_mask = MAL_CHAN_MASK(dev->mal_rx_chan);
@@ -3145,12 +3152,6 @@ static int emac_probe(struct platform_device *ofdev)
 		ndev->features |= ndev->hw_features | NETIF_F_RXCSUM;
 	}
 	ndev->watchdog_timeo = 5 * HZ;
-	if (emac_phy_supports_gige(dev->phy_mode)) {
-		ndev->netdev_ops = &emac_gige_netdev_ops;
-		dev->commac.ops = &emac_commac_sg_ops;
-	} else
-		ndev->netdev_ops = &emac_netdev_ops;
-	ndev->ethtool_ops = &emac_ethtool_ops;
 
 	/* MTU range: 46 - 1500 or whatever is in OF */
 	ndev->min_mtu = EMAC_MIN_MTU;

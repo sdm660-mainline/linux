@@ -47,8 +47,8 @@ struct max77686_clk_init_data {
 
 struct max77686_clk_driver_data {
 	enum max77686_chip_name chip;
-	struct max77686_clk_init_data *max_clk_data;
 	size_t num_clks;
+	struct max77686_clk_init_data max_clk_data[] __counted_by(num_clks);
 };
 
 static const struct
@@ -168,19 +168,7 @@ static int max77686_clk_probe(struct platform_device *pdev)
 	struct regmap *regmap;
 	int i, ret, num_clks;
 
-	drv_data = devm_kzalloc(dev, sizeof(*drv_data), GFP_KERNEL);
-	if (!drv_data)
-		return -ENOMEM;
-
-	regmap = dev_get_regmap(parent, NULL);
-	if (!regmap) {
-		dev_err(dev, "Failed to get rtc regmap\n");
-		return -ENODEV;
-	}
-
-	drv_data->chip = id->driver_data;
-
-	switch (drv_data->chip) {
+	switch (id->driver_data) {
 	case CHIP_MAX77686:
 		num_clks = MAX77686_CLKS_NUM;
 		hw_clks = max77686_hw_clks_info;
@@ -201,12 +189,18 @@ static int max77686_clk_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	drv_data->num_clks = num_clks;
-	drv_data->max_clk_data = devm_kcalloc(dev, num_clks,
-					      sizeof(*drv_data->max_clk_data),
-					      GFP_KERNEL);
-	if (!drv_data->max_clk_data)
+	drv_data = devm_kzalloc(dev, struct_size(drv_data, max_clk_data, num_clks), GFP_KERNEL);
+	if (!drv_data)
 		return -ENOMEM;
+
+	drv_data->num_clks = num_clks;
+	drv_data->chip = id->driver_data;
+
+	regmap = dev_get_regmap(parent, NULL);
+	if (!regmap) {
+		dev_err(dev, "Failed to get rtc regmap\n");
+		return -ENODEV;
+	}
 
 	for (i = 0; i < num_clks; i++) {
 		struct max77686_clk_init_data *max_clk_data;
@@ -270,10 +264,10 @@ static int max77686_clk_probe(struct platform_device *pdev)
 }
 
 static const struct platform_device_id max77686_clk_id[] = {
-	{ "max77686-clk", .driver_data = CHIP_MAX77686, },
-	{ "max77802-clk", .driver_data = CHIP_MAX77802, },
-	{ "max77620-clock", .driver_data = CHIP_MAX77620, },
-	{},
+	{ .name = "max77686-clk", .driver_data = CHIP_MAX77686 },
+	{ .name = "max77802-clk", .driver_data = CHIP_MAX77802 },
+	{ .name = "max77620-clock", .driver_data = CHIP_MAX77620 },
+	{ }
 };
 MODULE_DEVICE_TABLE(platform, max77686_clk_id);
 

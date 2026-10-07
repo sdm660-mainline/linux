@@ -660,6 +660,7 @@ static void pci_init_host_bridge(struct pci_host_bridge *bridge)
 {
 	INIT_LIST_HEAD(&bridge->windows);
 	INIT_LIST_HEAD(&bridge->dma_ranges);
+	INIT_LIST_HEAD(&bridge->ports);
 
 	/*
 	 * We assume we can manage these PCIe features.  Some systems may
@@ -1073,9 +1074,6 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 			dev_err(&bus->dev, "failed to add bus: %d\n", err);
 	}
 
-	/* Create legacy_io and legacy_mem files for this bus */
-	pci_create_legacy_files(bus);
-
 	if (parent)
 		dev_info(parent, "PCI host bridge to bus %s\n", name);
 	else
@@ -1280,9 +1278,6 @@ add_dev:
 		if (WARN_ON(ret < 0))
 			dev_err(&child->dev, "failed to add bus: %d\n", ret);
 	}
-
-	/* Create legacy_io and legacy_mem files for this bus */
-	pci_create_legacy_files(child);
 
 	return child;
 }
@@ -2753,6 +2748,8 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 	pci_reassigndev_resource_alignment(dev);
 
 	pci_init_capabilities(dev);
+
+	platform_pci_configure_wake(dev);
 
 	/*
 	 * Add the device to our list of discovered devices

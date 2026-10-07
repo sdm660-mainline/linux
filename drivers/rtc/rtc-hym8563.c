@@ -376,8 +376,8 @@ static struct clk *hym8563_clkout_register_clk(struct hym8563 *hym8563)
 {
 	struct i2c_client *client = hym8563->client;
 	struct device_node *node = client->dev.of_node;
+	struct clk_init_data init = {};
 	struct clk *clk;
-	struct clk_init_data init;
 	int ret;
 
 	ret = i2c_smbus_write_byte_data(client, HYM8563_CLKOUT,
@@ -564,8 +564,8 @@ static int hym8563_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id hym8563_id[] = {
-	{ "hym8563" },
-	{}
+	{ .name = "hym8563" },
+	{ }
 };
 MODULE_DEVICE_TABLE(i2c, hym8563_id);
 

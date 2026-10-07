@@ -2057,8 +2057,8 @@ static unsigned short *ssif_address_list(void)
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id ssif_acpi_match[] = {
-	{ "IPI0001", 0 },
-	{ },
+	{ .id = "IPI0001" },
+	{ }
 };
 MODULE_DEVICE_TABLE(acpi, ssif_acpi_match);
 #endif
@@ -2094,7 +2094,7 @@ static int dmi_ipmi_probe(struct platform_device *pdev)
 #endif
 
 static const struct i2c_device_id ssif_id[] = {
-	{ DEVICE_NAME },
+	{ .name = DEVICE_NAME },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ssif_id);
@@ -2127,7 +2127,7 @@ static void ssif_platform_remove(struct platform_device *dev)
 }
 
 static const struct platform_device_id ssif_plat_ids[] = {
-    { "dmi-ipmi-ssif", 0 },
+    { .name = "dmi-ipmi-ssif" },
     { }
 };
 MODULE_DEVICE_TABLE(platform, ssif_plat_ids);

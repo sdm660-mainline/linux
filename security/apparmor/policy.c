@@ -81,6 +81,7 @@
 #include "include/file.h"
 #include "include/ipc.h"
 #include "include/match.h"
+#include "include/net.h"
 #include "include/path.h"
 #include "include/policy.h"
 #include "include/policy_ns.h"
@@ -232,6 +233,13 @@ static void __remove_profile(struct aa_profile *profile)
 	aa_label_remove(&profile->label);
 	__aafs_profile_rmdir(profile);
 	__list_remove_profile(profile);
+	/* rawdata is only ever referenced by fs lookup, that is no
+	 * longer possible here, so put the reference to it. This will
+	 * enable the rawdata to be freed if for some reason the profile
+	 * is pinned and going to live for a while.
+	 */
+	aa_put_profile_loaddata(profile->rawdata);
+	profile->rawdata = NULL;
 }
 
 /**
@@ -712,7 +720,7 @@ struct aa_profile *aa_alloc_null(struct aa_profile *parent, const char *name,
 }
 
 /**
- * aa_new_learning_profile - create or find a null-X learning profile
+ * __aa_new_learning_profile - create or find a null-X learning profile
  * @parent: profile that caused this profile to be created (NOT NULL)
  * @hat: true if the null- learning profile is a hat
  * @base: name to base the null profile off of
@@ -729,8 +737,9 @@ struct aa_profile *aa_alloc_null(struct aa_profile *parent, const char *name,
  *
  * Returns: new refcounted profile else NULL on failure
  */
-struct aa_profile *aa_new_learning_profile(struct aa_profile *parent, bool hat,
-					   const char *base, gfp_t gfp)
+struct aa_profile *__aa_new_learning_profile(struct aa_profile *parent,
+					     bool hat, const char *base,
+					     gfp_t gfp)
 {
 	struct aa_profile *p, *profile;
 	const char *bname;
@@ -738,6 +747,7 @@ struct aa_profile *aa_new_learning_profile(struct aa_profile *parent, bool hat,
 	size_t name_sz;
 
 	AA_BUG(!parent);
+	AA_BUG(!mutex_is_locked(&parent->ns->lock));
 
 	if (base) {
 		name_sz = strlen(parent->base.hname) + 8 + strlen(base);
@@ -771,7 +781,6 @@ name:
 	if (hat)
 		profile->label.flags |= FLAG_HAT;
 
-	mutex_lock_nested(&profile->ns->lock, profile->ns->level);
 	p = __find_child(&parent->base.profiles, bname);
 	if (p) {
 		aa_free_profile(profile);
@@ -779,7 +788,6 @@ name:
 	} else {
 		__add_profile(&parent->base.profiles, profile);
 	}
-	mutex_unlock(&profile->ns->lock);
 
 	/* refcount released by caller */
 out:
@@ -791,6 +799,18 @@ fail:
 	kfree(name);
 	aa_free_profile(profile);
 	return NULL;
+}
+
+struct aa_profile *aa_new_learning_profile(struct aa_profile *parent, bool hat,
+					   const char *base, gfp_t gfp)
+{
+	struct aa_profile *profile;
+
+	mutex_lock_nested(&parent->ns->lock, parent->ns->level);
+	profile = __aa_new_learning_profile(parent, hat, base, gfp);
+	mutex_unlock(&parent->ns->lock);
+
+	return profile;
 }
 
 /**
@@ -1151,6 +1171,8 @@ static struct aa_profile *update_to_newest_parent(struct aa_profile *new)
  * @label: label that is attempting to load/replace policy
  * @mask: permission mask
  * @udata: serialized data stream  (NOT NULL)
+ * @compressed_profile: The userspace-provided compressed profile. May be NULL
+ * @compressed_size: If compressed_data is not NULL, the compressed data size
  *
  * unpack and replace a profile on the profile list and uses of that profile
  * by any task creds via invalidating the old version of the profile, which
@@ -1160,7 +1182,8 @@ static struct aa_profile *update_to_newest_parent(struct aa_profile *new)
  * Returns: size of data consumed else error code on failure.
  */
 ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
-			    u32 mask, struct aa_loaddata *udata)
+			    u32 mask, struct aa_loaddata *udata,
+			    char *compressed_profile, size_t compressed_size)
 {
 	const char *ns_name = NULL, *info = NULL;
 	struct aa_ns *ns = NULL;
@@ -1173,7 +1196,7 @@ ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
 	op = mask & AA_MAY_REPLACE_POLICY ? OP_PROF_REPL : OP_PROF_LOAD;
 	aa_get_profile_loaddata(udata);
 	/* released below */
-	error = aa_unpack(udata, &lh, &ns_name);
+	error = aa_unpack(udata, &lh, &ns_name, compressed_profile, compressed_size);
 	if (error)
 		goto out;
 
@@ -1223,8 +1246,12 @@ ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
 			if (aa_rawdata_eq(rawdata_ent, udata)) {
 				struct aa_loaddata *tmp;
 
-				tmp = aa_get_profile_loaddata(rawdata_ent);
-				/* check we didn't fail the race */
+				/*
+				 * Entries remain on rawdata_list with
+				 * pcount == 0 until do_ploaddata_rmfs()
+				 * runs; only take a live profile ref.
+				 */
+				tmp = aa_get_profile_loaddata_not0(rawdata_ent);
 				if (tmp) {
 					aa_put_profile_loaddata(udata);
 					udata = tmp;
@@ -1342,6 +1369,16 @@ ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
 			goto skip;
 		}
 
+		if (!aa_g_export_binary) {
+			if (ent->old && ent->old->rawdata &&
+			    ent->old->dents[AAFS_LOADDATA_DIR]) {
+				/* remove rawdata symlinks because the symlink
+				 * target will be removed
+				 */
+				__aa_remove_rawdata_symlink_dents(ent->old);
+			}
+		}
+
 		/*
 		 * TODO: finer dedup based on profile range in data. Load set
 		 * can differ but profile may remain unchanged
@@ -1352,6 +1389,11 @@ ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
 		if (ent->old) {
 			share_name(ent->old, ent->new);
 			__replace_profile(ent->old, ent->new);
+			if (aa_g_export_binary) {
+				/* recreate rawdata symlinks */
+				if (!ent->old->rawdata)
+					__aa_create_rawdata_symlink_dents(ent->new);
+			}
 		} else {
 			struct list_head *lh;
 
@@ -1372,12 +1414,15 @@ ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
 
 out:
 	aa_put_ns(ns);
+
+	ssize_t udata_sz = udata->size;
+
 	aa_put_profile_loaddata(udata);
 	kfree(ns_name);
 
 	if (error)
 		return error;
-	return udata->size;
+	return udata_sz;
 
 fail_lock:
 	mutex_unlock(&ns->lock);

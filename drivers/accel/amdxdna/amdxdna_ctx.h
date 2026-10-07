@@ -55,7 +55,7 @@ struct amdxdna_cmd_chain {
 	u32 submit_index;
 	u32 error_index;
 	u32 reserved[3];
-	u64 data[] __counted_by(command_count);
+	u64 data[];
 };
 
 /*
@@ -132,6 +132,7 @@ enum amdxdna_job_opcode {
 struct amdxdna_drv_cmd {
 	enum amdxdna_job_opcode	opcode;
 	u32			result;
+	struct kref		refcnt;
 };
 
 struct app_health_report;

@@ -127,19 +127,19 @@
 #define CFG0_READ_FMTTYPE                                        \
 	FIELD_PREP(ASPEED_TLP_COMMON_FIELDS,                     \
 		   ASPEED_TLP_FMT_TYPE(PCIE_TLP_FMT_3DW_NO_DATA, \
-				       PCIE_TLP_TYPE_CFG0_RD))
+				       PCIE_TLP_TYPE_CFG0_RDWR))
 #define CFG0_WRITE_FMTTYPE                                    \
 	FIELD_PREP(ASPEED_TLP_COMMON_FIELDS,                  \
 		   ASPEED_TLP_FMT_TYPE(PCIE_TLP_FMT_3DW_DATA, \
-				       PCIE_TLP_TYPE_CFG0_WR))
+				       PCIE_TLP_TYPE_CFG0_RDWR))
 #define CFG1_READ_FMTTYPE                                        \
 	FIELD_PREP(ASPEED_TLP_COMMON_FIELDS,                     \
 		   ASPEED_TLP_FMT_TYPE(PCIE_TLP_FMT_3DW_NO_DATA, \
-				       PCIE_TLP_TYPE_CFG1_RD))
+				       PCIE_TLP_TYPE_CFG1_RDWR))
 #define CFG1_WRITE_FMTTYPE                                    \
 	FIELD_PREP(ASPEED_TLP_COMMON_FIELDS,                  \
 		   ASPEED_TLP_FMT_TYPE(PCIE_TLP_FMT_3DW_DATA, \
-				       PCIE_TLP_TYPE_CFG1_WR))
+				       PCIE_TLP_TYPE_CFG1_RDWR))
 #define CFG_PAYLOAD_SIZE		0x01 /* 1 DWORD */
 #define TLP_HEADER_BYTE_EN(x, y)	((GENMASK((x) - 1, 0) << ((y) % 4)))
 #define TLP_GET_VALUE(x, y, z)	\
@@ -725,10 +725,10 @@ static int aspeed_pcie_init_irq_domain(struct aspeed_pcie *pcie)
 {
 	int ret;
 
-	pcie->intx_domain = irq_domain_add_linear(pcie->dev->of_node,
-						  PCI_NUM_INTX,
-						  &aspeed_intx_domain_ops,
-						  pcie);
+	pcie->intx_domain = irq_domain_create_linear(dev_fwnode(pcie->dev),
+						     PCI_NUM_INTX,
+						     &aspeed_intx_domain_ops,
+						     pcie);
 	if (!pcie->intx_domain) {
 		ret = dev_err_probe(pcie->dev, -ENOMEM,
 				    "failed to get INTx IRQ domain\n");

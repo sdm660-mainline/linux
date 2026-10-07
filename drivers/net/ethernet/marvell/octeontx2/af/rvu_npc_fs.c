@@ -729,7 +729,12 @@ static void npc_set_features(struct rvu *rvu, int blkaddr, u8 intf)
 		if (!npc_check_field(rvu, blkaddr, NPC_LB, intf))
 			*features &= ~BIT_ULL(NPC_OUTER_VID);
 
-	/* Allow extracting SPI field from AH and ESP headers at same offset */
+	/* Warn on unrelated MKEX fields colliding with SPI key bits.  AH/ESP
+	 * sharing the same SPI key offset is valid; use npc_is_field_present(),
+	 * not npc_check_field(), to advertise the feature.
+	 */
+	if (npc_check_overlap(rvu, blkaddr, NPC_IPSEC_SPI, 0, intf))
+		dev_warn(rvu->dev, "Overlap detected the field NPC_IPSEC_SPI\n");
 	if (npc_is_field_present(rvu, NPC_IPSEC_SPI, intf) &&
 	    (*features & (BIT_ULL(NPC_IPPROTO_ESP) | BIT_ULL(NPC_IPPROTO_AH))))
 		*features |= BIT_ULL(NPC_IPSEC_SPI);
@@ -2225,7 +2230,7 @@ int npc_install_mcam_drop_rule(struct rvu *rvu, int mcam_idx, u16 *counter_idx,
 		return err;
 	}
 
-	dev_err(rvu->dev,
+	dev_dbg(rvu->dev,
 		"%s: Installed single drop on non hit rule at %d, cntr=%d\n",
 		__func__, mcam_idx, req.cntr);
 

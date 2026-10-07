@@ -29,6 +29,7 @@ enum bitmap_state {
 	BITMAP_FIRST_USE   = 3, /* llbitmap is just created */
 	BITMAP_CLEAN       = 4, /* llbitmap is created with assume_clean */
 	BITMAP_DAEMON_BUSY = 5, /* llbitmap daemon is not finished after daemon_sleep */
+	BITMAP_SHUTDOWN    = 6, /* llbitmap is being destroyed */
 	BITMAP_HOSTENDIAN  =15,
 };
 
@@ -93,6 +94,15 @@ struct bitmap_operations {
 	void (*write_all)(struct mddev *mddev);
 	void (*dirty_bits)(struct mddev *mddev, unsigned long s,
 			   unsigned long e);
+	/* Prepare a range for this bitmap implementation. */
+	void (*prepare_range)(struct mddev *mddev,
+			      sector_t *offset,
+			      unsigned long *sectors,
+			      bool discard);
+	void (*reshape_finish)(struct mddev *mddev);
+	int (*reshape_can_start)(struct mddev *mddev);
+	void (*reshape_mark)(struct mddev *mddev, sector_t old_pos,
+			     sector_t new_pos);
 	void (*unplug)(struct mddev *mddev, bool sync);
 	void (*daemon_work)(struct mddev *mddev);
 

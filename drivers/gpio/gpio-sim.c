@@ -23,7 +23,6 @@
 #include <linux/list.h>
 #include <linux/lockdep.h>
 #include <linux/minmax.h>
-#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
@@ -791,8 +790,7 @@ gpio_sim_make_bank_swnode(struct gpio_sim_bank *bank,
 
 	line_names_size = gpio_sim_get_line_names_size(bank);
 	if (line_names_size) {
-		line_names = kcalloc(line_names_size, sizeof(*line_names),
-				     GFP_KERNEL);
+		line_names = kzalloc_objs(*line_names, line_names_size);
 		if (!line_names)
 			return ERR_PTR(-ENOMEM);
 

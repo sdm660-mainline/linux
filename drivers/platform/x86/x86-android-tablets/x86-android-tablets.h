@@ -13,6 +13,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/irqdomain_defs.h>
+#include <linux/device-id/dmi.h>
 #include <linux/spi/spi.h>
 
 struct gpio_desc;
@@ -95,6 +96,7 @@ struct x86_dev_info {
 	int (*init)(struct device *dev);
 	void (*exit)(void);
 	bool use_pci;
+	bool has_crystalcove;
 	enum x86_gpiochip_type gpiochip_type;
 };
 
@@ -106,6 +108,7 @@ int x86_acpi_irq_helper_get(const struct x86_acpi_irq_data *data);
 /* Software nodes representing GPIO chips used by various tablets */
 extern const struct software_node baytrail_gpiochip_nodes[];
 extern const struct software_node cherryview_gpiochip_nodes[];
+extern const struct software_node crystalcove_gpiochip_node;
 
 /*
  * Extern declarations of x86_dev_info structs so there can be a single

@@ -24,7 +24,6 @@
 #include <linux/input/touchscreen.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
-#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/unaligned.h>
@@ -786,7 +785,8 @@ static int iqs5xx_fw_file_parse(struct i2c_client *client,
 		switch (rec_type) {
 		case IQS5XX_REC_TYPE_DATA:
 			if (rec_addr < IQS5XX_CHKSM ||
-			    rec_addr > IQS5XX_PMAP_END) {
+			    rec_addr > IQS5XX_PMAP_END ||
+			    rec_len > IQS5XX_PMAP_END + 1 - rec_addr) {
 				dev_err(&client->dev,
 					"Invalid address at record %u\n",
 					rec_num);
@@ -1049,9 +1049,9 @@ static int iqs5xx_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id iqs5xx_id[] = {
-	{ "iqs550", 0 },
-	{ "iqs572", 1 },
-	{ "iqs525", 2 },
+	{ .name = "iqs550" },
+	{ .name = "iqs572" },
+	{ .name = "iqs525" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, iqs5xx_id);

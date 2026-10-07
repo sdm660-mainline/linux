@@ -166,7 +166,7 @@ static DEVICE_ATTR_RO(eui);
 static ssize_t nsid_show(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
-	return sysfs_emit(buf, "%d\n", dev_to_ns_head(dev)->ns_id);
+	return sysfs_emit(buf, "%u\n", dev_to_ns_head(dev)->ns_id);
 }
 static DEVICE_ATTR_RO(nsid);
 
@@ -240,8 +240,10 @@ static ssize_t nuse_show(struct device *dev, struct device_attribute *attr,
 		ret = ns_head_update_nuse(head);
 	else
 		ret = ns_update_nuse(disk->private_data);
-	if (ret)
+	if (ret < 0)
 		return ret;
+	else if (ret > 0)
+		return -EIO;
 
 	return sysfs_emit(buf, "%llu\n", head->nuse);
 }
@@ -394,7 +396,7 @@ static ssize_t nvme_io_errors_store(struct device *dev,
 	return count;
 }
 
-struct device_attribute dev_attr_io_errors =
+static struct device_attribute dev_attr_io_errors =
 	__ATTR(command_error_count, 0644,
 		nvme_io_errors_show, nvme_io_errors_store);
 
@@ -441,7 +443,7 @@ static umode_t nvme_ns_diag_attrs_are_visible(struct kobject *kobj,
 	return a->mode;
 }
 
-const struct attribute_group nvme_ns_diag_attr_group = {
+static const struct attribute_group nvme_ns_diag_attr_group = {
 	.name		= "diag",
 	.attrs		= nvme_ns_diag_attrs,
 	.is_visible	= nvme_ns_diag_attrs_are_visible,
@@ -677,7 +679,7 @@ static ssize_t cntrltype_show(struct device *dev,
 	if (ctrl->cntrltype > NVME_CTRL_ADMIN || !type[ctrl->cntrltype])
 		return sysfs_emit(buf, "reserved\n");
 
-	return sysfs_emit(buf, type[ctrl->cntrltype]);
+	return sysfs_emit(buf, "%s", type[ctrl->cntrltype]);
 }
 static DEVICE_ATTR_RO(cntrltype);
 
@@ -694,7 +696,7 @@ static ssize_t dctype_show(struct device *dev,
 	if (ctrl->dctype > NVME_DCTYPE_CDC || !type[ctrl->dctype])
 		return sysfs_emit(buf, "reserved\n");
 
-	return sysfs_emit(buf, type[ctrl->dctype]);
+	return sysfs_emit(buf, "%s", type[ctrl->dctype]);
 }
 static DEVICE_ATTR_RO(dctype);
 
@@ -1147,7 +1149,7 @@ static ssize_t nvme_adm_errors_store(struct device *dev,
 	return count;
 }
 
-struct device_attribute dev_attr_adm_errors =
+static struct device_attribute dev_attr_adm_errors =
 	__ATTR(command_error_count, 0644,
 		nvme_adm_errors_show, nvme_adm_errors_store);
 

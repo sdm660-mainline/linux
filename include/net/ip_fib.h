@@ -302,7 +302,8 @@ static inline struct fib_table *fib_get_table(struct net *net, u32 id)
 		&net->ipv4.fib_table_hash[TABLE_LOCAL_INDEX] :
 		&net->ipv4.fib_table_hash[TABLE_MAIN_INDEX];
 
-	tb_hlist = rcu_dereference_rtnl(hlist_first_rcu(ptr));
+	/* Only fib4_rules_init() adds fib_table. */
+	tb_hlist = rcu_dereference_protected(hlist_first_rcu(ptr), true);
 
 	return hlist_entry(tb_hlist, struct fib_table, tb_hlist);
 }
@@ -374,7 +375,7 @@ static inline int fib_lookup(struct net *net, struct flowi4 *flp,
 			     struct fib_result *res, unsigned int flags)
 {
 	struct fib_table *tb;
-	int err = -ENETUNREACH;
+	int err = -EAGAIN;
 
 	flags |= FIB_LOOKUP_NOREF;
 	if (net->ipv4.fib_has_custom_rules)
@@ -388,17 +389,16 @@ static inline int fib_lookup(struct net *net, struct flowi4 *flp,
 	if (tb)
 		err = fib_table_lookup(tb, flp, res, flags);
 
-	if (!err)
+	if (err != -EAGAIN)
 		goto out;
 
 	tb = rcu_dereference_rtnl(net->ipv4.fib_default);
 	if (tb)
 		err = fib_table_lookup(tb, flp, res, flags);
 
-out:
 	if (err == -EAGAIN)
 		err = -ENETUNREACH;
-
+out:
 	rcu_read_unlock();
 
 	return err;

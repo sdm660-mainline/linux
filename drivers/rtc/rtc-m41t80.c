@@ -71,17 +71,17 @@
 #define M41T80_FEATURE_SQ_ALT	BIT(4)	/* RSx bits are in reg 4 */
 
 static const struct i2c_device_id m41t80_id[] = {
-	{ "m41t62", M41T80_FEATURE_SQ | M41T80_FEATURE_SQ_ALT },
-	{ "m41t65", M41T80_FEATURE_WD },
-	{ "m41t80", M41T80_FEATURE_SQ },
-	{ "m41t81", M41T80_FEATURE_HT | M41T80_FEATURE_SQ},
-	{ "m41t81s", M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
-	{ "m41t82", M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
-	{ "m41t83", M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
-	{ "m41st84", M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
-	{ "m41st85", M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
-	{ "m41st87", M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
-	{ "rv4162", M41T80_FEATURE_SQ | M41T80_FEATURE_WD | M41T80_FEATURE_SQ_ALT },
+	{ .name = "m41t62", .driver_data = M41T80_FEATURE_SQ | M41T80_FEATURE_SQ_ALT },
+	{ .name = "m41t65", .driver_data = M41T80_FEATURE_WD },
+	{ .name = "m41t80", .driver_data = M41T80_FEATURE_SQ },
+	{ .name = "m41t81", .driver_data = M41T80_FEATURE_HT | M41T80_FEATURE_SQ},
+	{ .name = "m41t81s", .driver_data = M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
+	{ .name = "m41t82", .driver_data = M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
+	{ .name = "m41t83", .driver_data = M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
+	{ .name = "m41st84", .driver_data = M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
+	{ .name = "m41st85", .driver_data = M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
+	{ .name = "m41st87", .driver_data = M41T80_FEATURE_HT | M41T80_FEATURE_BL | M41T80_FEATURE_SQ },
+	{ .name = "rv4162", .driver_data = M41T80_FEATURE_SQ | M41T80_FEATURE_WD | M41T80_FEATURE_SQ_ALT },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, m41t80_id);
@@ -574,8 +574,8 @@ static struct clk *m41t80_sqw_register_clk(struct m41t80_data *m41t80)
 	struct i2c_client *client = m41t80->client;
 	struct device_node *node = client->dev.of_node;
 	struct device_node *fixed_clock;
+	struct clk_init_data init = {};
 	struct clk *clk;
-	struct clk_init_data init;
 	int ret;
 
 	fixed_clock = of_get_child_by_name(node, "clock");

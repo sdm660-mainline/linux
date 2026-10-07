@@ -311,6 +311,18 @@ static void cifs_kill_sb(struct super_block *sb)
 		/* Wait for all opened files to release */
 		flush_workqueue(deferredclose_wq);
 
+		/*
+		 * Wait for all in-flight netfs I/O requests to finish their
+		 * cleanup_work so that any cifsFileInfo final puts they queue
+		 * to fileinfo_put_wq/serverclose_wq have been queued, then
+		 * drain the workqueue so the cfile dentry refs are dropped to
+		 * avoid the busy dentry warning.
+		 */
+		wait_var_event(&cifs_sb->outstanding_rreq,
+			       !atomic_read(&cifs_sb->outstanding_rreq));
+		flush_workqueue(serverclose_wq);
+		flush_workqueue(fileinfo_put_wq);
+
 		/* finally release root dentry */
 		dput(cifs_sb->root);
 		cifs_sb->root = NULL;
@@ -428,6 +440,7 @@ cifs_alloc_inode(struct super_block *sb)
 		return NULL;
 	cifs_inode->cifsAttrs = ATTR_ARCHIVE;	/* default */
 	cifs_inode->time = 0;
+	cifs_inode->time_last_write = 0;
 	/*
 	 * Until the file is open and we have gotten oplock info back from the
 	 * server, can not assume caching of file data or metadata.
@@ -679,6 +692,8 @@ cifs_show_options(struct seq_file *s, struct dentry *root)
 		seq_puts(s, ",seal");
 	else if (tcon->ses->server->ignore_signature)
 		seq_puts(s, ",signloosely");
+	if (cifs_sb->ctx->compress)
+		seq_puts(s, ",compress");
 	if (tcon->nocase)
 		seq_puts(s, ",nocase");
 	if (tcon->nodelete)
@@ -1397,9 +1412,21 @@ static loff_t cifs_remap_file_range(struct file *src_file, loff_t off,
 	 * server could even support copy of range where source = target
 	 */
 	lock_two_nondirectories(target_inode, src_inode);
+	filemap_invalidate_lock(target_inode->i_mapping);
 
-	if (len == 0)
-		len = src_inode->i_size - off;
+	if (len == 0) {
+		loff_t src_size = i_size_read(src_inode);
+
+		if (off > src_size) {
+			rc = -EINVAL;
+			goto unlock;
+		}
+		len = src_size - off;
+		if (!len) {
+			rc = 0;
+			goto unlock;
+		}
+	}
 
 	cifs_dbg(FYI, "clone range\n");
 
@@ -1441,9 +1468,15 @@ static loff_t cifs_remap_file_range(struct file *src_file, loff_t off,
 	i_size = target_inode->i_size;
 	spin_unlock(&target_inode->i_lock);
 
-	/* Discard all the folios that overlap the destination region. */
+	/*
+	 * Discard all the folios that overlap the destination region.  Start at
+	 * the old EOF when extending so the folio straddling it, which may hold
+	 * data written past EOF through an mmap, is dropped too.
+	 */
 	cifs_dbg(FYI, "about to discard pages %llx-%llx\n", fstart, fend);
-	truncate_inode_pages_range(&target_inode->i_data, fstart, fend);
+	truncate_inode_pages_range(&target_inode->i_data,
+				   min(fstart, i_size), fend);
+	netfs_wait_for_outstanding_io(target_inode);
 
 	fscache_invalidate(cifs_inode_cookie(target_inode), NULL, i_size, 0);
 
@@ -1451,11 +1484,7 @@ static loff_t cifs_remap_file_range(struct file *src_file, loff_t off,
 	if (target_tcon->ses->server->ops->duplicate_extents) {
 		rc = target_tcon->ses->server->ops->duplicate_extents(xid,
 			smb_file_src, smb_file_target, off, len, destoff);
-		if (rc == 0 && new_size > i_size) {
-			truncate_setsize(target_inode, new_size);
-			fscache_resize_cookie(cifs_inode_cookie(target_inode),
-					      new_size);
-		} else if (rc == -EOPNOTSUPP) {
+		if (rc == -EOPNOTSUPP) {
 			/*
 			 * copy_file_range syscall man page indicates EINVAL
 			 * is returned e.g when "fd_in and fd_out refer to the
@@ -1478,10 +1507,15 @@ static loff_t cifs_remap_file_range(struct file *src_file, loff_t off,
 		}
 	}
 
-	/* force revalidate of size and timestamps of target file now
-	   that target is updated on the server */
-	CIFS_I(target_inode)->time = 0;
+	/*
+	 * On success, duplicate_extents already updated the target inode attrs
+	 * or marked them stale if the refresh failed.  On failure, mark attrs
+	 * stale because EOF may have changed before the clone failed.
+	 */
+	if (rc)
+		CIFS_I(target_inode)->time = 0;
 unlock:
+	filemap_invalidate_unlock(target_inode->i_mapping);
 	/* although unlocking in the reverse order from locking is not
 	   strictly necessary here it is a little cleaner to be consistent */
 	unlock_two_nondirectories(src_inode, target_inode);
@@ -1504,6 +1538,9 @@ ssize_t cifs_file_copychunk_range(unsigned int xid,
 	struct cifs_tcon *src_tcon;
 	struct cifs_tcon *target_tcon;
 	ssize_t rc;
+
+	if (len == 0)
+		return 0;
 
 	cifs_dbg(FYI, "copychunk range\n");
 
@@ -1534,6 +1571,7 @@ ssize_t cifs_file_copychunk_range(unsigned int xid,
 	 * server could even support copy of range where source = target
 	 */
 	lock_two_nondirectories(target_inode, src_inode);
+	filemap_invalidate_lock(target_inode->i_mapping);
 
 	cifs_dbg(FYI, "about to flush pages\n");
 
@@ -1555,10 +1593,28 @@ ssize_t cifs_file_copychunk_range(unsigned int xid,
 	/* Flush and invalidate all the folios in the destination region.  If
 	 * the copy was successful, then some of the flush is extra overhead,
 	 * but we need to allow for the copy failing in some way (eg. ENOSPC).
+	 *
+	 * Start at the old EOF when extending so the folio straddling it, which
+	 * may hold data written past EOF through an mmap, is dropped too.
 	 */
-	rc = filemap_invalidate_inode(target_inode, true, destoff, destoff + len - 1);
-	if (rc)
-		goto unlock;
+	if (target_inode->i_mapping->nrpages) {
+		loff_t fstart = min(destoff, i_size_read(target_inode));
+		loff_t fend = destoff + len - 1;
+
+		unmap_mapping_pages(target_inode->i_mapping,
+				    fstart >> PAGE_SHIFT,
+				    (fend >> PAGE_SHIFT) -
+				    (fstart >> PAGE_SHIFT) + 1,
+				    false);
+		rc = filemap_write_and_wait_range(target_inode->i_mapping,
+						  fstart, fend);
+		if (rc)
+			goto unlock;
+		invalidate_inode_pages2_range(target_inode->i_mapping,
+					      fstart >> PAGE_SHIFT,
+					      fend >> PAGE_SHIFT);
+	}
+	netfs_wait_for_outstanding_io(target_inode);
 
 	fscache_invalidate(cifs_inode_cookie(target_inode), NULL,
 			   i_size_read(target_inode), 0);
@@ -1590,6 +1646,7 @@ ssize_t cifs_file_copychunk_range(unsigned int xid,
 	CIFS_I(target_inode)->time = 0;
 
 unlock:
+	filemap_invalidate_unlock(target_inode->i_mapping);
 	/* although unlocking in the reverse order from locking is not
 	 * strictly necessary here it is a little cleaner to be consistent
 	 */

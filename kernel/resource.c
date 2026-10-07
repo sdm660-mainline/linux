@@ -1238,7 +1238,7 @@ reserve_region_with_split(struct resource *root, resource_size_t start,
  *
  * Returns alignment on success, 0 (invalid alignment) on failure.
  */
-resource_size_t resource_alignment(struct resource *res)
+resource_size_t resource_alignment(const struct resource *res)
 {
 	switch (res->flags & (IORESOURCE_SIZEALIGN | IORESOURCE_STARTALIGN)) {
 	case IORESOURCE_SIZEALIGN:
@@ -1859,7 +1859,7 @@ int iomem_map_sanity_check(resource_size_t addr, unsigned long size)
 		if (p->flags & IORESOURCE_BUSY)
 			continue;
 
-		pr_warn("resource sanity check: requesting [mem %pa-%pa], which spans more than %s %pR\n",
+		pr_debug("resource sanity check: requesting [mem %pa-%pa], which spans more than %s %pR\n",
 			&addr, &end, p->name, p);
 		err = -1;
 		break;

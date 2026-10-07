@@ -1184,12 +1184,7 @@ static int pcf2127_configure_interrupt_pins(struct device *dev)
 	if (ret)
 		return ret;
 
-	ret = regmap_write(pcf2127->regmap,
-			   PCF2131_REG_INT_A_MASK2, 0);
-	if (ret)
-		return ret;
-
-	return ret;
+	return regmap_write(pcf2127->regmap, PCF2131_REG_INT_A_MASK2, 0);
 }
 
 static int pcf2127_probe(struct device *dev, struct regmap *regmap,
@@ -1449,10 +1444,10 @@ static const struct regmap_bus pcf2127_i2c_regmap = {
 static struct i2c_driver pcf2127_i2c_driver;
 
 static const struct i2c_device_id pcf2127_i2c_id[] = {
-	{ "pcf2127", (kernel_ulong_t)&pcf21xx_cfg[PCF2127] },
-	{ "pcf2129", (kernel_ulong_t)&pcf21xx_cfg[PCF2129] },
-	{ "pca2129", (kernel_ulong_t)&pcf21xx_cfg[PCF2129] },
-	{ "pcf2131", (kernel_ulong_t)&pcf21xx_cfg[PCF2131] },
+	{ .name = "pcf2127", .driver_data = (kernel_ulong_t)&pcf21xx_cfg[PCF2127] },
+	{ .name = "pcf2129", .driver_data = (kernel_ulong_t)&pcf21xx_cfg[PCF2129] },
+	{ .name = "pca2129", .driver_data = (kernel_ulong_t)&pcf21xx_cfg[PCF2129] },
+	{ .name = "pcf2131", .driver_data = (kernel_ulong_t)&pcf21xx_cfg[PCF2131] },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, pcf2127_i2c_id);

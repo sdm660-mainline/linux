@@ -10,6 +10,8 @@
 #define EINVAL 22
 #define ENOENT 2
 
+#define CT_OPTS_ERROR_GUARD 0x12345678
+
 #define NF_CT_ZONE_DIR_ORIG (1 << IP_CT_DIR_ORIGINAL)
 #define NF_CT_ZONE_DIR_REPL (1 << IP_CT_DIR_REPLY)
 
@@ -19,6 +21,8 @@ int test_einval_reserved = 0;
 int test_einval_reserved_new = 0;
 int test_einval_netns_id = 0;
 int test_einval_len_opts = 0;
+int test_einval_len_opts_small_lookup = 0;
+int test_einval_len_opts_small_alloc = 0;
 int test_eproto_l4proto = 0;
 int test_enonet_netns_id = 0;
 int test_enoent_lookup = 0;
@@ -124,6 +128,28 @@ nf_ct_test(struct nf_conn *(*lookup_fn)(void *, struct bpf_sock_tuple *, u32,
 	else
 		test_einval_len_opts = opts_def.error;
 
+	opts_def.error = CT_OPTS_ERROR_GUARD;
+	ct = lookup_fn(ctx, &bpf_tuple, sizeof(bpf_tuple.ipv4), &opts_def,
+		       sizeof(opts_def.netns_id));
+	if (ct) {
+		bpf_ct_release(ct);
+		test_einval_len_opts_small_lookup = -EINVAL;
+	} else {
+		test_einval_len_opts_small_lookup = opts_def.error;
+	}
+
+	opts_def.error = CT_OPTS_ERROR_GUARD;
+	ct = alloc_fn(ctx, &bpf_tuple, sizeof(bpf_tuple.ipv4), &opts_def,
+		      sizeof(opts_def.netns_id));
+	if (ct) {
+		ct = bpf_ct_insert_entry(ct);
+		if (ct)
+			bpf_ct_release(ct);
+		test_einval_len_opts_small_alloc = -EINVAL;
+	} else {
+		test_einval_len_opts_small_alloc = opts_def.error;
+	}
+
 	opts_def.l4proto = IPPROTO_ICMP;
 	ct = lookup_fn(ctx, &bpf_tuple, sizeof(bpf_tuple.ipv4), &opts_def,
 		       sizeof(opts_def));
@@ -164,8 +190,8 @@ nf_ct_test(struct nf_conn *(*lookup_fn)(void *, struct bpf_sock_tuple *, u32,
 	ct = alloc_fn(ctx, &bpf_tuple, sizeof(bpf_tuple.ipv4), &opts_def,
 		      sizeof(opts_def));
 	if (ct) {
-		__u16 sport = bpf_get_prandom_u32();
-		__u16 dport = bpf_get_prandom_u32();
+		__u16 sport = bpf_get_prandom_u32() % 65535 + 1;
+		__u16 dport = bpf_get_prandom_u32() % 65535 + 1;
 		union nf_inet_addr saddr = {};
 		union nf_inet_addr daddr = {};
 		struct nf_conn *ct_ins;
@@ -267,8 +293,8 @@ nf_ct_opts_new_test(struct nf_conn *(*lookup_fn)(void *, struct bpf_sock_tuple *
 	ct = alloc_fn(ctx, &bpf_tuple, sizeof(bpf_tuple.ipv4), &opts_def,
 		      sizeof(opts_def));
 	if (ct) {
-		__u16 sport = bpf_get_prandom_u32();
-		__u16 dport = bpf_get_prandom_u32();
+		__u16 sport = bpf_get_prandom_u32() % 65535 + 1;
+		__u16 dport = bpf_get_prandom_u32() % 65535 + 1;
 		union nf_inet_addr saddr = {};
 		union nf_inet_addr daddr = {};
 		struct nf_conn *ct_ins;

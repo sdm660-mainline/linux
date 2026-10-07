@@ -205,8 +205,8 @@ static void xdp_test_run_teardown(struct xdp_test_data *xdp)
 {
 	xdp_unreg_mem_model(&xdp->mem);
 	page_pool_destroy(xdp->pp);
-	kfree(xdp->frames);
-	kfree(xdp->skbs);
+	kvfree(xdp->frames);
+	kvfree(xdp->skbs);
 }
 
 static bool frame_was_changed(const struct xdp_page_head *head)
@@ -452,12 +452,8 @@ static int bpf_test_finish(const union bpf_attr *kattr,
 	}
 
 	if (data_out) {
-		int len = sinfo ? copy_size - frag_size : copy_size;
-
-		if (len < 0) {
-			err = -ENOSPC;
-			goto out;
-		}
+		u32 head_len = size - frag_size;
+		u32 len = min(copy_size, head_len);
 
 		if (copy_to_user(data_out, data, len))
 			goto out;

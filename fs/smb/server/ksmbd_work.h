@@ -12,6 +12,9 @@
 struct ksmbd_conn;
 struct ksmbd_session;
 struct ksmbd_tree_connect;
+struct ksmbd_file;
+
+#define KSMBD_WORK_INLINE_IOVS	4
 
 enum {
 	KSMBD_WORK_ACTIVE = 0,
@@ -42,6 +45,7 @@ struct ksmbd_work {
 	int				iov_alloc_cnt;
 	int				iov_cnt;
 	int				iov_idx;
+	struct kvec			iov_inline[KSMBD_WORK_INLINE_IOVS];
 
 	/* Next cmd hdr in compound req buf*/
 	int                             next_smb2_rcv_hdr_off;
@@ -57,11 +61,19 @@ struct ksmbd_work {
 	u64				compound_fid;
 	u64				compound_pfid;
 	u64				compound_sid;
+	__le32				compound_status;
 
 	const struct cred		*saved_cred;
 
 	/* Number of granted credits */
 	unsigned int			credits_granted;
+
+	/*
+	 * Credit charge added to conn->outstanding_credits at receive time
+	 * for the SMB2 PDU currently being processed, pending release.  Zero
+	 * once the charge has been returned (on the response or error path).
+	 */
+	unsigned short			credit_charge;
 
 	/* response smb header size */
 	unsigned int                    response_sz;
@@ -70,7 +82,7 @@ struct ksmbd_work {
 	/* Contiguous SMB2 compression transform owned by this work item. */
 	void				*compress_buf;
 
-	unsigned char			state;
+	unsigned int			state;
 	/* No response for cancelled request */
 	bool                            send_no_response:1;
 	/* Request is encrypted */
@@ -79,7 +91,11 @@ struct ksmbd_work {
 	bool                            compress_response:1;
 	/* Is this SYNC or ASYNC ksmbd_work */
 	bool                            asynchronous:1;
+	/* Work owns a reference to @conn. */
+	bool				owns_conn_ref:1;
 	bool                            need_invalidate_rkey:1;
+	bool				request_open_chseq_tracked:1;
+	bool				session_setup_reauth:1;
 
 	unsigned int                    remote_key;
 	/* cancel works */
@@ -87,12 +103,21 @@ struct ksmbd_work {
 	void                            **cancel_argv;
 	void                            (*cancel_fn)(void **argv);
 
+	/*
+	 * Refcounted open associated with the SMB2 command currently being
+	 * processed.
+	 */
+	struct ksmbd_file		*request_open;
+	__le16				request_open_chseq;
+
 	struct work_struct              work;
 	/* List head at conn->requests */
 	struct list_head                request_entry;
 	/* List head at conn->async_requests */
 	struct list_head                async_request_entry;
 	struct list_head                fp_entry;
+	/* List head at ksmbd_file->notify_pendings */
+	struct list_head                notify_entry;
 };
 
 /**

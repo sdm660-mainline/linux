@@ -78,7 +78,7 @@ static int mlx5_lag_create_single_fdb_filter(struct mlx5_lag *ldev, u32 filter)
 	}
 	return 0;
 err:
-	mlx5_lag_for_each_reverse(j, i, 0, ldev, filter) {
+	mlx5_lag_for_each_reverse(j, i - 1, 0, ldev, filter) {
 		struct mlx5_eswitch *slave_esw;
 
 		if (j == master_idx)
@@ -270,6 +270,7 @@ err_rescan_drivers:
 			pf->sd_fdb_active = false;
 		}
 		mlx5_lag_destroy_single_fdb_filter(ldev, group_id);
+		mlx5_lag_unload_reps_from_locked(ldev, filter);
 	}
 err_add_devices:
 	mlx5_lag_add_devices_filter(ldev, filter);

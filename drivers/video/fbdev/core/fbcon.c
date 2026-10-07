@@ -660,6 +660,13 @@ static void fbcon_prepare_logo(struct vc_data *vc, struct fb_info *info,
 		erase &= ~0x400;
 	logo_height = fb_prepare_logo(info, par->rotate);
 	logo_lines = DIV_ROUND_UP(logo_height, vc->vc_font.height);
+	logo_lines = min(logo_lines, rows);
+	logo_lines = min(logo_lines, new_rows - 1);
+	if (logo_lines <= 0) {
+		logo_lines = 0;
+		logo_shown = FBCON_LOGO_DONTSHOW;
+		return;
+	}
 	q = (unsigned short *) (vc->vc_origin +
 				vc->vc_size_row * rows);
 	step = logo_lines * cols;
@@ -1273,6 +1280,7 @@ static void fbcon_deinit(struct vc_data *vc)
 	int idx;
 
 	fbcon_free_font(p);
+	p->mode = NULL;
 	idx = con2fb_map[vc->vc_num];
 
 	if (idx == -1)
@@ -1443,12 +1451,12 @@ static void fbcon_set_disp(struct fb_info *info, struct fb_var_screeninfo *var,
 
 	p = &fb_display[unit];
 
-	if (var_to_display(p, var, info))
-		return;
-
 	vc = vc_cons[unit].d;
 
 	if (!vc)
+		return;
+
+	if (var_to_display(p, var, info))
 		return;
 
 	default_mode = vc->vc_display_fg;
@@ -2405,6 +2413,7 @@ static int fbcon_do_set_font(struct vc_data *vc, int w, int h, int charcount,
 	int resize, ret, old_width, old_height, old_charcount;
 	font_data_t *old_fontdata = p->fontdata;
 	const u8 *old_data = vc->vc_font.data;
+	unsigned short old_hi_font_mask = vc->vc_hi_font_mask;
 
 	font_data_get(data);
 
@@ -2450,6 +2459,12 @@ err_out:
 	vc->vc_font.width = old_width;
 	vc->vc_font.height = old_height;
 	vc->vc_font.charcount = old_charcount;
+
+	/* Restore the hi_font state and screen buffer */
+	if (old_hi_font_mask && !vc->vc_hi_font_mask)
+		set_vc_hi_font(vc, true);
+	else if (!old_hi_font_mask && vc->vc_hi_font_mask)
+		set_vc_hi_font(vc, false);
 
 	font_data_put(data);
 
@@ -2633,8 +2648,30 @@ static void fbcon_modechanged(struct fb_info *info)
 	    fbcon_info_from_console(par->currcon) != info)
 		return;
 
+	/*
+	 * Clear the selection before switching bitops.  Without this, the
+	 * clear_selection() inside vc_resize() below repaints the highlighted
+	 * cells through the new bitops while the console geometry(vc_rows/vc_cols)
+	 * has not been updated to match, so the repaint is computed from a
+	 * half-switched geometry and overflows the framebuffer address.
+	 * Pre-clearing makes that repaint a no-op.
+	 */
+	clear_selection();
+
 	p = &fb_display[vc->vc_num];
 	set_blitting_type(vc, info);
+
+	/*
+	 * Rebuild par->rotated.buf for the new rotation now that bitops have
+	 * switched.  The new putcs/cursor ops read this buffer; if it is still
+	 * sized for the old rotation, fbcon_putcs() and the cursor path reached
+	 * via update_screen() below overflow it.  Mirrors fbcon_switch(); fall
+	 * back to unrotated rendering on allocation failure.
+	 */
+	if (par->bitops->rotate_font && par->bitops->rotate_font(info, vc)) {
+		par->rotate = FB_ROTATE_UR;
+		set_blitting_type(vc, info);
+	}
 
 	if (con_is_visible(vc)) {
 		var_to_display(p, &info->var, info);
@@ -2666,6 +2703,9 @@ static void fbcon_set_all_vcs(struct fb_info *info)
 
 	if (!par || par->currcon < 0)
 		return;
+
+	/* See the comment in fbcon_modechanged(). */
+	clear_selection();
 
 	for (i = first_fb_vc; i <= last_fb_vc; i++) {
 		vc = vc_cons[i].d;
