@@ -1668,9 +1668,14 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level,
 	return -EINVAL;
 }
 
-static unsigned long system_supported_vcpu_features(void)
+static unsigned long system_supported_vcpu_features(struct kvm_vcpu *vcpu)
 {
-	unsigned long features = KVM_VCPU_VALID_FEATURES;
+	unsigned long features;
+
+	if (vcpu->kvm->arch.vm_flavor == VM_PROTECTED_PKVM)
+		features = KVM_PROTECTED_VCPU_VALID_FEATURES;
+	else
+		features = KVM_VCPU_VALID_FEATURES;
 
 	if (!cpus_have_final_cap(ARM64_HAS_32BIT_EL1))
 		clear_bit(KVM_ARM_VCPU_EL1_32BIT, &features);
@@ -1708,7 +1713,7 @@ static int kvm_vcpu_init_check_features(struct kvm_vcpu *vcpu,
 			return -ENOENT;
 	}
 
-	if (features & ~system_supported_vcpu_features())
+	if (features & ~system_supported_vcpu_features(vcpu))
 		return -EINVAL;
 
 	/*
