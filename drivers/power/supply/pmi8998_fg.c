@@ -625,6 +625,18 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* The charger named in power-supplies, if any, for status checking */
+	chip->chg_psy = devm_power_supply_get_by_reference(chip->dev,
+							   "power-supplies");
+	if (!chip->chg_psy)
+		return dev_err_probe(chip->dev, -EPROBE_DEFER,
+				     "Charger supply not registered yet\n");
+	if (IS_ERR(chip->chg_psy)) {
+		ret = PTR_ERR(chip->chg_psy);
+		dev_warn(chip->dev, "Failed to get charger supply: %d\n", ret);
+		chip->chg_psy = NULL;
+	}
+
 	supply_config.drv_data = chip;
 
 	chip->batt_psy = devm_power_supply_register(chip->dev,
@@ -651,15 +663,6 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to request soc-delta IRQ: %d\n", ret);
 		return ret;
-	}
-
-	/* Optional: Get charger power supply for status checking */
-	chip->chg_psy = devm_power_supply_get_by_reference(chip->dev,
-							   "power-supplies");
-	if (IS_ERR(chip->chg_psy)) {
-		ret = PTR_ERR(chip->chg_psy);
-		dev_warn(chip->dev, "Failed to get charger supply: %d\n", ret);
-		chip->chg_psy = NULL;
 	}
 
 	if (chip->chg_psy) {
