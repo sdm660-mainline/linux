@@ -882,6 +882,37 @@ xrep_ino_ensure_extent_count(
 	return 0;
 }
 
+/* Discard the contents of this fork and initialize as empty extent-format. */
+void
+xrep_reset_fork_to_extents(
+	struct xfs_scrub	*sc,
+	int			whichfork)
+{
+	struct xfs_ifork	*ifp = xfs_ifork_ptr(sc->ip, whichfork);
+	uint			ilog_flags = XFS_ILOG_CORE;
+
+	switch (whichfork) {
+	case XFS_DATA_FORK:
+		ilog_flags |= XFS_ILOG_DDATA;
+		break;
+	case XFS_ATTR_FORK:
+		ilog_flags |= XFS_ILOG_ADATA;
+		break;
+	default:
+		ASSERT(0);
+		return;
+	}
+
+	xfs_idestroy_fork(ifp);
+	ifp->if_format = XFS_DINODE_FMT_EXTENTS;
+	ifp->if_nextents = 0;
+	ifp->if_bytes = 0;
+	ifp->if_data = NULL;
+	ifp->if_height = 0;
+
+	xfs_trans_log_inode(sc->tp, sc->ip, ilog_flags);
+}
+
 /*
  * Initialize all the btree cursors for an AG repair except for the btree that
  * we're rebuilding.

@@ -1319,21 +1319,8 @@ xrep_xattr_swap_prep(
 	 * that to an empty extent list in preparation for the atomic mapping
 	 * exchange.
 	 */
-	if (ip_local) {
-		struct xfs_ifork	*ifp;
-
-		ifp = xfs_ifork_ptr(sc->ip, XFS_ATTR_FORK);
-
-		xfs_idestroy_fork(ifp);
-		ifp->if_format = XFS_DINODE_FMT_EXTENTS;
-		ifp->if_nextents = 0;
-		ifp->if_bytes = 0;
-		ifp->if_data = NULL;
-		ifp->if_height = 0;
-
-		xfs_trans_log_inode(sc->tp, sc->ip,
-				XFS_ILOG_CORE | XFS_ILOG_ADATA);
-	}
+	if (ip_local)
+		xrep_reset_fork_to_extents(sc, XFS_ATTR_FORK);
 
 	return 0;
 }
