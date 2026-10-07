@@ -101,7 +101,14 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 		return -ENODEV;
 	}
 
+	ret = snd_card_file_add(compr->card, f);
+	if (ret < 0) {
+		snd_card_unref(compr->card);
+		return ret;
+	}
+
 	if (!try_module_get(compr->card->module)) {
+		snd_card_file_remove(compr->card, f);
 		snd_card_unref(compr->card);
 		return -EFAULT;
 	}
@@ -144,6 +151,7 @@ __error:
 		kfree(runtime);
 		kfree(data);
 		module_put(compr->card->module);
+		snd_card_file_remove(compr->card, f);
 	}
 	snd_card_unref(compr->card);
 	return ret;
@@ -153,6 +161,7 @@ static int snd_compr_free(struct inode *inode, struct file *f)
 {
 	struct snd_compr_file *data = f->private_data;
 	struct snd_compr_runtime *runtime = data->stream.runtime;
+	struct snd_compr *compr = data->stream.device;
 
 	cancel_delayed_work_sync(&data->stream.error_work);
 
@@ -174,6 +183,7 @@ static int snd_compr_free(struct inode *inode, struct file *f)
 	module_put(data->stream.device->card->module);
 	kfree(data->stream.runtime);
 	kfree(data);
+	snd_card_file_remove(compr->card, f);
 	return 0;
 }
 
