@@ -1782,13 +1782,90 @@ static void redistribute(void)
 }
 
 /*
- * Userspace pokes this (PROG_RUN) to bring alloc_ns[] current before reading
- * it for the stats display. Skipping when the partition guard is held is
- * fine - alloc_ts is untouched, so the elapsed time is charged next time.
+ * Owner id for a @sched value of ops.sub_cid_sched_updated(). A child is
+ * attached before its first task runs and its tasks are re-homed before it
+ * detaches, so a child's cgroup id always has its slot.
+ */
+static s32 cid_sched_owner(u64 sched)
+{
+	s32 i;
+
+	if (sched == SCX_CID_SCHED_NONE)
+		return CID_NONE;
+	if (sched == SCX_CID_SCHED_SELF)
+		return CID_SELF;
+	bpf_for(i, 0, MAX_SUB_SCHEDS)
+		if (qa.sub_sched_ctxs[i].cgroup_id == sched)
+			return i;
+	return CID_NONE;
+}
+
+/* used_ns[] is summed from every cpu, hence the atomic adds */
+static void cid_sched_charge(s32 cid, u64 now)
+{
+	s32 owner = qa.cid_sched[cid];
+	u64 delta = now - qa.cid_sched_since[cid];
+
+	if (owner >= 0 && owner < MAX_SUB_SCHEDS)
+		__sync_fetch_and_add(&qa.used_ns[owner], delta);
+	else if (owner == CID_SELF)
+		__sync_fetch_and_add(&qa.self_used_ns, delta);
+	qa.cid_sched_since[cid] = now;
+}
+
+void BPF_STRUCT_OPS(qmap_sub_cid_sched_updated, s32 cid, u64 sched)
+{
+	if (cid < 0 || cid >= SCX_QMAP_MAX_CPUS)
+		return;
+
+	cid_sched_charge(cid, bpf_ktime_get_ns());
+	qa.cid_sched[cid] = cid_sched_owner(sched);
+}
+
+/*
+ * Snapshot the used time for the stats display: the closed intervals plus the
+ * ones still open. The reads race the notifications on other cpus, so an
+ * interval closing in between can be missing from one snapshot or counted in
+ * two. The next snapshot evens it out and the display floors a negative
+ * difference at zero.
+ */
+static void snapshot_used(void)
+{
+	u64 now = bpf_ktime_get_ns();
+	s32 nr_cids = qa.nr_cids;
+	s32 cid, i;
+
+	if (nr_cids < 0 || nr_cids > SCX_QMAP_MAX_CPUS)
+		return;
+
+	bpf_for(i, 0, MAX_SUB_SCHEDS)
+		qa.used_snap_ns[i] = qa.used_ns[i];
+	qa.self_used_snap_ns = qa.self_used_ns;
+
+	bpf_for(cid, 0, nr_cids) {
+		s32 owner = qa.cid_sched[cid];
+		u64 since = qa.cid_sched_since[cid];
+
+		/* restarted after @now by a notification on another cpu */
+		if (since > now)
+			continue;
+		if (owner >= 0 && owner < MAX_SUB_SCHEDS)
+			qa.used_snap_ns[owner] += now - since;
+		else if (owner == CID_SELF)
+			qa.self_used_snap_ns += now - since;
+	}
+}
+
+/*
+ * Userspace pokes this (PROG_RUN) to bring alloc_ns[] and the used snapshot
+ * current before reading them for the stats display. Skipping the alloc part
+ * when the partition guard is held is fine - alloc_ts is untouched, so the
+ * elapsed time is charged next time.
  */
 SEC("syscall")
 int flush_alloc(void *ctx)
 {
+	snapshot_used();
 	if (part_try_start()) {
 		account_alloc();
 		part_end();
@@ -1939,6 +2016,9 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(qmap_init)
 
 	/* cache the cid count, trusted to be <= SCX_QMAP_MAX_CPUS hereafter */
 	qa.nr_cids = nr_cids;
+
+	bpf_for(i, 0, nr_cids)
+		qa.cid_sched[i] = CID_NONE;
 
 	/* cmasks are embedded in qa, so they only need initializing */
 	cmask_init(&qa.idle_cids.mask, 0, nr_cids);
@@ -2151,6 +2231,7 @@ SCX_OPS_CID_DEFINE(qmap_ops,
 	       .sub_detach		= (void *)qmap_sub_detach,
 	       .sub_caps_updated	= (void *)qmap_sub_caps_updated,
 	       .sub_ecaps_updated	= (void *)qmap_sub_ecaps_updated,
+	       .sub_cid_sched_updated	= (void *)qmap_sub_cid_sched_updated,
 	       .init_cids		= (void *)qmap_init_cids,
 	       .init			= (void *)qmap_init,
 	       .exit			= (void *)qmap_exit,
