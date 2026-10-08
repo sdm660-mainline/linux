@@ -36,6 +36,7 @@
 #define HST_FIXED_SHIFT 10  /* 10 bits of decimal precision */
 #define HST_FIXED_MAX (ULLONG_MAX >> HST_FIXED_SHIFT)
 #define HST_FIXED_1 (1 << HST_FIXED_SHIFT)
+#define HST_FIXED_POINT_5 (1 << (HST_FIXED_SHIFT - 1))
 #define HST_FIXED_95 972
 #define HST_MAX_INFLIGHT HST_FIXED_1
 #define HST_BUCKET_SHIFT 24 /* Buckets are ~ 16ms */
@@ -66,46 +67,6 @@ struct path_info {
 	u64 outstanding;
 };
 
-/**
- * fixed_power - compute: x^n, in O(log n) time
- *
- * @x:         base of the power
- * @frac_bits: fractional bits of @x
- * @n:         power to raise @x to.
- *
- * By exploiting the relation between the definition of the natural power
- * function: x^n := x*x*...*x (x multiplied by itself for n times), and
- * the binary encoding of numbers used by computers: n := \Sum n_i * 2^i,
- * (where: n_i \elem {0, 1}, the binary vector representing n),
- * we find: x^n := x^(\Sum n_i * 2^i) := \Prod x^(n_i * 2^i), which is
- * of course trivially computable in O(log_2 n), the length of our binary
- * vector.
- *
- * (see: kernel/sched/loadavg.c)
- */
-static u64 fixed_power(u64 x, unsigned int frac_bits, unsigned int n)
-{
-	unsigned long result = 1UL << frac_bits;
-
-	if (n) {
-		for (;;) {
-			if (n & 1) {
-				result *= x;
-				result += 1UL << (frac_bits - 1);
-				result >>= frac_bits;
-			}
-			n >>= 1;
-			if (!n)
-				break;
-			x *= x;
-			x += 1UL << (frac_bits - 1);
-			x >>= frac_bits;
-		}
-	}
-
-	return result;
-}
-
 /*
  * Calculate the next value of an exponential moving average
  * a_1 = a_0 * e + a * (1 - e)
@@ -123,7 +84,7 @@ static u64 fixed_ema(u64 last, u64 next, u64 weight)
 {
 	last *= weight;
 	last += next * (HST_FIXED_1 - weight);
-	last += 1ULL << (HST_FIXED_SHIFT - 1);
+	last += HST_FIXED_POINT_5;
 	return last >> HST_FIXED_SHIFT;
 }
 
@@ -167,8 +128,10 @@ static void hst_set_weights(struct path_selector *ps, unsigned int base)
 	if (base >= HST_FIXED_1)
 		return;
 
-	for (i = 0; i < HST_WEIGHT_COUNT - 1; i++)
-		s->weights[i] = fixed_power(base, HST_FIXED_SHIFT, i + 1);
+	s->weights[0] = base;
+	for (i = 1; i < HST_WEIGHT_COUNT - 1; i++)
+		s->weights[i] = (base * s->weights[i - 1] +
+				 HST_FIXED_POINT_5) >> HST_FIXED_SHIFT;
 	s->weights[HST_WEIGHT_COUNT - 1] = 0;
 }
 
