@@ -31,7 +31,7 @@
 
 #define DM_MSG_PREFIX	"multipath historical-service-time"
 #define HST_MIN_IO 1
-#define HST_VERSION "0.1.1"
+#define HST_VERSION "0.2.0"
 
 #define HST_FIXED_SHIFT 10  /* 10 bits of decimal precision */
 #define HST_FIXED_MAX (ULLONG_MAX >> HST_FIXED_SHIFT)
@@ -216,7 +216,7 @@ static int hst_status(struct path_selector *ps, struct dm_path *path,
 			       pi->outstanding, pi->stale_after);
 			break;
 		case STATUSTYPE_TABLE:
-			DMEMIT("0 ");
+			DMEMIT("%u ", pi->repeat_count);
 			break;
 		case STATUSTYPE_IMA:
 			*result = '\0';
@@ -249,6 +249,11 @@ static int hst_add_path(struct path_selector *ps, struct dm_path *path,
 	if (argc && (sscanf(argv[0], "%u%c", &repeat_count, &dummy) != 1)) {
 		*error = "historical-service-time ps: invalid repeat count";
 		return -EINVAL;
+	}
+
+	if (repeat_count > 1) {
+		DMWARN_LIMIT("repeat_count > 1 is deprecated, using 1 instead");
+		repeat_count = 1;
 	}
 
 	/* allocate the path */
