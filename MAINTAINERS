@@ -15072,7 +15072,6 @@ N:	litex
 
 LIVE PATCHING
 M:	Josh Poimboeuf <jpoimboe@kernel.org>
-M:	Jiri Kosina <jikos@kernel.org>
 M:	Miroslav Benes <mbenes@suse.cz>
 M:	Petr Mladek <pmladek@suse.com>
 R:	Joe Lawrence <joe.lawrence@redhat.com>
