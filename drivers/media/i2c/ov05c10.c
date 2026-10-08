@@ -108,7 +108,7 @@ static const struct regmap_config ov05c10_regmap_config = {
 	.disable_locking = true,
 };
 
-#define to_ov05c10(_sd)		container_of(_sd, struct ov05c10, sd)
+#define to_ov05c10(_sd) container_of_const(_sd, struct ov05c10, sd)
 
 static const char *const ov05c10_test_pattern_menu[] = {
 	"Disabled",
@@ -320,7 +320,7 @@ static int ov05c10_test_pattern(struct ov05c10 *ov05c10, u32 pattern)
 static int ov05c10_set_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct ov05c10 *ov05c10 =
-		container_of(ctrl->handler, struct ov05c10, ctrl_handler);
+		container_of_const(ctrl->handler, struct ov05c10, ctrl_handler);
 	struct i2c_client *client = v4l2_get_subdevdata(&ov05c10->sd);
 	struct v4l2_subdev_state *state;
 	const struct v4l2_mbus_framefmt *format;
@@ -439,6 +439,7 @@ static int ov05c10_init_controls(struct ov05c10 *ov05c10)
 			  OV05C10_MIN_ANALOG_GAIN, OV05C10_MAX_ANALOG_GAIN,
 			  OV05C10_ANALOG_GAIN_STEP,
 			  OV05C10_ANALOG_GAIN_DEFAULT);
+
 	v4l2_ctrl_new_std(ctrl_hdlr, &ov05c10_ctrl_ops, V4L2_CID_DIGITAL_GAIN,
 			  OV05C10_MIN_DIG_GAIN, OV05C10_MAX_DIG_GAIN,
 			  OV05C10_DGTL_GAIN_STEP, OV05C10_DGTL_GAIN_DEFAULT);
@@ -693,13 +694,7 @@ static const struct v4l2_subdev_pad_ops ov05c10_pad_ops = {
 	.disable_streams = ov05c10_disable_streams,
 };
 
-static const struct v4l2_subdev_core_ops ov05c10_core_ops = {
-	.subscribe_event = v4l2_ctrl_subdev_subscribe_event,
-	.unsubscribe_event = v4l2_event_subdev_unsubscribe,
-};
-
 static const struct v4l2_subdev_ops ov05c10_subdev_ops = {
-	.core = &ov05c10_core_ops,
 	.pad = &ov05c10_pad_ops,
 };
 
@@ -720,7 +715,7 @@ static int ov05c10_parse_fwnode(struct ov05c10 *ov05c10, struct device *dev)
 	ret = v4l2_fwnode_endpoint_alloc_parse(endpoint, &bus_cfg);
 	fwnode_handle_put(endpoint);
 	if (ret) {
-		dev_err(dev, "parsing endpoint node failed\n");
+		dev_err_probe(dev, ret, "parsing endpoint node failed\n");
 		goto out_err;
 	}
 
@@ -743,16 +738,13 @@ static int ov05c10_identify_module(struct ov05c10 *ov05c10)
 	int ret = 0;
 
 	cci_read(ov05c10->regmap, OV05C10_REG_CHIP_ID, &val, &ret);
-	if (ret) {
-		dev_err(&client->dev, "chip id read err");
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(&client->dev, ret, "chip id read err");
 
-	if (val != OV05C10_CHIP_ID) {
-		dev_err(&client->dev, "chip id mismatch: %x!=%llu",
-			OV05C10_CHIP_ID, val);
-		return -ENXIO;
-	}
+	if (val != OV05C10_CHIP_ID)
+		return dev_err_probe(&client->dev, -ENXIO,
+				     "chip id mismatch: %x!=%llu",
+				     OV05C10_CHIP_ID, val);
 
 	return 0;
 }
@@ -871,35 +863,33 @@ static int ov05c10_probe(struct i2c_client *client)
 	full_power = acpi_dev_state_d0(dev);
 	if (full_power) {
 		ret = ov05c10_power_on(dev);
-		if (ret) {
-			dev_err(&client->dev, "failed to power on\n");
+		if (ret)
 			return ret;
-		}
 	}
 
 	ret = ov05c10_init_controls(ov05c10);
 	if (ret) {
-		dev_err(&client->dev, "failed to init controls: %d", ret);
+		dev_err_probe(&client->dev, ret, "failed to init controls\n");
 		goto probe_error_power_off;
 	}
 
 	ov05c10->sd.internal_ops = &ov05c10_internal_ops;
-	ov05c10->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE |
-			     V4L2_SUBDEV_FL_HAS_EVENTS;
+	ov05c10->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	ov05c10->sd.entity.ops = NULL;
 	ov05c10->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
 	ov05c10->pad.flags = MEDIA_PAD_FL_SOURCE;
 
 	ret = media_entity_pads_init(&ov05c10->sd.entity, 1, &ov05c10->pad);
 	if (ret) {
-		dev_err(&client->dev, "failed to init entity pads: %d", ret);
+		dev_err_probe(&client->dev, ret,
+			      "failed to init entity pads\n");
 		goto probe_error_v4l2_ctrl_handler_free;
 	}
 
 	ov05c10->sd.state_lock = ov05c10->ctrl_handler.lock;
 	ret = v4l2_subdev_init_finalize(&ov05c10->sd);
 	if (ret < 0) {
-		dev_err(dev, "v4l2 subdev init error: %d\n", ret);
+		dev_err_probe(dev, ret, "v4l2 subdev init error\n");
 		goto probe_error_media_entity_cleanup;
 	}
 
@@ -909,8 +899,8 @@ static int ov05c10_probe(struct i2c_client *client)
 
 	ret = v4l2_async_register_subdev_sensor(&ov05c10->sd);
 	if (ret < 0) {
-		dev_err(&client->dev, "failed to register V4L2 subdev: %d",
-			ret);
+		dev_err_probe(&client->dev, ret,
+			      "failed to register V4L2 subdev");
 		goto probe_error_rpm;
 	}
 	pm_runtime_set_autosuspend_delay(&client->dev, 1000);
