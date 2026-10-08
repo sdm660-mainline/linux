@@ -358,8 +358,6 @@ static ssize_t regmap_reg_ranges_read_file(struct file *file,
 	struct regmap_debugfs_off_cache *c;
 	loff_t p = 0;
 	size_t buf_pos = 0;
-	char *buf;
-	char *entry;
 	int ret;
 	unsigned int entry_len;
 
@@ -369,15 +367,13 @@ static ssize_t regmap_reg_ranges_read_file(struct file *file,
 	if (count > (PAGE_SIZE << MAX_PAGE_ORDER))
 		count = PAGE_SIZE << MAX_PAGE_ORDER;
 
-	buf = kmalloc(count, GFP_KERNEL);
+	char *buf __free(kfree) = kmalloc(count, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
-	entry = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (!entry) {
-		kfree(buf);
+	char *entry __free(kfree) = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!entry)
 		return -ENOMEM;
-	}
 
 	/* While we are at it, build the register dump cache
 	 * now so the read() operation on the `registers' file
@@ -404,17 +400,13 @@ static ssize_t regmap_reg_ranges_read_file(struct file *file,
 		}
 	}
 
-	kfree(entry);
 	ret = buf_pos;
 
-	if (copy_to_user(user_buf, buf, buf_pos)) {
-		ret = -EFAULT;
-		goto out_buf;
-	}
+	if (copy_to_user(user_buf, buf, buf_pos))
+		return -EFAULT;
 
 	*ppos += buf_pos;
-out_buf:
-	kfree(buf);
+
 	return ret;
 }
 
