@@ -161,10 +161,10 @@ config CC_OPT_STRICT_FLEX_ARRAYS
 
 # gcc-10 renamed --param=allow-store-data-races=0 to -fno-allow-store-data-races
 config CC_OPT_ALLOW_STORE_DATA_RACES_PARAM
-	def_string "$(cc-option-str,--param=allow-store-data-races=0)" if CC_IS_GCC
+	def_string "$(cc-option-str,--param=allow-store-data-races=0)"
 
 config CC_OPT_NO_ALLOW_STORE_DATA_RACES
-	def_string "$(cc-option-str,-fno-allow-store-data-races)" if CC_IS_GCC
+	def_string "$(cc-option-str,-fno-allow-store-data-races)"
 
 config CC_HAS_MNOP_MCOUNT
 	def_bool $(cc-option,-mnop-mcount)
@@ -180,19 +180,19 @@ config LD_OPT_NO_WARN_RWX_SEGMENTS
 	def_string "$(ld-option-str,--no-warn-rwx-segments)"
 
 config CC_OPT_WNO_ADDRESS_OF_PACKED_MEMBER
-	def_string "-Wno-address-of-packed-member" if $(cc-option,-Waddress-of-packed-member)
+	def_string "$(cc-option-str,-Wno-address-of-packed-member)"
 
 config CC_OPT_WNO_FORMAT_OVERFLOW_NON_KPRINTF
-	def_string "-Wno-format-overflow-non-kprintf" if CC_IS_CLANG && $(cc-option,-Wformat-overflow-non-kprintf)
+	def_string "$(cc-option-str,-Wno-format-overflow-non-kprintf)"
 
 config CC_OPT_WNO_FORMAT_TRUNCATION_NON_KPRINTF
-	def_string "-Wno-format-truncation-non-kprintf" if CC_IS_CLANG && $(cc-option,-Wformat-truncation-non-kprintf)
+	def_string "$(cc-option-str,-Wno-format-truncation-non-kprintf)"
 
 config CC_OPT_WNO_DEFAULT_CONST_INIT_UNSAFE
-	def_string "-Wno-default-const-init-unsafe" if CC_IS_CLANG && $(cc-option,-Wdefault-const-init-unsafe)
+	def_string "$(cc-option-str,-Wno-default-const-init-unsafe)"
 
 config CC_OPT_WNO_DANGLING_POINTER
-	def_string "-Wno-dangling-pointer" if $(cc-option,-Wdangling-pointer)
+	def_string "$(cc-option-str,-Wno-dangling-pointer)"
 
 config CC_OPT_WVLA_LARGER_THAN
 	def_string "$(cc-option-str,-Wvla-larger-than=1)"
@@ -201,7 +201,7 @@ config CC_HAS_WSTRINGOP_OVERFLOW
 	def_bool $(cc-option,-Wstringop-overflow)
 
 config CC_OPT_WNO_UNTERMINATED_STRING_INITIALIZATION
-	def_string "-Wno-unterminated-string-initialization" if $(cc-option,-Wunterminated-string-initialization)
+	def_string "$(cc-option-str,-Wno-unterminated-string-initialization)"
 
 config CC_OPT_WERROR_DESIGNATED_INIT
 	def_string "$(cc-option-str,-Werror=designated-init)"
@@ -210,13 +210,13 @@ config CC_OPT_WENUM_CONVERSION
 	def_string "$(cc-option-str,-Wenum-conversion)"
 
 config CC_OPT_WNO_PACKED_NOT_ALIGNED
-	def_string "-Wno-packed-not-aligned" if $(cc-option,-Wpacked-not-aligned)
+	def_string "$(cc-option-str,-Wno-packed-not-aligned)"
 
 config CC_OPT_WNO_FORMAT_OVERFLOW
-	def_string "-Wno-format-overflow" if $(cc-option,-Wformat-overflow)
+	def_string "$(cc-option-str,-Wno-format-overflow)"
 
 config CC_OPT_WNO_STRINGOP_TRUNCATION
-	def_string "-Wno-stringop-truncation" if $(cc-option,-Wstringop-truncation)
+	def_string "$(cc-option-str,-Wno-stringop-truncation)"
 
 config CC_HAS_COUNTED_BY
 	bool
