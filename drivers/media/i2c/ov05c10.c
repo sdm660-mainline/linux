@@ -765,7 +765,7 @@ static int ov05c10_get_pm_resources(struct device *dev)
 		return dev_err_probe(dev, PTR_ERR(ov05c10->avdd),
 				     "failed to get avdd regulator\n");
 
-	ov05c10->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
+	ov05c10->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ov05c10->reset))
 		return dev_err_probe(dev, PTR_ERR(ov05c10->reset),
 				     "failed to get reset gpio\n");
