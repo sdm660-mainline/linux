@@ -202,6 +202,7 @@ static int hst_status(struct path_selector *ps, struct dm_path *path,
 {
 	unsigned int sz = 0;
 	struct path_info *pi;
+	unsigned long flags;
 
 	if (!path) {
 		struct selector *s = ps->context;
@@ -212,8 +213,10 @@ static int hst_status(struct path_selector *ps, struct dm_path *path,
 
 		switch (type) {
 		case STATUSTYPE_INFO:
+			spin_lock_irqsave(&pi->lock, flags);
 			DMEMIT("%llu %llu %llu ", pi->historical_service_time,
 			       pi->outstanding, pi->stale_after);
+			spin_unlock_irqrestore(&pi->lock, flags);
 			break;
 		case STATUSTYPE_TABLE:
 			DMEMIT("%u ", pi->repeat_count);
