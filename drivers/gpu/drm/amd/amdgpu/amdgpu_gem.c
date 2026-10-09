@@ -25,7 +25,6 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <linux/ktime.h>
 #include <linux/module.h>
 #include <linux/overflow.h>
 #include <linux/pagemap.h>
@@ -40,6 +39,7 @@
 #include <drm/drm_gem_ttm_helper.h>
 #include <drm/ttm/ttm_tt.h>
 #include <drm/drm_syncobj.h>
+#include <drm/drm_timeout.h>
 
 #include "amdgpu.h"
 #include "amdgpu_display.h"
@@ -386,6 +386,14 @@ static int amdgpu_gem_object_mmap(struct drm_gem_object *obj, struct vm_area_str
 	return drm_gem_ttm_mmap(obj, vma);
 }
 
+static void amdgpu_gem_object_handle_free(struct drm_gem_object *gobj)
+{
+	struct amdgpu_bo *aobj = gem_to_amdgpu_bo(gobj);
+
+	amdgpu_ualink_revoke_exported_memory(aobj);
+
+}
+
 const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.free = amdgpu_gem_object_free,
 	.open = amdgpu_gem_object_open,
@@ -395,6 +403,7 @@ const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.vunmap = drm_gem_ttm_vunmap,
 	.mmap = amdgpu_gem_object_mmap,
 	.vm_ops = &amdgpu_gem_vm_ops,
+	.handle_free = amdgpu_gem_object_handle_free
 };
 
 static bool amdgpu_gem_are_domains_valid(u32 domains)
@@ -643,23 +652,11 @@ int amdgpu_gem_mmap_ioctl(struct drm_device *dev, void *data,
  */
 unsigned long amdgpu_gem_timeout(uint64_t timeout_ns)
 {
-	unsigned long timeout_jiffies;
-	ktime_t timeout;
-
-	/* clamp timeout if it's to large */
-	if (((int64_t)timeout_ns) < 0)
+	/* Map anything that doesn't fit in a s64 to an infinite wait */
+	if (timeout_ns > S64_MAX)
 		return MAX_SCHEDULE_TIMEOUT;
 
-	timeout = ktime_sub(ns_to_ktime(timeout_ns), ktime_get());
-	if (ktime_to_ns(timeout) < 0)
-		return 0;
-
-	timeout_jiffies = nsecs_to_jiffies(ktime_to_ns(timeout));
-	/*  clamp timeout to avoid unsigned-> signed overflow */
-	if (timeout_jiffies > MAX_SCHEDULE_TIMEOUT)
-		return MAX_SCHEDULE_TIMEOUT - 1;
-
-	return timeout_jiffies;
+	return drm_timeout_abs_to_jiffies(timeout_ns);
 }
 
 int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
