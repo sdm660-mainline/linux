@@ -507,7 +507,7 @@ static int imx576_set_window(struct imx576 *imx576,
 	format = v4l2_subdev_state_get_format(state, 0);
 
 	/* Line length */
-	cci_write(imx576->regmap, CCS_R_FRAME_LENGTH_LINES, IMX576_LINE_LENGTH,
+	cci_write(imx576->regmap, CCS_R_LINE_LENGTH_PCK, IMX576_LINE_LENGTH,
 		  &ret);
 
 	/* Imaging area */
