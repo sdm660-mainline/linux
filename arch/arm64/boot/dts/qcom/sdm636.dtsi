@@ -6,6 +6,8 @@
  */
 
 #include "sdm660.dtsi"
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/irq.h>
 
 /delete-node/ &remoteproc_cdsp;
 /delete-node/ &cdsp_smmu;
@@ -26,3 +28,199 @@
 	compatible = "qcom,adreno-509.0", "qcom,adreno";
 	/* Adreno 509 shares the frequency table with 512 */
 };
+
+&soc {
+	cpu_clock_osm: clock-controller@179c0000 {
+		compatible = "qcom,sdm636-cpu-clock-osm";
+		reg = <0x179c0000 0x4000>,	/* osm - shared by both clusters */
+		      <0x17916000 0x1000>,	/* pwrcl_pll */
+		      <0x17816000 0x1000>,	/* perfcl_pll */
+		      <0x179d1000 0x1000>,	/* apcs_common */
+		      <0x00784130 0x8>,	/* perfcl_efuse (QFPROM) */
+		      <0x1791101c 0x8>;	/* debug */
+		reg-names = "osm", "pwrcl_pll", "perfcl_pll",
+			    "apcs_common", "perfcl_efuse", "debug";
+
+		interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "pwrcl-irq", "perfcl-irq";
+
+		#clock-cells = <1>;	/* 0 = pwrcl, 1 = perfcl */
+
+		/* <pwrcl perfcl> - additional_setup() inputs, needed
+		 * because TZ does not pre-init OSM on this device (confirmed
+		 * by reading ENABLE_REG/FREQ_REG as zero on real hardware,
+		 * 2026-08-23). Values below are whyred's own, from the same
+		 * downstream interposer file as the LUT data. */
+		qcom,l-val-base        = <0x17916004 0x17816004>;
+		qcom,apcs-pll-user-ctl = <0x1791600c 0x1781600c>;
+		qcom,apcs-cfg-rcgr     = <0x17911054 0x17811054>;
+		qcom,apcs-cmd-rcgr     = <0x17911050 0x17811050>;
+		qcom,apcs-itm-present  = <0x179d143c 0x179d143c>;
+		qcom,apm-mode-ctl      = <0x179d0004 0x179d0010>;
+		qcom,apm-ctrl-status   = <0x179d000c 0x179d0018>;
+
+		/* freq_hz freq_data override_data spare_data virtual_corner(1-based) */
+		qcom,pwrcl-speedbin0-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1 1 >,
+			<   345600000 0x05040012 0x02200020 0x1 2 >,
+			<   422400000 0x05040016 0x02200020 0x1 3 >,
+			<   499200000 0x0504001a 0x02200020 0x1 4 >,
+			<   576000000 0x0504001e 0x03200020 0x1 5 >,
+			<   633600000 0x05040021 0x03200020 0x1 6 >,
+			<   710400000 0x05040025 0x03200020 0x1 7 >,
+			<   806400000 0x0504002a 0x04200020 0x1 8 >,
+			<   883200000 0x0404002e 0x04250025 0x1 9 >,
+			<   960000000 0x04040032 0x05280028 0x1 10 >,
+			<  1036800000 0x04040036 0x052b002b 0x2 11 >,
+			<  1113600000 0x0404003a 0x052e002e 0x2 12 >,
+			<  1190400000 0x0404003e 0x06320032 0x2 13 >,
+			<  1248000000 0x04040041 0x06340034 0x2 14 >,
+			<  1324800000 0x04040045 0x06370037 0x2 15 >,
+			<  1401600000 0x04040049 0x073a003a 0x2 16 >,
+			<  1478400000 0x0404004d 0x073e003e 0x2 17 >,
+			<  1574400000 0x04040052 0x08420042 0x2 18 >,
+			<  1651200000 0x04040056 0x08450045 0x2 19 >,
+			<  1728000000 0x0404005a 0x08480048 0x2 20 >,
+			<  1804800000 0x0404005e 0x094b004b 0x3 21 >,
+			<  1881600000 0x04040062 0x094e004e 0x3 22 >;
+
+		qcom,perfcl-speedbin0-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1 1 >,
+			<   345600000 0x05040012 0x02200020 0x1 2 >,
+			<   422400000 0x05040016 0x02200020 0x1 3 >,
+			<   480000000 0x05040019 0x02200020 0x1 4 >,
+			<   556800000 0x0504001d 0x03200020 0x1 5 >,
+			<   633600000 0x05040021 0x03200020 0x1 6 >,
+			<   710400000 0x05040025 0x03200020 0x1 7 >,
+			<   787200000 0x05040029 0x04200020 0x1 8 >,
+			<   844800000 0x0404002c 0x04230023 0x1 9 >,
+			<   902400000 0x0404002f 0x04260026 0x1 10 >,
+			<   979200000 0x04040033 0x05290029 0x1 11 >,
+			<  1056000000 0x04040037 0x052c002c 0x1 12 >,
+			<  1171200000 0x0404003d 0x06310031 0x2 13 >,
+			<  1248000000 0x04040041 0x06340034 0x2 14 >,
+			<  1324800000 0x04040045 0x06370037 0x2 15 >,
+			<  1401600000 0x04040049 0x073a003a 0x2 16 >,
+			<  1478400000 0x0404004d 0x073e003e 0x2 17 >,
+			<  1536000000 0x04040050 0x07400040 0x2 18 >,
+			<  1632000000 0x04040055 0x08440044 0x2 19 >,
+			<  1708800000 0x04040059 0x08470047 0x2 20 >,
+			<  1785600000 0x0404005d 0x094a004a 0x2 21 >,
+			<  1862400000 0x04040061 0x094e004e 0x2 22 >,
+			<  1939200000 0x04040065 0x09510051 0x3 23 >,
+			<  2016000000 0x04040069 0x0a540054 0x3 24 >,
+			<  2092800000 0x0404006d 0x0a570057 0x3 25 >;
+
+		/* MEM-ACC trim - also whyred's own, from the interposer file.
+		 * apcs_mem_acc_val is 9 cells (3 levels x 3 values/level). */
+		qcom,pwrcl-apcs-mem-acc-cfg = <0x179d1360 0x179d1364 0x179d1364>;
+		qcom,perfcl-apcs-mem-acc-cfg = <0x179d1368 0x179d136c 0x179d1370>;
+		qcom,pwrcl-apcs-mem-acc-val =
+			<0x00000000 0x80000000 0x80000000>,
+			<0x00000000 0x00000000 0x00000000>,
+			<0x00000000 0x00000001 0x00000001>;
+		qcom,perfcl-apcs-mem-acc-val =
+			<0x00000000 0x00000000 0x80000000>,
+			<0x00000000 0x00000000 0x00000000>,
+			<0x00000000 0x00000000 0x00000001>;
+
+		/* qcom,apm-threshold-voltage = <832000>; (uV) exists in the
+		 * downstream tree but is NOT wired into the driver yet - it
+		 * feeds clk_osm_resolve_crossover_corners(), which needs a
+		 * real CPR/rpmh regulator corner table we deliberately don't
+		 * port (see README). Driver currently approximates
+		 * apm_threshold_vc/apm_crossover_vc as the LUT's top corner
+		 * instead - see clk_osm_probe_cluster() comment. */
+
+		/* ACD is fully optional (see clk-cpu-osm-sdm660.c comment) -
+		 * NOT present in this DT fragment: no "pwrcl-acd"/"perfcl-acd"
+		 * reg entries, no qcom,acd*-val properties. We have zero
+		 * evidence whyred's real board dtsi wires this up (the shared
+		 * interposer file has no "acd" references at all). If it
+		 * turns out the board does have it, add:
+		 *   reg = ..., <pwrcl_acd_phys 0x100>, <perfcl_acd_phys 0x100>;
+		 *   reg-names = ..., "pwrcl-acd", "perfcl-acd";
+		 *   qcom,acdtd-val = <pwrcl_val perfcl_val>;
+		 *   (and acdcr/acdsscr/acdextint0/acdextint1/acdautoxfer, same shape)
+		 * Without real hardware-traced values here, do NOT guess
+		 * these - wrong ACD calibration can cause instability under
+		 * load in a way that's hard to distinguish from other bugs.
+		 */
+	};
+};
+
+/ {
+	cpu0_opp_table: opp-table-cpu0 {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000  { opp-hz = /bits/ 64 <300000000>;  };
+		opp-345600000  { opp-hz = /bits/ 64 <345600000>;  };
+		opp-422400000  { opp-hz = /bits/ 64 <422400000>;  };
+		opp-499200000  { opp-hz = /bits/ 64 <499200000>;  };
+		opp-576000000  { opp-hz = /bits/ 64 <576000000>;  };
+		opp-633600000  { opp-hz = /bits/ 64 <633600000>;  };
+		opp-710400000  { opp-hz = /bits/ 64 <710400000>;  };
+		opp-806400000  { opp-hz = /bits/ 64 <806400000>;  };
+		opp-883200000  { opp-hz = /bits/ 64 <883200000>;  };
+		opp-960000000  { opp-hz = /bits/ 64 <960000000>;  };
+		opp-1036800000 { opp-hz = /bits/ 64 <1036800000>; };
+		opp-1113600000 { opp-hz = /bits/ 64 <1113600000>; };
+		opp-1190400000 { opp-hz = /bits/ 64 <1190400000>; };
+		opp-1248000000 { opp-hz = /bits/ 64 <1248000000>; };
+		opp-1324800000 { opp-hz = /bits/ 64 <1324800000>; };
+		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
+		opp-1478400000 { opp-hz = /bits/ 64 <1478400000>; };
+		opp-1574400000 { opp-hz = /bits/ 64 <1574400000>; };
+		opp-1651200000 { opp-hz = /bits/ 64 <1651200000>; };
+		opp-1728000000 { opp-hz = /bits/ 64 <1728000000>; };
+		opp-1804800000 { opp-hz = /bits/ 64 <1804800000>; };
+		/* Top pwrcl corner - see README on unresolved vc_to_uv risk
+		 * before relying on this staying stable under sustained load. */
+		opp-1881600000 { opp-hz = /bits/ 64 <1881600000>; };
+	};
+
+	cpu4_opp_table: opp-table-cpu4 {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000  { opp-hz = /bits/ 64 <300000000>;  };
+		opp-345600000  { opp-hz = /bits/ 64 <345600000>;  };
+		opp-422400000  { opp-hz = /bits/ 64 <422400000>;  };
+		opp-480000000  { opp-hz = /bits/ 64 <480000000>;  };
+		opp-556800000  { opp-hz = /bits/ 64 <556800000>;  };
+		opp-633600000  { opp-hz = /bits/ 64 <633600000>;  };
+		opp-710400000  { opp-hz = /bits/ 64 <710400000>;  };
+		opp-787200000  { opp-hz = /bits/ 64 <787200000>;  };
+		opp-844800000  { opp-hz = /bits/ 64 <844800000>;  };
+		opp-902400000  { opp-hz = /bits/ 64 <902400000>;  };
+		opp-979200000  { opp-hz = /bits/ 64 <979200000>;  };
+		opp-1056000000 { opp-hz = /bits/ 64 <1056000000>; };
+		opp-1171200000 { opp-hz = /bits/ 64 <1171200000>; };
+		opp-1248000000 { opp-hz = /bits/ 64 <1248000000>; };
+		opp-1324800000 { opp-hz = /bits/ 64 <1324800000>; };
+		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
+		opp-1478400000 { opp-hz = /bits/ 64 <1478400000>; };
+		opp-1536000000 { opp-hz = /bits/ 64 <1536000000>; };
+		opp-1632000000 { opp-hz = /bits/ 64 <1632000000>; };
+		opp-1708800000 { opp-hz = /bits/ 64 <1708800000>; };
+		opp-1785600000 { opp-hz = /bits/ 64 <1785600000>; };
+		opp-1862400000 { opp-hz = /bits/ 64 <1862400000>; };
+		opp-1939200000 { opp-hz = /bits/ 64 <1939200000>; };
+		opp-2016000000 { opp-hz = /bits/ 64 <2016000000>; };
+		/* Top perfcl corner - same caveat as pwrcl's top entry above,
+		 * plus this is the frequency furthest from anything validated. */
+		opp-2092800000 { opp-hz = /bits/ 64 <2092800000>; };
+	};
+};
+
+&cpu0 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
+&cpu1 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
+&cpu2 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
+&cpu3 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
+&cpu4 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
+&cpu5 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
+&cpu6 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
+&cpu7 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
+
