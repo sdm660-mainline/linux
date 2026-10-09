@@ -31,7 +31,7 @@
  *	 If you don't add the ACD block to your board dtsi, the driver
  *	 will return -EINVAL, but it will keep working.
  *
- *     Copyright (c) 2026, kulesha evgeniy <voovdop@gmail.com>
+ *     Copyright (c) 2026, kulesha Evgeniy <voovdop@gmail.com>
  */
 
 #include <linux/clk-provider.h>
@@ -1077,8 +1077,6 @@ static const struct of_device_id clk_osm_match_table[] = {
 	/*
 	 * Tested only on sdm636. I don't know if it works on sdm660/630 or not.
 	 */
-	{ .compatible = "qcom,sdm630-cpu-clock-osm" },
-	{ .compatible = "qcom,sdm636-cpu-clock-osm" },
 	{ .compatible = "qcom,sdm660-cpu-clock-osm" },
 	{ }
 };
@@ -1093,6 +1091,6 @@ static struct platform_driver clk_osm_driver = {
 };
 module_platform_driver(clk_osm_driver);
 
-MODULE_DESCRIPTION("SDM660/636 OSM v1 CPU clock driver (experimental port)");
-MODULE_AUTHOR("Kulesha evgeniy <voovdop@gmail.com>");
+MODULE_DESCRIPTION("SDM660-Family OSM v1 CPU clock driver");
+MODULE_AUTHOR("Kulesha Evgeniy <voovdop@gmail.com>");
 MODULE_LICENSE("GPL");
