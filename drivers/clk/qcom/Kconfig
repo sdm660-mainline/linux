@@ -1781,4 +1781,12 @@ config SM_VIDEOCC_8450
 	  SM8450 or SM8475 devices.
 	  Say Y if you want to support video devices and functionality such as
 	  video encode/decode.
+
+config SDM_CPU_OSM_660
+	tristate "SDM660/636 CPU OSM clock controller"
+	depends on ARM64 || COMPILE_TEST
+	select QCOM_SCM
+	help
+	  Support CPU frequency scaling on SDM660/636 (Kryo 260) via the
+	  OSM (Operating State Manager) hardware block.
 endif
