@@ -417,6 +417,7 @@ static enum power_supply_property smb_properties[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_USB_TYPE,
+	POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR,
 };
 
 static int smb_get_prop_usb_online(struct smb_chip *chip, int *val)
@@ -432,6 +433,32 @@ static int smb_get_prop_usb_online(struct smb_chip *chip, int *val)
 
 	*val = (stat & P_PATH_USE_USBIN_BIT) &&
 	       (stat & P_PATH_VALID_INPUT_POWER_SOURCE_STS_BIT);
+	return 0;
+}
+
+static int smb_get_prop_charge_behaviour(struct smb_chip *chip, int *val)
+{
+	unsigned int chg_en, usb_susp;
+	int rc;
+
+	rc = regmap_read(chip->regmap, chip->base + USBIN_CMD_IL, &usb_susp);
+	if (rc < 0)
+		return rc;
+
+	if (usb_susp & USBIN_SUSPEND_BIT) {
+		*val = POWER_SUPPLY_CHARGE_BEHAVIOUR_FORCE_DISCHARGE;
+		return 0;
+	}
+
+	rc = regmap_read(chip->regmap, chip->base + CHARGING_ENABLE_CMD,
+			 &chg_en);
+	if (rc < 0)
+		return rc;
+
+	*val = (chg_en & CHARGING_ENABLE_CMD_BIT) ?
+		POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO :
+		POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE;
+
 	return 0;
 }
 
@@ -682,10 +709,58 @@ static int smb_get_property(struct power_supply *psy,
 		return smb_get_prop_health(chip, &val->intval);
 	case POWER_SUPPLY_PROP_USB_TYPE:
 		return smb_apsd_get_charger_type(chip, &val->intval);
+	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
+		return smb_get_prop_charge_behaviour(chip, &val->intval);
 	default:
 		dev_err(chip->dev, "invalid property: %d\n", psp);
 		return -EINVAL;
 	}
+}
+
+/*
+ * The charge behaviour is controlled by two bits:
+ *
+ *   CHARGING_ENABLE_CMD_BIT - when clear, the battery is not charged.
+ *   USBIN_SUSPEND_BIT       - when set, the USB input is suspended, forcing
+ *                             the system to run from the battery.
+ *
+ * AUTO            - normal firmware-controlled charging (input active,
+ *                   charging enabled).
+ * INHIBIT_CHARGE  - stop charging but keep the USB input active, so the
+ *                   system keeps running from the charger (battery idle).
+ * FORCE_DISCHARGE - suspend the USB input so the system drains the battery
+ *                   even while a charger is connected.
+ */
+static int smb_set_charge_behaviour(struct smb_chip *chip, int behaviour)
+{
+	unsigned int chg_en, usb_susp;
+	int rc;
+
+	switch (behaviour) {
+	case POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO:
+		chg_en = CHARGING_ENABLE_CMD_BIT;
+		usb_susp = 0;
+		break;
+	case POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE:
+		chg_en = 0;
+		usb_susp = 0;
+		break;
+	case POWER_SUPPLY_CHARGE_BEHAVIOUR_FORCE_DISCHARGE:
+		chg_en = 0;
+		usb_susp = USBIN_SUSPEND_BIT;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	rc = regmap_update_bits(chip->regmap,
+				chip->base + CHARGING_ENABLE_CMD,
+				CHARGING_ENABLE_CMD_BIT, chg_en);
+	if (rc < 0)
+		return rc;
+
+	return regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
+				  USBIN_SUSPEND_BIT, usb_susp);
 }
 
 static int smb_set_property(struct power_supply *psy,
@@ -700,6 +775,8 @@ static int smb_set_property(struct power_supply *psy,
 					  USBIN_SUSPEND_BIT, !val->intval);
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		return smb_set_current_limit(chip, val->intval);
+	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
+		return smb_set_charge_behaviour(chip, val->intval);
 	default:
 		dev_err(chip->dev, "No setter for property: %d\n", psp);
 		return -EINVAL;
@@ -712,6 +789,7 @@ static int smb_property_is_writable(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
 		return 1;
 	default:
 		return 0;
@@ -780,6 +858,9 @@ static irqreturn_t smb_handle_wdog_bark(int irq, void *data)
 static const struct power_supply_desc smb_psy_desc = {
 	.name = "pmi8998_charger",
 	.type = POWER_SUPPLY_TYPE_USB,
+	.charge_behaviours = BIT(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO) |
+			     BIT(POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE) |
+			     BIT(POWER_SUPPLY_CHARGE_BEHAVIOUR_FORCE_DISCHARGE),
 	.usb_types = BIT(POWER_SUPPLY_USB_TYPE_SDP) |
 		     BIT(POWER_SUPPLY_USB_TYPE_CDP) |
 		     BIT(POWER_SUPPLY_USB_TYPE_DCP) |
