@@ -1133,6 +1133,8 @@ static ssize_t hwsim_background_cac_write(struct file *file,
 	if (copy_from_user(buf, user_buf, count))
 		return -EFAULT;
 
+	guard(wiphy)(data->hw->wiphy);
+
 	/* Check if background radar channel is configured */
 	if (!data->radar_background_chandef.chan)
 		return -ENOENT;
@@ -1150,6 +1152,7 @@ static ssize_t hwsim_background_cac_write(struct file *file,
 }
 
 static const struct file_operations hwsim_background_cac_ops = {
+	.owner = THIS_MODULE,
 	.write = hwsim_background_cac_write,
 	.open = simple_open,
 	.llseek = default_llseek,
@@ -1210,6 +1213,7 @@ static ssize_t hwsim_simulate_incumbent_signal_write(struct file *file,
 }
 
 static const struct file_operations hwsim_simulate_incumbent_signal_fops = {
+	.owner	= THIS_MODULE,
 	.open	= simple_open,
 	.write	= hwsim_simulate_incumbent_signal_write,
 };
