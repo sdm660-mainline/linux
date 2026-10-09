@@ -435,6 +435,144 @@
 			};
 		};
 	};
+
+		cpu_clock_osm: clock-controller@179c0000 {
+		compatible = "qcom,sdm660-cpu-clock-osm";
+		reg = <0x179c0000 0x4000>,	/* osm - shared by both clusters */
+		      <0x17916000 0x1000>,	/* pwrcl_pll */
+		      <0x17816000 0x1000>,	/* perfcl_pll */
+		      <0x179d1000 0x1000>,	/* apcs_common */
+		      <0x00784130 0x8>,		/* pwrcl_efuse (QFPROM) */
+		      <0x00784130 0x8>;		/* perfcl_efuse (QFPROM) */
+		reg-names = "osm", "pwrcl_pll", "perfcl_pll",
+			    "apcs_common", "pwrcl_efuse", "perfcl_efuse";
+
+		interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "pwrcl-irq", "perfcl-irq";
+
+		#clock-cells = <1>;	/* 0 = pwrcl, 1 = perfcl */
+
+		/* <pwrcl perfcl> - additional_setup() inputs, taken from the
+		 * stock SDM660 clk-cpu-osm node (identical to SDM630/SDM636). */
+		qcom,l-val-base        = <0x17916004 0x17816004>;
+		qcom,apcs-pll-user-ctl = <0x1791600c 0x1781600c>;
+		qcom,apcs-cfg-rcgr     = <0x17911054 0x17811054>;
+		qcom,apcs-cmd-rcgr     = <0x17911050 0x17811050>;
+		qcom,apcs-itm-present  = <0x179d143c 0x179d143c>;
+		qcom,apm-mode-ctl      = <0x179d0004 0x179d0010>;
+		qcom,apm-ctrl-status   = <0x179d000c 0x179d0018>;
+
+		/* Stock downstream LUT, one table per speedbin (efuse selected).
+		 * freq_hz freq_data override_data spare_data virtual_corner(1-based)
+		 * pwrcl: bin0 == bin1; bin3 tops out at 1612.8 MHz.
+		 * perfcl: bin0 = 2457.6, bin1 = 2208.0, bin3 = 1804.8 MHz. */
+		qcom,pwrcl-speedbin0-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   633600000 0x05040021 0x03200020 0x1  2 >,
+			<   902400000 0x0404002f 0x04260026 0x1  3 >,
+			<  1113600000 0x0404003a 0x052e002e 0x2  4 >,
+			<  1401600000 0x04040049 0x073a003a 0x2  5 >,
+			<  1536000000 0x04040050 0x08400040 0x2  6 >,
+			<  1747200000 0x0404005b 0x09480048 0x2  7 >,
+			<  1843200000 0x04040060 0x094c004c 0x3  8 >;
+
+		qcom,pwrcl-speedbin1-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   633600000 0x05040021 0x03200020 0x1  2 >,
+			<   902400000 0x0404002f 0x04260026 0x1  3 >,
+			<  1113600000 0x0404003a 0x052e002e 0x2  4 >,
+			<  1401600000 0x04040049 0x073a003a 0x2  5 >,
+			<  1536000000 0x04040050 0x08400040 0x2  6 >,
+			<  1747200000 0x0404005b 0x09480048 0x2  7 >,
+			<  1843200000 0x04040060 0x094c004c 0x3  8 >;
+
+		qcom,pwrcl-speedbin3-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   633600000 0x05040021 0x03200020 0x1  2 >,
+			<   902400000 0x0404002f 0x04260026 0x1  3 >,
+			<  1113600000 0x0404003a 0x052e002e 0x2  4 >,
+			<  1401600000 0x04040049 0x073a003a 0x2  5 >,
+			<  1536000000 0x04040050 0x08400040 0x2  6 >,
+			<  1612800000 0x04040054 0x09430043 0x2  7 >;
+
+		qcom,perfcl-speedbin0-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<  1113600000 0x0404003a 0x052e002e 0x1  2 >,
+			<  1401600000 0x04040049 0x073a003a 0x2  3 >,
+			<  1747200000 0x0404005b 0x09480048 0x2  4 >,
+			<  1958400000 0x04040066 0x0a510051 0x2  5 >,
+			<  2150400000 0x04040070 0x0b590059 0x2  6 >,
+			<  2457600000 0x04040080 0x0c660066 0x3  7 >;
+
+		qcom,perfcl-speedbin1-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<  1113600000 0x0404003a 0x052e002e 0x1  2 >,
+			<  1401600000 0x04040049 0x073a003a 0x2  3 >,
+			<  1747200000 0x0404005b 0x09480048 0x2  4 >,
+			<  1958400000 0x04040066 0x0a510051 0x2  5 >,
+			<  2150400000 0x04040070 0x0b590059 0x2  6 >,
+			<  2208000000 0x04040073 0x0b5c005c 0x3  7 >;
+
+		qcom,perfcl-speedbin3-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<  1113600000 0x0404003a 0x052e002e 0x1  2 >,
+			<  1401600000 0x04040049 0x073a003a 0x2  3 >,
+			<  1747200000 0x0404005b 0x09480048 0x2  4 >,
+			<  1804800000 0x0404005e 0x094b004b 0x2  5 >;
+
+		/* MEM-ACC trim is NOT provided here: the stock SDM660 tree carries
+		 * no qcom,*-apcs-mem-acc-* properties, so whyred's values must not
+		 * be reused for this SoC without a downstream source for them. */
+
+		/* qcom,apm-threshold-voltage = <872000>; (uV) in the stock tree,
+		 * not wired into the driver - see the SDM636 fragment for how the
+		 * crossover corner is approximated instead. */
+
+		/* ACD is optional. The stock SDM660 tree does enable it, with one
+		 * register window and identical values for both clusters:
+		 *   reg = ..., <0x17914800 0x800>;	(pwrcl_acd)
+		 *   qcom,acdtd-val      = <0x0000a111 0x0000a111>;
+		 *   qcom,acdcr-val      = <0x002c5ffd 0x002c5ffd>;
+		 *   qcom,acdsscr-val    = <0x00000901 0x00000901>;
+		 *   qcom,acdextint0-val = <0x02cf9ae8 0x02cf9ae8>;
+		 *   qcom,acdextint1-val = <0x02cf9afe 0x02cf9afe>;
+		 *   qcom,acdautoxfer-val = <0x00000015 0x00000015>;
+		 * The stock tree lists no perfcl_acd window, so it is left out
+		 * until its physical address is confirmed on hardware. */
+	};
+};
+
+/ {
+	cpu0_opp_table: opp-table-cpu0 {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000  { opp-hz = /bits/ 64 <300000000>; };
+		opp-633600000  { opp-hz = /bits/ 64 <633600000>; };
+		opp-902400000  { opp-hz = /bits/ 64 <902400000>; };
+		opp-1113600000 { opp-hz = /bits/ 64 <1113600000>; };
+		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
+		opp-1536000000 { opp-hz = /bits/ 64 <1536000000>; };
+		opp-1612800000 { opp-hz = /bits/ 64 <1612800000>; };
+		opp-1747200000 { opp-hz = /bits/ 64 <1747200000>; };
+		opp-1843200000 { opp-hz = /bits/ 64 <1843200000>; };
+	};
+
+	cpu4_opp_table: opp-table-cpu4 {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000  { opp-hz = /bits/ 64 <300000000>; };
+		opp-1113600000 { opp-hz = /bits/ 64 <1113600000>; };
+		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
+		opp-1747200000 { opp-hz = /bits/ 64 <1747200000>; };
+		opp-1804800000 { opp-hz = /bits/ 64 <1804800000>; };
+		opp-1958400000 { opp-hz = /bits/ 64 <1958400000>; };
+		opp-2150400000 { opp-hz = /bits/ 64 <2150400000>; };
+		opp-2208000000 { opp-hz = /bits/ 64 <2208000000>; };
+		opp-2457600000 { opp-hz = /bits/ 64 <2457600000>; };
+	};
 };
 
 &tlmm {
