@@ -847,7 +847,8 @@ static int q6v5proc_reset(struct q6v5 *qproc)
 			} else {
 				/* MSS_MSM8998, MSS_SDM660 */
 				mem_pwr_ctl = QDSP6V6SS_MEM_PWR_CTL;
-				i = 28;
+				/* SDM660 QDSP6v62 1.5 has one additional memory bank */
+				i = qproc->version == MSS_SDM660 ? 29 : 28;
 				reverse = 0;
 			}
 
