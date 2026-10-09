@@ -31,7 +31,7 @@
 
 &soc {
 	cpu_clock_osm: clock-controller@179c0000 {
-		compatible = "qcom,sdm636-cpu-clock-osm";
+		compatible = "qcom,sdm660-cpu-clock-osm";
 		reg = <0x179c0000 0x4000>,	/* osm - shared by both clusters */
 		      <0x17916000 0x1000>,	/* pwrcl_pll */
 		      <0x17816000 0x1000>,	/* perfcl_pll */

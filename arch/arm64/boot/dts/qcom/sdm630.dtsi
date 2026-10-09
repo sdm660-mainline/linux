@@ -69,6 +69,8 @@
 						&perf_cluster_sleep_1
 						&perf_cluster_sleep_2>;
 			capacity-dmips-mhz = <1126>;
+			clocks = <&cpu_clock_osm 1>;
+			operating-points-v2 = <&cpu_perf_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_1>;
 			l2_1: l2-cache {
@@ -89,6 +91,8 @@
 						&perf_cluster_sleep_1
 						&perf_cluster_sleep_2>;
 			capacity-dmips-mhz = <1126>;
+			clocks = <&cpu_clock_osm 1>;
+			operating-points-v2 = <&cpu_perf_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_1>;
 		};
@@ -104,6 +108,8 @@
 						&perf_cluster_sleep_1
 						&perf_cluster_sleep_2>;
 			capacity-dmips-mhz = <1126>;
+			clocks = <&cpu_clock_osm 1>;
+			operating-points-v2 = <&cpu_perf_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_1>;
 		};
@@ -119,6 +125,8 @@
 						&perf_cluster_sleep_1
 						&perf_cluster_sleep_2>;
 			capacity-dmips-mhz = <1126>;
+			clocks = <&cpu_clock_osm 1>;
+			operating-points-v2 = <&cpu_perf_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_1>;
 		};
@@ -134,6 +142,8 @@
 						&pwr_cluster_sleep_1
 						&pwr_cluster_sleep_2>;
 			capacity-dmips-mhz = <1024>;
+			clocks = <&cpu_clock_osm 0>;
+			operating-points-v2 = <&cpu_pwr_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_0>;
 			l2_0: l2-cache {
@@ -154,6 +164,8 @@
 						&pwr_cluster_sleep_1
 						&pwr_cluster_sleep_2>;
 			capacity-dmips-mhz = <1024>;
+			clocks = <&cpu_clock_osm 0>;
+			operating-points-v2 = <&cpu_pwr_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_0>;
 		};
@@ -169,6 +181,8 @@
 						&pwr_cluster_sleep_1
 						&pwr_cluster_sleep_2>;
 			capacity-dmips-mhz = <1024>;
+			clocks = <&cpu_clock_osm 0>;
+			operating-points-v2 = <&cpu_pwr_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_0>;
 		};
@@ -184,6 +198,8 @@
 						&pwr_cluster_sleep_1
 						&pwr_cluster_sleep_2>;
 			capacity-dmips-mhz = <1024>;
+			clocks = <&cpu_clock_osm 0>;
+			operating-points-v2 = <&cpu_pwr_sdm630_opp_table>;
 			#cooling-cells = <2>;
 			next-level-cache = <&l2_0>;
 		};
@@ -339,6 +355,96 @@
 		device_type = "memory";
 		/* We expect the bootloader to fill in the reg */
 		reg = <0x0 0x80000000 0x0 0x0>;
+	};
+
+	cpu_pwr_sdm630_opp_table: opp-table-cpu-pwr {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-614400000 {
+			opp-hz = /bits/ 64 <614400000>;
+		};
+
+		opp-883200000 {
+			opp-hz = /bits/ 64 <883200000>;
+		};
+
+		opp-1094400000 {
+			opp-hz = /bits/ 64 <1094400000>;
+		};
+
+		opp-1382400000 {
+			opp-hz = /bits/ 64 <1382400000>;
+		};
+
+		opp-1536000000 {
+			opp-hz = /bits/ 64 <1536000000>;
+		};
+
+		opp-1728000000 {
+			opp-hz = /bits/ 64 <1728000000>;
+		};
+
+		opp-1843200000 {
+			opp-hz = /bits/ 64 <1843200000>;
+		};
+	};
+
+	cpu_perf_sdm630_opp_table: opp-table-cpu-perf {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-787200000 {
+			opp-hz = /bits/ 64 <787200000>;
+		};
+
+		opp-1113600000 {
+			opp-hz = /bits/ 64 <1113600000>;
+		};
+
+		opp-1344000000 {
+			opp-hz = /bits/ 64 <1344000000>;
+		};
+
+		opp-1516800000 {
+			opp-hz = /bits/ 64 <1516800000>;
+		};
+
+		opp-1670400000 {
+			opp-hz = /bits/ 64 <1670400000>;
+		};
+
+		opp-1881600000 {
+			opp-hz = /bits/ 64 <1881600000>;
+		};
+
+		opp-2016000000 {
+			opp-hz = /bits/ 64 <2016000000>;
+		};
+
+		opp-2150400000 {
+			opp-hz = /bits/ 64 <2150400000>;
+		};
+
+		opp-2208000000 {
+			opp-hz = /bits/ 64 <2208000000>;
+		};
+
+		opp-2380800000 {
+			opp-hz = /bits/ 64 <2380800000>;
+		};
+
+		opp-2515200000 {
+			opp-hz = /bits/ 64 <2515200000>;
+		};
 	};
 
 	dsi_opp_table: opp-table-dsi {
@@ -2630,6 +2736,87 @@
 				reg = <0x17928000 0x1000>;
 				status = "disabled";
 			};
+		};
+
+		cpu_clock_osm: clock-controller@179c0000 {
+			compatible = "qcom,sdm660-cpu-clock-osm";
+			reg = <0x179c0000 0x4000>,	/* osm - shared by both clusters */
+			      <0x17916000 0x1000>,	/* pwrcl_pll */
+			      <0x17816000 0x1000>,	/* perfcl_pll */
+			      <0x179d1000 0x1000>,	/* apcs_common */
+			      <0x00784130 0x8>;		/* perfcl_efuse (QFPROM) */
+			reg-names = "osm", "pwrcl_pll", "perfcl_pll",
+				    "apcs_common", "perfcl_efuse";
+
+			interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "pwrcl-irq", "perfcl-irq";
+
+			#clock-cells = <1>;	/* 0 = pwrcl (cpu4-7), 1 = perfcl (cpu0-3) */
+
+			/* <pwrcl perfcl> - additional_setup() inputs, taken from the
+			 * stock SDM630 clk-cpu-osm node (same layout on SDM660/SDM636). */
+			qcom,l-val-base        = <0x17916004 0x17816004>;
+			qcom,apcs-pll-user-ctl = <0x1791600c 0x1781600c>;
+			qcom,apcs-cfg-rcgr     = <0x17911054 0x17811054>;
+			qcom,apcs-cmd-rcgr     = <0x17911050 0x17811050>;
+			qcom,apcs-itm-present  = <0x179d143c 0x179d143c>;
+			qcom,apm-mode-ctl      = <0x179d0004 0x179d0010>;
+			qcom,apm-ctrl-status   = <0x179d000c 0x179d0018>;
+
+			/* Stock downstream LUT, one table per speedbin (selected by efuse).
+			 * freq_hz freq_data override_data spare_data virtual_corner(1-based)
+			 * pwrcl has a single bin; perfcl tops out at 2380.8 (bin0),
+			 * 2208.0 (bin1) and 2515.2 MHz (bin2). */
+			qcom,pwrcl-speedbin0-v0 =
+				<   300000000 0x0004000f 0x01200020 0x1  1 >,
+				<   614400000 0x05040020 0x03200020 0x1  2 >,
+				<   883200000 0x0404002e 0x04250025 0x1  3 >,
+				<  1094400000 0x04040039 0x052e002e 0x2  4 >,
+				<  1382400000 0x04040048 0x07390039 0x2  5 >,
+				<  1536000000 0x04040050 0x08400040 0x2  6 >,
+				<  1728000000 0x0404005a 0x09480048 0x2  7 >,
+				<  1843200000 0x04040060 0x094c004c 0x3  8 >;
+
+			qcom,perfcl-speedbin0-v0 =
+				<   300000000 0x0004000f 0x01200020 0x1  1 >,
+				<   787200000 0x05040029 0x04200020 0x1  2 >,
+				<  1113600000 0x0404003a 0x052e002e 0x1  3 >,
+				<  1344000000 0x04040046 0x07380038 0x2  4 >,
+				<  1516800000 0x0404004f 0x073f003f 0x2  5 >,
+				<  1670400000 0x04040057 0x08450045 0x2  6 >,
+				<  1881600000 0x04040062 0x094e004e 0x2  7 >,
+				<  2016000000 0x04040069 0x0a540054 0x2  8 >,
+				<  2150400000 0x04040070 0x0b590059 0x2  9 >,
+				<  2380800000 0x0404007c 0x0c630063 0x3 10 >;
+
+			qcom,perfcl-speedbin1-v0 =
+				<   300000000 0x0004000f 0x01200020 0x1  1 >,
+				<   787200000 0x05040029 0x04200020 0x1  2 >,
+				<  1113600000 0x0404003a 0x052e002e 0x1  3 >,
+				<  1344000000 0x04040046 0x07380038 0x2  4 >,
+				<  1516800000 0x0404004f 0x073f003f 0x2  5 >,
+				<  1670400000 0x04040057 0x08450045 0x2  6 >,
+				<  1881600000 0x04040062 0x094e004e 0x2  7 >,
+				<  2016000000 0x04040069 0x0a540054 0x2  8 >,
+				<  2150400000 0x04040070 0x0b590059 0x2  9 >,
+				<  2208000000 0x04040073 0x0b5c005c 0x3 10 >;
+
+			qcom,perfcl-speedbin2-v0 =
+				<   300000000 0x0004000f 0x01200020 0x1  1 >,
+				<   787200000 0x05040029 0x04200020 0x1  2 >,
+				<  1113600000 0x0404003a 0x052e002e 0x1  3 >,
+				<  1344000000 0x04040046 0x07380038 0x2  4 >,
+				<  1516800000 0x0404004f 0x073f003f 0x2  5 >,
+				<  1670400000 0x04040057 0x08450045 0x2  6 >,
+				<  1881600000 0x04040062 0x094e004e 0x2  7 >,
+				<  2016000000 0x04040069 0x0a540054 0x2  8 >,
+				<  2150400000 0x04040070 0x0b590059 0x2  9 >,
+				<  2380800000 0x0404007c 0x0c630063 0x3 10 >,
+				<  2515200000 0x04040083 0x0d680068 0x3 11 >;
+
+			/* The stock SDM630 tree defines no MEM-ACC trim and no ACD for this
+			 * clock controller, so neither is described here. */
 		};
 
 		intc: interrupt-controller@17a00000 {
