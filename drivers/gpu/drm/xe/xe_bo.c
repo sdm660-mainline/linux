@@ -465,6 +465,100 @@ static void xe_ttm_tt_account_subtract(struct xe_device *xe, struct ttm_tt *tt)
 		xe_shrinker_mod_pages(xe->mem.shrinker, -(long)tt->num_pages, 0);
 }
 
+static bool xe_ttm_bo_is_imported(struct ttm_buffer_object *tbo)
+{
+	dma_resv_assert_held(tbo->base.resv);
+
+	return tbo->ttm &&
+		(tbo->ttm->page_flags & (TTM_TT_FLAG_EXTERNAL | TTM_TT_FLAG_EXTERNAL_MAPPABLE)) ==
+		TTM_TT_FLAG_EXTERNAL;
+}
+
+/*
+ * Account @bo's pages as pinned for the shrinker. Removes @bo's pages
+ * from the shrinker's shrinkable / purgeable counts on the transition
+ * from unpinned to pinned. Must be called with @bo's dma-resv held,
+ * after &ttm_buffer_object.pin_count has been incremented by
+ * ttm_bo_pin(). Safe to call unconditionally regardless of which pin
+ * path (kernel, external, framebuffer, backup object, ...) is pinning
+ * @bo, since it only acts on the true 0->1 pin_count transition.
+ *
+ * Imported bos (xe_ttm_bo_is_imported()) are excluded: for those,
+ * xe_ttm_tt_populate() never actually populates the tt or calls
+ * xe_ttm_tt_account_add(), but TTM core's ttm_tt_populate() still
+ * unconditionally marks the tt as populated on driver-hook success.
+ * Relying on ttm_tt_is_populated() for these would subtract pages that
+ * were never added, underflowing the shrinker's counts.
+ */
+static void xe_bo_account_pin(struct xe_bo *bo)
+{
+	struct xe_device *xe = xe_bo_device(bo);
+
+	if (bo->ttm.pin_count == 1 && bo->ttm.ttm && ttm_tt_is_populated(bo->ttm.ttm) &&
+	    !xe_ttm_bo_is_imported(&bo->ttm))
+		xe_ttm_tt_account_subtract(xe, bo->ttm.ttm);
+}
+
+/*
+ * Counterpart to xe_bo_account_pin(). Must be called with @bo's dma-resv
+ * held, before &ttm_buffer_object.pin_count is decremented by
+ * ttm_bo_unpin(), so that the check against the true 1->0 transition sees
+ * the pin count that is about to be released. See xe_bo_account_pin() for
+ * why imported bos are excluded.
+ *
+ * On the true last unpin, also removes @bo from whichever pinned-bo list
+ * (external or kernel_bo_present) it may currently be linked on, since a
+ * bo's final unpin can happen through a pin path (e.g. framebuffer,
+ * backup object) that has no notion of, or ownership over, that list.
+ * This is safe and list-agnostic: list_del_init() only needs the node
+ * itself, not knowledge of which list it is threaded through, and is a
+ * no-op if @bo is not linked.
+ */
+static void xe_bo_account_unpin(struct xe_bo *bo)
+{
+	struct xe_device *xe = xe_bo_device(bo);
+	bool last_unpin = bo->ttm.pin_count == 1;
+
+	if (last_unpin && !list_empty(&bo->pinned_link)) {
+		spin_lock(&xe->pinned.lock);
+		list_del_init(&bo->pinned_link);
+		spin_unlock(&xe->pinned.lock);
+	}
+
+	if (last_unpin && bo->ttm.ttm && ttm_tt_is_populated(bo->ttm.ttm) &&
+	    !xe_ttm_bo_is_imported(&bo->ttm))
+		xe_ttm_tt_account_add(xe, bo->ttm.ttm);
+}
+
+/**
+ * xe_bo_pin_account() - Pin a bo and account its pages for the shrinker
+ * @bo: The buffer object to pin.
+ *
+ * Pins @bo via ttm_bo_pin() and updates the shrinker's shrinkable /
+ * purgeable page accounting to match. Must be called with @bo's dma-resv
+ * held. Safe to call regardless of which pin path (kernel, external,
+ * framebuffer, backup object, ...) is pinning @bo.
+ */
+void xe_bo_pin_account(struct xe_bo *bo)
+{
+	ttm_bo_pin(&bo->ttm);
+	xe_bo_account_pin(bo);
+}
+
+/**
+ * xe_bo_unpin_account() - Unpin a bo and account its pages for the shrinker
+ * @bo: The buffer object to unpin.
+ *
+ * Counterpart to xe_bo_pin_account(). Updates the shrinker's shrinkable /
+ * purgeable page accounting to match, then unpins @bo via ttm_bo_unpin().
+ * Must be called with @bo's dma-resv held.
+ */
+void xe_bo_unpin_account(struct xe_bo *bo)
+{
+	xe_bo_account_unpin(bo);
+	ttm_bo_unpin(&bo->ttm);
+}
+
 static void update_global_total_pages(struct ttm_device *ttm_dev,
 				      long num_pages)
 {
@@ -860,6 +954,8 @@ static int xe_bo_move_notify(struct xe_bo *bo,
  *
  * Transfers pages between shrinkable and purgeable buckets when the BO
  * purgeable state changes. Called automatically from xe_bo_set_purgeable_state().
+ * For pinned BOs, whose pages are not accounted, only the purgeable flag is
+ * updated, so that the correct bucket is used when the BO is unpinned.
  */
 static void xe_bo_set_purgeable_shrinker(struct xe_bo *bo,
 					 enum xe_madv_purgeable_state new_state)
@@ -876,7 +972,8 @@ static void xe_bo_set_purgeable_shrinker(struct xe_bo *bo,
 		return;
 
 	xe_tt = container_of(tt, struct xe_ttm_tt, ttm);
-	tt_pages = tt->num_pages;
+	/* Pinned bos are not accounted. Only update the purgeable flag. */
+	tt_pages = xe_bo_is_pinned(bo) ? 0 : tt->num_pages;
 
 	if (!xe_tt->purgeable && new_state == XE_MADV_PURGEABLE_DONTNEED) {
 		xe_tt->purgeable = true;
@@ -1396,7 +1493,8 @@ int xe_bo_notifier_prepare_pinned(struct xe_bo *bo)
 		}
 
 		backup->parent_obj = xe_bo_get(bo); /* Released by bo_destroy */
-		ttm_bo_pin(&backup->ttm);
+		/* Note: XE_BO_FLAG_SYSTEM resolves to XE_PL_TT so already populated. */
+		xe_bo_pin_account(backup);
 		bo->backup_obj = backup;
 	}
 
@@ -1416,7 +1514,7 @@ int xe_bo_notifier_unprepare_pinned(struct xe_bo *bo)
 {
 	xe_bo_lock(bo, false);
 	if (bo->backup_obj) {
-		ttm_bo_unpin(&bo->backup_obj->ttm);
+		xe_bo_unpin_account(bo->backup_obj);
 		xe_bo_put(bo->backup_obj);
 		bo->backup_obj = NULL;
 	}
@@ -1627,7 +1725,7 @@ out_backup:
 	xe_bo_vunmap(backup);
 	if (!bo->backup_obj) {
 		if (xe_bo_is_pinned(backup))
-			ttm_bo_unpin(&backup->ttm);
+			xe_bo_unpin_account(backup);
 		xe_bo_put(backup);
 	}
 out_unlock_bo:
@@ -2017,15 +2115,6 @@ static vm_fault_t xe_err_to_fault_t(int err)
 		break;
 	}
 	return VM_FAULT_SIGBUS;
-}
-
-static bool xe_ttm_bo_is_imported(struct ttm_buffer_object *tbo)
-{
-	dma_resv_assert_held(tbo->base.resv);
-
-	return tbo->ttm &&
-		(tbo->ttm->page_flags & (TTM_TT_FLAG_EXTERNAL | TTM_TT_FLAG_EXTERNAL_MAPPABLE)) ==
-		TTM_TT_FLAG_EXTERNAL;
 }
 
 static vm_fault_t xe_bo_cpu_fault_fastpath(struct vm_fault *vmf, struct xe_device *xe,
@@ -3148,12 +3237,13 @@ uint64_t vram_region_gpu_offset(struct ttm_resource *res)
 int xe_bo_pin_external(struct xe_bo *bo, bool in_place, struct drm_exec *exec)
 {
 	struct xe_device *xe = xe_bo_device(bo);
+	bool first_pin = !xe_bo_is_pinned(bo);
 	int err;
 
 	xe_assert(xe, !bo->vm);
 	xe_assert(xe, xe_bo_is_user(bo));
 
-	if (!xe_bo_is_pinned(bo)) {
+	if (first_pin) {
 		if (!in_place) {
 			err = xe_bo_validate(bo, NULL, false, exec);
 			if (err)
@@ -3165,9 +3255,7 @@ int xe_bo_pin_external(struct xe_bo *bo, bool in_place, struct drm_exec *exec)
 		spin_unlock(&xe->pinned.lock);
 	}
 
-	ttm_bo_pin(&bo->ttm);
-	if (bo->ttm.ttm && ttm_tt_is_populated(bo->ttm.ttm))
-		xe_ttm_tt_account_subtract(xe, bo->ttm.ttm);
+	xe_bo_pin_account(bo);
 
 	/*
 	 * FIXME: If we always use the reserve / unreserve functions for locking
@@ -3223,9 +3311,7 @@ int xe_bo_pin(struct xe_bo *bo, struct drm_exec *exec)
 		spin_unlock(&xe->pinned.lock);
 	}
 
-	ttm_bo_pin(&bo->ttm);
-	if (bo->ttm.ttm && ttm_tt_is_populated(bo->ttm.ttm))
-		xe_ttm_tt_account_subtract(xe, bo->ttm.ttm);
+	xe_bo_pin_account(bo);
 
 	/*
 	 * FIXME: If we always use the reserve / unreserve functions for locking
@@ -3254,14 +3340,7 @@ void xe_bo_unpin_external(struct xe_bo *bo)
 	xe_assert(xe, xe_bo_is_pinned(bo));
 	xe_assert(xe, xe_bo_is_user(bo));
 
-	spin_lock(&xe->pinned.lock);
-	if (bo->ttm.pin_count == 1 && !list_empty(&bo->pinned_link))
-		list_del_init(&bo->pinned_link);
-	spin_unlock(&xe->pinned.lock);
-
-	ttm_bo_unpin(&bo->ttm);
-	if (bo->ttm.ttm && ttm_tt_is_populated(bo->ttm.ttm))
-		xe_ttm_tt_account_add(xe, bo->ttm.ttm);
+	xe_bo_unpin_account(bo);
 
 	/*
 	 * FIXME: If we always use the reserve / unreserve functions for locking
@@ -3282,21 +3361,16 @@ void xe_bo_unpin(struct xe_bo *bo)
 	xe_assert(xe, xe_bo_is_pinned(bo));
 
 	if (mem_type_is_vram(place->mem_type) || bo->flags & XE_BO_FLAG_GGTT) {
-		spin_lock(&xe->pinned.lock);
 		xe_assert(xe, !list_empty(&bo->pinned_link));
-		list_del_init(&bo->pinned_link);
-		spin_unlock(&xe->pinned.lock);
 
 		if (bo->backup_obj) {
 			if (xe_bo_is_pinned(bo->backup_obj))
-				ttm_bo_unpin(&bo->backup_obj->ttm);
+				xe_bo_unpin_account(bo->backup_obj);
 			xe_bo_put(bo->backup_obj);
 			bo->backup_obj = NULL;
 		}
 	}
-	ttm_bo_unpin(&bo->ttm);
-	if (bo->ttm.ttm && ttm_tt_is_populated(bo->ttm.ttm))
-		xe_ttm_tt_account_add(xe, bo->ttm.ttm);
+	xe_bo_unpin_account(bo);
 }
 
 /**
