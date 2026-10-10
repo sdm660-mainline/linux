@@ -2815,6 +2815,15 @@
 				<  2380800000 0x0404007c 0x0c630063 0x3 10 >,
 				<  2515200000 0x04040083 0x0d680068 0x3 11 >;
 
+			/* Open-loop uV per virtual corner: CPR ceilings from sdm630-regulator.dtsi.
+			 * pwrcl: 8 corners. perfcl: 11 corners, the per-index maximum over bins 0-2
+			 * (bin2 is higher only at vc 10-11), so no bin ends up undervolted. */
+			qcom,pwrcl-corner-uv =
+				<724000 724000 788000 788000 1068000 1068000 1068000 1068000>;
+
+			qcom,perfcl-corner-uv =
+				<724000 724000 724000 788000 868000 868000 988000 988000 988000 1140000 1140000>;
+
 			/* The stock SDM630 tree defines no MEM-ACC trim and no ACD for this
 			 * clock controller, so neither is described here. */
 		};

@@ -319,6 +319,20 @@
 			<  2016000000 0x04040069 0x0a540054 0x3 24 >,
 			<  2092800000 0x0404006d 0x0a570057 0x3 25 >;
 
+		/* Open-loop uV per virtual corner. Msm8998 CPR corner ceilings
+		 * (upper bound, no fuse adjustment), indexed by 1-based vc.
+		 * pwrcl: 22 corners, perfcl: 25 corners. */
+		qcom,pwrcl-corner-uv =
+			<896000 896000 896000 896000 896000 896000 896000 896000
+			 896000 896000 896000 896000 896000 896000 896000 896000
+			 896000 1032000 1032000 1032000 1112000 1112000>;
+
+		qcom,perfcl-corner-uv =
+			<896000 896000 896000 896000 896000 896000 896000 896000
+			 896000 896000 896000 896000 896000 896000 896000 896000
+			 896000 896000 1032000 1032000 1032000 1032000
+			 1112000 1112000 1112000>;
+
 		/* MEM-ACC trim - also whyred's own, from the interposer file.
 		 * apcs_mem_acc_val is 9 cells (3 levels x 3 values/level). */
 		qcom,pwrcl-apcs-mem-acc-cfg = <0x179d1360 0x179d1364 0x179d1364>;
