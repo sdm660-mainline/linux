@@ -1173,6 +1173,20 @@ config CHARGER_QCOM_SMB2
 	  adds support for the SMB2 switch mode battery charger found
 	  in PMI8998 and related PMICs.
 
+config CHARGER_QCOM_SMB1351
+	tristate "Qualcomm SMB1351 parallel charger driver"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say Y here to enable the driver for the Qualcomm SMB1351 charger
+	  and the register-compatible SMB1350, which some phones use in
+	  parallel with the charger in their PMIC. The driver keeps the
+	  charger from charging the battery on its own and reports whether
+	  it has input power.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called qcom_smb1351.
+
 config FUEL_GAUGE_MM8013
 	tristate "Mitsumi MM8013 fuel gauge driver"
 	depends on I2C
