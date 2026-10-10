@@ -84,7 +84,8 @@
 
 /* Only needed for clk_osm_do_additional_setup() - the microcode/PLL/GFMUX
  * bring-up that we confirmed (2026-08-27, real hardware register readback)
- * TZ does NOT do on whyred. */
+ * TZ does NOT do on whyred.
+ */
 #define PLL_MIN_LVAL			43
 #define PLL_POST_DIV1			0x1F
 #define PLL_POST_DIV2			0x11F
@@ -169,7 +170,8 @@ static const u32 seq_br_instr[] = {
  * exact bit packing). We keep the same on-disk DT shape here so the
  * property arrays extracted from msm8998-interposer-sdm660.dtsi can be
  * reused as-is without hand re-encoding every row.
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 struct osm_entry {
 	u32 frequency;		/* Hz */
 	u32 freq_data;		/* raw PLL programming word, opaque passthrough */
@@ -190,7 +192,8 @@ struct clk_osm {
 	/* One open-loop microvolt value per virtual corner, from DT
 	 * (opp-microvolt on each opp-hz node - see README on why we do
 	 * NOT try to derive this from a CPR/rpmh regulator corner table
-	 * the way downstream does via regulator_list_corner_voltage()). */
+	 * the way downstream does via regulator_list_corner_voltage()).
+	 */
 	u32 *vc_to_uv;
 	unsigned int num_vc;
 
@@ -263,7 +266,8 @@ static inline void clk_osm_acd_master_write_reg(struct clk_osm *c, u32 val,
 
 /* "Local write through": write to the master copy, then push it to the
  * local (active) copy of a single register and wait for that transfer
- * to complete - downstream's clk_osm_acd_master_write_through_reg(). */
+ * to complete - downstream's clk_osm_acd_master_write_through_reg().
+ */
 static int clk_osm_acd_write_through_reg(struct clk_osm *c, u32 val,
 					   u32 offset)
 {
@@ -289,7 +293,8 @@ static int clk_osm_acd_write_through_reg(struct clk_osm *c, u32 val,
 }
 
 /* Bulk auto-transfer of several master-copy registers at once, selected
- * by a bitmask - downstream's clk_osm_acd_auto_local_write_reg(). */
+ * by a bitmask - downstream's clk_osm_acd_auto_local_write_reg().
+ */
 static int clk_osm_acd_auto_local_write_reg(struct clk_osm *c, u32 mask)
 {
 	u32 regval;
@@ -310,7 +315,8 @@ static int clk_osm_acd_auto_local_write_reg(struct clk_osm *c, u32 mask)
 /* Full init sequence, ported 1:1 from clk_osm_acd_init() in downstream
  * clock-osm.c. No-ops (returns 0 immediately) if c->acd_base is NULL,
  * i.e. no "*-acd" DT reg region was found for this cluster - matches
- * downstream's c->acd_init gate exactly. */
+ * downstream's c->acd_init gate exactly.
+ */
 static int clk_osm_acd_init(struct clk_osm *c)
 {
 	u32 auto_xfer_mask = 0;
@@ -372,7 +378,8 @@ static int clk_osm_acd_init(struct clk_osm *c)
 /* Ensure a write actually lands before anything downstream of it (a
  * frequency switch, an FSM kick) can be observed. Downstream does this
  * with a dummy read-back; keep the same pattern rather than trusting a
- * bare memory barrier to be enough across the OSM's internal AHB path. */
+ * bare memory barrier to be enough across the OSM's internal AHB path.
+ */
 static inline void osm_mb(struct clk_osm *c)
 {
 	readl_relaxed(c->base + ENABLE_REG);
@@ -381,7 +388,8 @@ static inline void osm_mb(struct clk_osm *c)
 /* ---------------------------------------------------------------------
  * LUT programming - clk_osm_setup_hw_table() downstream, unchanged
  * register semantics. Plain iowrite, no TZ/SCM dependency.
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static void clk_osm_setup_hw_table(struct clk_osm *c)
 {
 	unsigned int i, off;
@@ -399,7 +407,8 @@ static void clk_osm_setup_hw_table(struct clk_osm *c)
 
 			/* bits[21:16] = virtual corner, bits[11:0] = open
 			 * loop voltage in mV (downstream: BVAL(21,16,vc) |
-			 * BVAL(11,0,open_loop_mv)). */
+			 * BVAL(11,0,open_loop_mv)).
+			 */
 			volt_val = ((e->virtual_corner & 0x3f) << 16) |
 				   ((uv / 1000) & 0xfff);
 
@@ -422,7 +431,8 @@ static void clk_osm_setup_hw_table(struct clk_osm *c)
  * APM control-register wiring - clk_osm_program_apm_regs() downstream.
  * Plain iowrite in the downstream source too (no scm_io_write calls in
  * that function), so ported verbatim.
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static void clk_osm_program_apm_regs(struct clk_osm *c)
 {
 	osm_write(c, c->apm_mode_ctl, SEQ_REG(2));
@@ -444,21 +454,24 @@ static void clk_osm_program_apm_regs(struct clk_osm *c)
  * branch and used qcom_scm_io_writel() here. Left the SCM path further
  * down as a fallback in case that assumption ever needs revisiting on
  * a different board/firmware.
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static void clk_osm_apm_vc_setup(struct clk_osm *c)
 {
 	osm_write(c, c->apm_threshold_vc, SEQ_REG(1));
 	osm_write(c, c->apm_crossover_vc, SEQ_REG(72));
 	/* SEQ_REG(8) downstream stores this cluster's own OSM base address
 	 * plus SEQ_REG(1)'s offset - an internal self-reference the FSM
-	 * microcode reads back at runtime, not a value we chose. */
+	 * microcode reads back at runtime, not a value we chose.
+	 */
 	osm_write(c, SEQ_REG(1), SEQ_REG(8));
 	osm_write(c, c->apm_threshold_vc, SEQ_REG(15));
 	/* apm_threshold_pre_vc: downstream derives this from an optional
 	 * mem-acc-threshold-voltage crossover; we don't model that corner
 	 * (see mem_acc TODO), so fall back to apm_threshold_vc itself -
 	 * matches downstream's own fallback when no mem-acc crossover is
-	 * configured. */
+	 * configured.
+	 */
 	osm_write(c, c->apm_threshold_vc, SEQ_REG(31));
 	osm_write(c, 0x3b | (c->apm_threshold_vc << 6), SEQ_REG(73));
 	osm_write(c, 0x39 | (c->apm_threshold_vc << 6), SEQ_REG(76));
@@ -468,7 +481,8 @@ static void clk_osm_apm_vc_setup(struct clk_osm *c)
 /* Fallback for a board that turns out to need the TZ-present path after
  * all (secure_init==false downstream) - NOT currently called, kept for
  * reference/completeness. Needs the physical base address, unlike the
- * function above. */
+ * function above.
+ */
 static int __maybe_unused clk_osm_apm_vc_setup_scm(struct clk_osm *c, phys_addr_t base_phys)
 {
 	int ret;
@@ -495,7 +509,8 @@ static int __maybe_unused clk_osm_apm_vc_setup_scm(struct clk_osm *c, phys_addr_
  * secure_init==true branch. mem_acc_level_map[] is NOT DT data - it's
  * derived here from the LUT's own spare_data column (downstream does
  * the same derivation inline in this function, not in DT parsing).
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static void clk_osm_program_mem_acc_regs(struct clk_osm *c)
 {
 	u32 mem_acc_level_map[MAX_MEM_ACC_LEVELS] = { 0, 0, 0 };
@@ -538,7 +553,8 @@ static void clk_osm_program_mem_acc_regs(struct clk_osm *c)
  * no SCM. Must run AFTER clk_osm_do_additional_setup()'s GFMUX/PLL
  * register-address programming below, matching downstream's call order
  * in clk_osm_do_additional_setup() (sequencer load is the last step).
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static void clk_osm_setup_sequencer(struct clk_osm *c)
 {
 	unsigned int i;
@@ -555,7 +571,8 @@ static void clk_osm_setup_sequencer(struct clk_osm *c)
  * on both clusters together here since it decides which cluster's ITM
  * is "primary". We call it once, from the perfcl probe (see probe()
  * wiring), passing both clk_osm structs.
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static void clk_osm_setup_itm_to_osm_handoff(struct clk_osm *pwrcl,
 					      struct clk_osm *perfcl)
 {
@@ -573,7 +590,8 @@ static void clk_osm_setup_itm_to_osm_handoff(struct clk_osm *pwrcl,
  * control-register address programming, run ONLY because we confirmed
  * TZ leaves this undone on whyred. All plain MMIO in the downstream
  * source (no SCM here, unlike apm_vc_setup's TZ-present branch).
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static void clk_osm_do_additional_setup(struct clk_osm *c)
 {
 	osm_write(c, BVAL(23, 16, 0xF), SPM_CC_CTRL);
@@ -601,7 +619,8 @@ static void clk_osm_do_additional_setup(struct clk_osm *c)
 	 * clk_osm_setup_sequencer() is called once per cluster after both
 	 * clusters have had do_additional_setup() applied, matching
 	 * downstream's ordering (do_additional_setup for both clusters,
-	 * THEN itm_to_osm_handoff, THEN setup_sequencer for both). */
+	 * THEN itm_to_osm_handoff, THEN setup_sequencer for both).
+	 */
 }
 
 /* ---------------------------------------------------------------------
@@ -612,7 +631,8 @@ static void clk_osm_do_additional_setup(struct clk_osm *c)
  * qcom-cpufreq-hw.c uses for SDM845+, just invoked from a clk_ops
  * instead (matching how this generation's LUT has to be *written* by
  * Linux rather than merely *read*, see file header).
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static int clk_osm_find_index(struct clk_osm *c, unsigned long rate)
 {
 	int quad_idx, single_idx = -1;
@@ -686,7 +706,8 @@ static int clk_osm_determine_rate(struct clk_hw *hw,
 	req->rate = best;
 	return 0;
 }
-/*static long clk_osm_round_rate(struct clk_hw *hw, unsigned long rate,
+/*
+  static long clk_osm_round_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long *parent_rate)
 {
 	struct clk_osm *c = to_clk_osm(hw);
@@ -704,7 +725,8 @@ static int clk_osm_determine_rate(struct clk_hw *hw,
 	}
 
 	return best;
-} old code */
+} old code
+*/
 
 static int clk_osm_enable(struct clk_hw *hw)
 {
@@ -738,7 +760,8 @@ static const struct clk_ops clk_osm_ops = {
  *   <freq_hz  freq_data  override_data  spare_data  virtual_corner_1based>
  * virtual_corner is 1-based in DT and converted to 0-based on read, same
  * as downstream's "array[i + VIRTUAL_CORNER] - 1".
- * --------------------------------------------------------------------- */
+ * ---------------------------------------------------------------------
+ */
 static int clk_osm_parse_lut(struct platform_device *pdev, struct clk_osm *c,
 			      const char *propname)
 {
@@ -783,7 +806,8 @@ static int clk_osm_parse_lut(struct platform_device *pdev, struct clk_osm *c,
 		e->override_data = buf[i * 5 + 2];
 		e->spare_data	  = buf[i * 5 + 3];
 		/* virtual corners are 1-based in the DT array, same as
-		 * downstream's clk_osm_get_lut(). */
+		 * downstream's clk_osm_get_lut().
+		 */
 		e->virtual_corner = vc_1based ? vc_1based - 1 : 0;
 	}
 	c->num_entries = rows;
@@ -847,7 +871,8 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	/* Both clusters share one "osm" MMIO region (downstream: a single
 	 * qcom,cpu-clock-8998@0x179c0000 node drives pwrcl+perfcl together)
 	 * - see sdm660-whyred-cpu-osm.dtsi for why this replaced the
-	 * earlier (wrong) two-separate-region draft. */
+	 * earlier (wrong) two-separate-region draft.
+	 */
 	c->base = osm_base;
 	c->l_val_base = l_val_base;
 	c->apcs_pll_user_ctl = apcs_pll_user_ctl;
@@ -883,7 +908,8 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	 * values - THIS IS STILL THE ONE REMAINING REAL BLOCKER, see
 	 * README. clk_osm_setup_hw_table() will program 0mV open-loop
 	 * voltage for every row until this is filled in. DO NOT run this
-	 * on real silicon with vc_to_uv unpopulated. */
+	 * on real silicon with vc_to_uv unpopulated.
+	 */
 	c->num_vc = 0;
 	c->vc_to_uv = NULL;
 
@@ -900,7 +926,8 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	 * means APM switches to APC mode at/near the top of the table
 	 * rather than at the true CPR-measured threshold. Revisit once
 	 * vc_to_uv[] is populated: proper fix is "first vc whose uv >=
-	 * qcom,apm-threshold-voltage". */
+	 * qcom,apm-threshold-voltage".
+	 */
 	c->apm_threshold_vc = c->num_entries ? c->osm_table[c->num_entries - 1].virtual_corner : 0;
 	c->apm_crossover_vc = c->apm_threshold_vc;
 
@@ -962,7 +989,8 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	 * registration - 0, since cur_index was still -1 back then.
 	 * Setting cur_index and enabling the hardware before registration
 	 * means recalc_rate() reports the real frequency on that first,
-	 * only call the core ever makes on its own. */
+	 * only call the core ever makes on its own.
+	 */
 	clk_osm_setup_hw_table(c);
 	clk_osm_do_additional_setup(c);
 	clk_osm_program_mem_acc_regs(c);
@@ -997,7 +1025,8 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 /* One shared "osm" MMIO region drives both clusters (see DT file),
  * matching downstream's single-node/two-static-struct layout. We
  * register two clk_hw providers off that one region and hand them out
- * via #clock-cells = <1> (0 = pwrcl, 1 = perfcl). */
+ * via #clock-cells = <1> (0 = pwrcl, 1 = perfcl).
+ */
 struct clk_osm_cpucc {
 	struct clk_osm pwrcl;
 	struct clk_osm perfcl;
@@ -1024,7 +1053,8 @@ static int clk_osm_probe(struct platform_device *pdev)
 
 	/* All four of these are <pwrcl_val perfcl_val> 2-cell DT arrays,
 	 * matching downstream's qcom,l-val-base etc layout - see
-	 * sdm660-whyred-cpu-osm.dtsi. */
+	 * sdm660-whyred-cpu-osm.dtsi.
+	 */
 	of_property_read_u32_array(pdev->dev.of_node, "qcom,l-val-base", l_val_base, 2);
 	of_property_read_u32_array(pdev->dev.of_node, "qcom,apcs-pll-user-ctl", apcs_pll_user_ctl, 2);
 	of_property_read_u32_array(pdev->dev.of_node, "qcom,apcs-cfg-rcgr", apcs_cfg_rcgr, 2);
@@ -1050,7 +1080,8 @@ static int clk_osm_probe(struct platform_device *pdev)
 	/* Both clusters have had do_additional_setup() applied at this
 	 * point (inside clk_osm_probe_cluster) - now do the two steps
 	 * downstream does across BOTH clusters together, in this order:
-	 * ITM handoff, then sequencer microcode load for each. */
+	 * ITM handoff, then sequencer microcode load for each.
+	 */
 	clk_osm_setup_itm_to_osm_handoff(&cc->pwrcl, &cc->perfcl);
 	clk_osm_setup_sequencer(&cc->pwrcl);
 	clk_osm_setup_sequencer(&cc->perfcl);
@@ -1058,7 +1089,8 @@ static int clk_osm_probe(struct platform_device *pdev)
 	/* Only now, with PLL/GFMUX/microcode actually loaded, is it
 	 * meaningful to enable the clocks. clk_osm_enable() (ENABLE_REG=1)
 	 * runs lazily via the clk framework on first clk_prepare_enable()
-	 * from a consumer (e.g. a cpufreq driver) - not forced here. */
+	 * from a consumer (e.g. a cpufreq driver) - not forced here.
+	 */
 
 	cc->onecell.num = 2;
 	cc->onecell.hws[0] = &cc->pwrcl.hw;

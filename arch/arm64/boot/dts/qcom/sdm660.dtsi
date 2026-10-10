@@ -10,6 +10,8 @@
 #include "sdm630.dtsi"
 
 /delete-node/ &buffer_mem;
+/delete-node/ &cpu_pwr_sdm630_opp_table;
+/delete-node/ &cpu_perf_sdm630_opp_table;
 
 / {
 	smp2p-cdsp {
@@ -36,6 +38,87 @@
 		cdsp_region: cdsp@94a00000 {
 			reg = <0x0 0x94a00000 0x00 0x600000>;
 			no-map;
+		};
+	};
+
+	cpu_pwr_sdm660_opp_table: opp-table-pwrcl {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-633600000 {
+			opp-hz = /bits/ 64 <633600000>;
+		};
+
+		opp-902400000 {
+			opp-hz = /bits/ 64 <902400000>;
+		};
+
+		opp-1113600000 {
+			opp-hz = /bits/ 64 <1113600000>;
+		};
+
+		opp-1401600000 {
+			opp-hz = /bits/ 64 <1401600000>;
+		};
+
+		opp-1536000000 {
+			opp-hz = /bits/ 64 <1536000000>;
+		};
+
+		opp-1612800000 {
+			opp-hz = /bits/ 64 <1612800000>;
+		};
+
+		opp-1747200000 {
+			opp-hz = /bits/ 64 <1747200000>;
+		};
+
+		opp-1843200000 {
+			opp-hz = /bits/ 64 <1843200000>;
+		};
+	};
+
+	cpu_perf_sdm660_opp_table: opp-table-perfcl {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-1113600000 {
+			opp-hz = /bits/ 64 <1113600000>;
+		};
+
+		opp-1401600000 {
+			opp-hz = /bits/ 64 <1401600000>;
+		};
+
+		opp-1747200000 {
+			opp-hz = /bits/ 64 <1747200000>;
+		};
+		opp-1804800000 {
+			opp-hz = /bits/ 64 <1804800000>;
+		};
+
+		opp-1958400000 {
+			opp-hz = /bits/ 64 <1958400000>;
+		};
+
+		opp-2150400000 {
+			opp-hz = /bits/ 64 <2150400000>;
+		};
+
+		opp-2208000000 {
+			opp-hz = /bits/ 64 <2208000000>;
+		};
+
+		opp-2457600000 {
+			opp-hz = /bits/ 64 <2457600000>;
 		};
 	};
 };
@@ -148,49 +231,49 @@
 &cpu0 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu1 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu2 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu3 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu4 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &cpu5 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &cpu6 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &cpu7 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &gcc {
@@ -436,7 +519,7 @@
 		};
 	};
 
-		cpu_clock_osm: clock-controller@179c0000 {
+	cpu_clock_osm: clock-controller@179c0000 {
 		compatible = "qcom,sdm660-cpu-clock-osm";
 		reg = <0x179c0000 0x4000>,	/* osm - shared by both clusters */
 		      <0x17916000 0x1000>,	/* pwrcl_pll */
@@ -446,6 +529,8 @@
 		      <0x00784130 0x8>;		/* perfcl_efuse (QFPROM) */
 		reg-names = "osm", "pwrcl_pll", "perfcl_pll",
 			    "apcs_common", "pwrcl_efuse", "perfcl_efuse";
+
+		/delete-property/ qcom,perfcl-speedbin2-v0;
 
 		interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
 			     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
@@ -523,11 +608,13 @@
 
 		/* MEM-ACC trim is NOT provided here: the stock SDM660 tree carries
 		 * no qcom,*-apcs-mem-acc-* properties, so whyred's values must not
-		 * be reused for this SoC without a downstream source for them. */
+		 * be reused for this SoC without a downstream source for them.
+		 */
 
 		/* qcom,apm-threshold-voltage = <872000>; (uV) in the stock tree,
 		 * not wired into the driver - see the SDM636 fragment for how the
-		 * crossover corner is approximated instead. */
+		 * crossover corner is approximated instead.
+		 */
 
 		/* ACD is optional. The stock SDM660 tree does enable it, with one
 		 * register window and identical values for both clusters:
@@ -539,39 +626,8 @@
 		 *   qcom,acdextint1-val = <0x02cf9afe 0x02cf9afe>;
 		 *   qcom,acdautoxfer-val = <0x00000015 0x00000015>;
 		 * The stock tree lists no perfcl_acd window, so it is left out
-		 * until its physical address is confirmed on hardware. */
-	};
-};
-
-/ {
-	cpu0_opp_table: opp-table-cpu0 {
-		compatible = "operating-points-v2";
-		opp-shared;
-
-		opp-300000000  { opp-hz = /bits/ 64 <300000000>; };
-		opp-633600000  { opp-hz = /bits/ 64 <633600000>; };
-		opp-902400000  { opp-hz = /bits/ 64 <902400000>; };
-		opp-1113600000 { opp-hz = /bits/ 64 <1113600000>; };
-		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
-		opp-1536000000 { opp-hz = /bits/ 64 <1536000000>; };
-		opp-1612800000 { opp-hz = /bits/ 64 <1612800000>; };
-		opp-1747200000 { opp-hz = /bits/ 64 <1747200000>; };
-		opp-1843200000 { opp-hz = /bits/ 64 <1843200000>; };
-	};
-
-	cpu4_opp_table: opp-table-cpu4 {
-		compatible = "operating-points-v2";
-		opp-shared;
-
-		opp-300000000  { opp-hz = /bits/ 64 <300000000>; };
-		opp-1113600000 { opp-hz = /bits/ 64 <1113600000>; };
-		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
-		opp-1747200000 { opp-hz = /bits/ 64 <1747200000>; };
-		opp-1804800000 { opp-hz = /bits/ 64 <1804800000>; };
-		opp-1958400000 { opp-hz = /bits/ 64 <1958400000>; };
-		opp-2150400000 { opp-hz = /bits/ 64 <2150400000>; };
-		opp-2208000000 { opp-hz = /bits/ 64 <2208000000>; };
-		opp-2457600000 { opp-hz = /bits/ 64 <2457600000>; };
+		 * until its physical address is confirmed on hardware.
+		 */
 	};
 };
 
