@@ -12,11 +12,11 @@
 /delete-node/ &remoteproc_cdsp;
 /delete-node/ &cdsp_smmu;
 /delete-node/ &cdsp_region;
+/delete-node/ &cpu_pwr_sdm660_opp_table;
+/delete-node/ &cpu_perf_sdm660_opp_table;
 
 / {
 	/delete-node/ smp2p-cdsp;
-	/delete-node/ cpu_pwr_sdm660_opp_table;
-	/delete-node/ cpu_perf_sdm660_opp_table;
 
 	reserved-memory {
 		buffer_mem: tzbuffer@94a00000 {
