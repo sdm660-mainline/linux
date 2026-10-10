@@ -15,11 +15,211 @@
 
 / {
 	/delete-node/ smp2p-cdsp;
+	/delete-node/ cpu_pwr_sdm660_opp_table;
+	/delete-node/ cpu_perf_sdm660_opp_table;
 
 	reserved-memory {
 		buffer_mem: tzbuffer@94a00000 {
 			reg = <0x0 0x94a00000 0x00 0x100000>;
 			no-map;
+		};
+	};
+
+	cpu_pwr_sdm636_opp_table: opp-table-pwrcl {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-345600000 {
+			opp-hz = /bits/ 64 <345600000>;
+		};
+
+		opp-422400000 {
+			opp-hz = /bits/ 64 <422400000>;
+		};
+
+		opp-499200000 {
+			opp-hz = /bits/ 64 <499200000>;
+		};
+
+		opp-576000000 {
+			opp-hz = /bits/ 64 <576000000>;
+		};
+
+		opp-633600000 {
+			opp-hz = /bits/ 64 <633600000>;
+		};
+
+		opp-710400000 {
+			opp-hz = /bits/ 64 <710400000>;
+		};
+
+		opp-806400000 {
+			opp-hz = /bits/ 64 <806400000>;
+		};
+
+		opp-883200000 {
+			opp-hz = /bits/ 64 <883200000>;
+		};
+
+		opp-960000000 {
+			opp-hz = /bits/ 64 <960000000>;
+		};
+
+		opp-1036800000 {
+			opp-hz = /bits/ 64 <1036800000>;
+		};
+
+		opp-1113600000 {
+			opp-hz = /bits/ 64 <1113600000>;
+		};
+
+		opp-1190400000 {
+			opp-hz = /bits/ 64 <1190400000>;
+		};
+
+		opp-1248000000 {
+			opp-hz = /bits/ 64 <1248000000>;
+		};
+
+		opp-1324800000 {
+			opp-hz = /bits/ 64 <1324800000>;
+		};
+
+		opp-1401600000 {
+			opp-hz = /bits/ 64 <1401600000>;
+		};
+
+		opp-1478400000 {
+			opp-hz = /bits/ 64 <1478400000>;
+		};
+
+		opp-1574400000 {
+			opp-hz = /bits/ 64 <1574400000>;
+		};
+
+		opp-1651200000 {
+			opp-hz = /bits/ 64 <1651200000>;
+		};
+
+		opp-1728000000 {
+			opp-hz = /bits/ 64 <1728000000>;
+		};
+
+		opp-1804800000 {
+			opp-hz = /bits/ 64 <1804800000>;
+		};
+
+		opp-1881600000 {
+			opp-hz = /bits/ 64 <1881600000>;
+		};
+	};
+
+	cpu_perf_sdm636_opp_table: opp-table-perfcl {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-345600000 {
+			opp-hz = /bits/ 64 <345600000>;
+		};
+
+		opp-422400000 {
+			opp-hz = /bits/ 64 <422400000>;
+		};
+
+		opp-480000000 {
+			opp-hz = /bits/ 64 <480000000>;
+		};
+
+		opp-556800000 {
+			opp-hz = /bits/ 64 <556800000>;
+		};
+
+		opp-633600000 {
+			opp-hz = /bits/ 64 <633600000>;
+		};
+
+		opp-710400000 {
+			opp-hz = /bits/ 64 <710400000>;
+		};
+
+		opp-787200000 {
+			opp-hz = /bits/ 64 <787200000>;
+		};
+
+		opp-844800000 {
+			opp-hz = /bits/ 64 <844800000>;
+		};
+
+		opp-902400000 {
+			opp-hz = /bits/ 64 <902400000>;
+		};
+
+		opp-979200000 {
+			opp-hz = /bits/ 64 <979200000>;
+		};
+
+		opp-1056000000 {
+			opp-hz = /bits/ 64 <1056000000>;
+		};
+
+		opp-1171200000 {
+			opp-hz = /bits/ 64 <1171200000>;
+		};
+
+		opp-1248000000 {
+			opp-hz = /bits/ 64 <1248000000>;
+		};
+
+		opp-1324800000 {
+			opp-hz = /bits/ 64 <1324800000>;
+		};
+
+		opp-1401600000 {
+			opp-hz = /bits/ 64 <1401600000>;
+		};
+
+		opp-1478400000 {
+			opp-hz = /bits/ 64 <1478400000>;
+		};
+
+		opp-1536000000 {
+			opp-hz = /bits/ 64 <1536000000>;
+		};
+
+		opp-1632000000 {
+			opp-hz = /bits/ 64 <1632000000>;
+		};
+
+		opp-1708800000 {
+			opp-hz = /bits/ 64 <1708800000>;
+		};
+
+		opp-1785600000 {
+			opp-hz = /bits/ 64 <1785600000>;
+		};
+
+		opp-1862400000 {
+			opp-hz = /bits/ 64 <1862400000>;
+		};
+
+		opp-1939200000 {
+			opp-hz = /bits/ 64 <1939200000>;
+		};
+
+		opp-2016000000 {
+			opp-hz = /bits/ 64 <2016000000>;
+		};
+
+		opp-2092800000 {
+			opp-hz = /bits/ 64 <2092800000>;
 		};
 	};
 };
@@ -41,6 +241,12 @@
 		reg-names = "osm", "pwrcl_pll", "perfcl_pll",
 			    "apcs_common", "perfcl_efuse", "debug";
 
+		/delete-property/ qcom,pwrcl-speedbin1-v0;
+		/delete-property/ qcom,pwrcl-speedbin3-v0;
+		/delete-property/ qcom,perfcl-speedbin1-v0;
+		/delete-property/ qcom,perfcl-speedbin3-v0;
+
+
 		interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
 			     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
 		interrupt-names = "pwrcl-irq", "perfcl-irq";
@@ -50,8 +256,9 @@
 		/* <pwrcl perfcl> - additional_setup() inputs, needed
 		 * because TZ does not pre-init OSM on this device (confirmed
 		 * by reading ENABLE_REG/FREQ_REG as zero on real hardware,
-		 * 2026-08-23). Values below are whyred's own, from the same
-		 * downstream interposer file as the LUT data. */
+		 * 2026-08-23). Values below are whyredW's own, from the same
+		 * downstream interposer file as the LUT data.
+		 */
 		qcom,l-val-base        = <0x17916004 0x17816004>;
 		qcom,apcs-pll-user-ctl = <0x1791600c 0x1781600c>;
 		qcom,apcs-cfg-rcgr     = <0x17911054 0x17811054>;
@@ -129,7 +336,7 @@
 		 * downstream tree but is NOT wired into the driver yet - it
 		 * feeds clk_osm_resolve_crossover_corners(), which needs a
 		 * real CPR/rpmh regulator corner table we deliberately don't
-		 * port (see README). Driver currently approximates
+		 * port. Driver currently approximates
 		 * apm_threshold_vc/apm_crossover_vc as the LUT's top corner
 		 * instead - see clk_osm_probe_cluster() comment. */
 
@@ -150,77 +357,34 @@
 	};
 };
 
-/ {
-	cpu0_opp_table: opp-table-cpu0 {
-		compatible = "operating-points-v2";
-		opp-shared;
-
-		opp-300000000  { opp-hz = /bits/ 64 <300000000>;  };
-		opp-345600000  { opp-hz = /bits/ 64 <345600000>;  };
-		opp-422400000  { opp-hz = /bits/ 64 <422400000>;  };
-		opp-499200000  { opp-hz = /bits/ 64 <499200000>;  };
-		opp-576000000  { opp-hz = /bits/ 64 <576000000>;  };
-		opp-633600000  { opp-hz = /bits/ 64 <633600000>;  };
-		opp-710400000  { opp-hz = /bits/ 64 <710400000>;  };
-		opp-806400000  { opp-hz = /bits/ 64 <806400000>;  };
-		opp-883200000  { opp-hz = /bits/ 64 <883200000>;  };
-		opp-960000000  { opp-hz = /bits/ 64 <960000000>;  };
-		opp-1036800000 { opp-hz = /bits/ 64 <1036800000>; };
-		opp-1113600000 { opp-hz = /bits/ 64 <1113600000>; };
-		opp-1190400000 { opp-hz = /bits/ 64 <1190400000>; };
-		opp-1248000000 { opp-hz = /bits/ 64 <1248000000>; };
-		opp-1324800000 { opp-hz = /bits/ 64 <1324800000>; };
-		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
-		opp-1478400000 { opp-hz = /bits/ 64 <1478400000>; };
-		opp-1574400000 { opp-hz = /bits/ 64 <1574400000>; };
-		opp-1651200000 { opp-hz = /bits/ 64 <1651200000>; };
-		opp-1728000000 { opp-hz = /bits/ 64 <1728000000>; };
-		opp-1804800000 { opp-hz = /bits/ 64 <1804800000>; };
-		/* Top pwrcl corner - see README on unresolved vc_to_uv risk
-		 * before relying on this staying stable under sustained load. */
-		opp-1881600000 { opp-hz = /bits/ 64 <1881600000>; };
-	};
-
-	cpu4_opp_table: opp-table-cpu4 {
-		compatible = "operating-points-v2";
-		opp-shared;
-
-		opp-300000000  { opp-hz = /bits/ 64 <300000000>;  };
-		opp-345600000  { opp-hz = /bits/ 64 <345600000>;  };
-		opp-422400000  { opp-hz = /bits/ 64 <422400000>;  };
-		opp-480000000  { opp-hz = /bits/ 64 <480000000>;  };
-		opp-556800000  { opp-hz = /bits/ 64 <556800000>;  };
-		opp-633600000  { opp-hz = /bits/ 64 <633600000>;  };
-		opp-710400000  { opp-hz = /bits/ 64 <710400000>;  };
-		opp-787200000  { opp-hz = /bits/ 64 <787200000>;  };
-		opp-844800000  { opp-hz = /bits/ 64 <844800000>;  };
-		opp-902400000  { opp-hz = /bits/ 64 <902400000>;  };
-		opp-979200000  { opp-hz = /bits/ 64 <979200000>;  };
-		opp-1056000000 { opp-hz = /bits/ 64 <1056000000>; };
-		opp-1171200000 { opp-hz = /bits/ 64 <1171200000>; };
-		opp-1248000000 { opp-hz = /bits/ 64 <1248000000>; };
-		opp-1324800000 { opp-hz = /bits/ 64 <1324800000>; };
-		opp-1401600000 { opp-hz = /bits/ 64 <1401600000>; };
-		opp-1478400000 { opp-hz = /bits/ 64 <1478400000>; };
-		opp-1536000000 { opp-hz = /bits/ 64 <1536000000>; };
-		opp-1632000000 { opp-hz = /bits/ 64 <1632000000>; };
-		opp-1708800000 { opp-hz = /bits/ 64 <1708800000>; };
-		opp-1785600000 { opp-hz = /bits/ 64 <1785600000>; };
-		opp-1862400000 { opp-hz = /bits/ 64 <1862400000>; };
-		opp-1939200000 { opp-hz = /bits/ 64 <1939200000>; };
-		opp-2016000000 { opp-hz = /bits/ 64 <2016000000>; };
-		/* Top perfcl corner - same caveat as pwrcl's top entry above,
-		 * plus this is the frequency furthest from anything validated. */
-		opp-2092800000 { opp-hz = /bits/ 64 <2092800000>; };
-	};
+&cpu0 {
+	operating-points-v2 = <&cpu_perf_sdm636_opp_table>;
 };
 
-&cpu0 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
-&cpu1 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
-&cpu2 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
-&cpu3 { operating-points-v2 = <&cpu0_opp_table>; clocks = <&cpu_clock_osm 0>; };
-&cpu4 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
-&cpu5 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
-&cpu6 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
-&cpu7 { operating-points-v2 = <&cpu4_opp_table>; clocks = <&cpu_clock_osm 1>; };
+&cpu1 {
+	operating-points-v2 = <&cpu_perf_sdm636_opp_table>;
+};
 
+&cpu2 {
+	operating-points-v2 = <&cpu_perf_sdm636_opp_table>;
+};
+
+&cpu3 {
+	operating-points-v2 = <&cpu_perf_sdm636_opp_table>;
+};
+
+&cpu4 {
+	operating-points-v2 = <&cpu_pwr_sdm636_opp_table>;
+};
+
+&cpu5 {
+	operating-points-v2 = <&cpu_pwr_sdm636_opp_table>;
+};
+
+&cpu6 {
+	operating-points-v2 = <&cpu_pwr_sdm636_opp_table>;
+};
+
+&cpu7 {
+	operating-points-v2 = <&cpu_pwr_sdm636_opp_table>;
+};
