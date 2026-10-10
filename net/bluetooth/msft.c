@@ -1075,9 +1075,13 @@ void msft_vendor_evt(struct hci_dev *hdev, void *data, struct sk_buff *skb)
 		return;
 
 	/* When the extension has defined an event prefix, check that it
-	 * matches, and otherwise just return.
+	 * matches, and otherwise just return. A vendor event shorter than the
+	 * prefix cannot be an MSFT event, so it is not malformed either.
 	 */
 	if (msft->evt_prefix_len > 0) {
+		if (skb->len < msft->evt_prefix_len)
+			return;
+
 		evt_prefix = msft_skb_pull(hdev, skb, 0, msft->evt_prefix_len);
 		if (!evt_prefix)
 			return;
