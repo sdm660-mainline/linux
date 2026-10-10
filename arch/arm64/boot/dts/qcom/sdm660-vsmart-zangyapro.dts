@@ -128,8 +128,15 @@
 };
 
 &blsp_i2c2 {
-	/* SMB1351 parallel charger at 0x1d, no driver yet */
 	status = "okay";
+
+	charger@1d {
+		compatible = "qcom,smb1351";
+		reg = <0x1d>;
+
+		monitored-battery = <&battery>;
+		power-supplies = <&pm660_charger>;
+	};
 };
 
 &blsp1_uart2 {
