@@ -109,6 +109,11 @@
 	firmware-name = "a512_zap.mbn";
 };
 
+&blsp_i2c2 {
+	/* SMB1351 parallel charger at 0x1d, no driver yet */
+	status = "okay";
+};
+
 &blsp1_uart2 {
 	status = "okay";
 };
