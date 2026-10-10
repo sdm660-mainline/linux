@@ -143,6 +143,22 @@ properties:
       - description: pwrcl
       - description: perfcl
 
+  qcom,pwrcl-corner-uv:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      Open-loop voltage in uV for each virtual corner of the power cluster,
+      index 0 is virtual corner 1. Taken from the CPR corner ceilings.
+    minItems: 1
+    maxItems: 32
+
+  qcom,perfcl-corner-uv:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      Open-loop voltage in uV for each virtual corner of the performance
+      cluster, index 0 is virtual corner 1. Taken from the CPR corner ceilings.
+    minItems: 1
+    maxItems: 32
+
 patternProperties:
   '^qcom,(pwrcl|perfcl)-speedbin[0-9]+-v[0-9]+$':
     $ref: /schemas/types.yaml#/definitions/uint32-matrix
