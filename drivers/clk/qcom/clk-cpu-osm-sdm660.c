@@ -24,7 +24,7 @@
  *     TrustZone before Linux boots, so this path is expected to be
  *     unnecessary for whyred - but that is an assumption, not something
  *     we've confirmed by reading back OSM_BASE+VERSION_REG/ENABLE_REG
- *     state at early boot. See README.md, step 1.
+ *     state at early boot.
  *
  *     Copyright (c) 2026, kulesha Evgeniy <voovdop@gmail.com>
  */
@@ -45,6 +45,8 @@
 #include <linux/firmware/qcom/qcom_scm.h>
 
 #define OSM_TABLE_SIZE			40
+#define MAX_VIRTUAL_CORNER		(OSM_TABLE_SIZE - 1)
+#define OSM_SEQ_MINUS_ONE		0xff
 #define MAX_CORE_COUNT			4
 #define SINGLE_CORE			1
 #define CORE_COUNT_VAL(val)		(((val) & GENMASK(18, 16)) >> 16)
@@ -61,6 +63,10 @@
 #define OSM_REG_SIZE			32
 
 #define DCVS_PERF_STATE_DESIRED_REG	0x1F10
+
+/* Each cluster has its own OSM register window: pwrcl at +0, perfcl one
+ * window further. */
+#define OSM_CORE_TABLE_SIZE		0x2000
 
 #define SEQ_REG(n)			(0x300 + (n) * 4)
 #define MEM_ACC_SEQ_CONST(n)		(n)
@@ -178,23 +184,20 @@ struct osm_entry {
 struct clk_osm {
 	struct clk_hw hw;
 	struct device *dev;
-	void __iomem *base;		/* OSM_BASE region */
+	void __iomem *base;		/* this cluster's OSM window */
+	phys_addr_t base_phys;		/* ... and its physical address */
 	unsigned int cluster_num;	/* 0 = pwrcl, 1 = perfcl */
 
 	struct osm_entry osm_table[OSM_TABLE_SIZE];
 	unsigned int num_entries;
 
-	/* One open-loop microvolt value per virtual corner, from DT
-	 * (opp-microvolt on each opp-hz node - see README on why we do
-	 * NOT try to derive this from a CPR/rpmh regulator corner table
-	 * the way downstream does via regulator_list_corner_voltage()).
-	 */
 	u32 *vc_to_uv;
 	unsigned int num_vc;
 
 	u32 apm_mode_ctl;
 	u32 apm_ctrl_status;
 	u32 apm_threshold_vc;
+	u32 apm_threshold_pre_vc;
 	u32 apm_crossover_vc;
 
 	u32 apcs_mem_acc_cfg[3];
@@ -455,19 +458,16 @@ static void clk_osm_apm_vc_setup(struct clk_osm *c)
 {
 	osm_write(c, c->apm_threshold_vc, SEQ_REG(1));
 	osm_write(c, c->apm_crossover_vc, SEQ_REG(72));
-	/* SEQ_REG(8) downstream stores this cluster's own OSM base address
-	 * plus SEQ_REG(1)'s offset - an internal self-reference the FSM
-	 * microcode reads back at runtime, not a value we chose.
+	/* SEQ_REG(8): physical address of this cluster's SEQ_REG(1)
+	 * (downstream: pbases[OSM_BASE] + SEQ_REG(1)).
 	 */
-	osm_write(c, SEQ_REG(1), SEQ_REG(8));
+	osm_write(c, lower_32_bits(c->base_phys + SEQ_REG(1)), SEQ_REG(8));
 	osm_write(c, c->apm_threshold_vc, SEQ_REG(15));
-	/* apm_threshold_pre_vc: downstream derives this from an optional
-	 * mem-acc-threshold-voltage crossover; we don't model that corner
-	 * (see mem_acc TODO), so fall back to apm_threshold_vc itself -
-	 * matches downstream's own fallback when no mem-acc crossover is
-	 * configured.
+	/* SEQ_REG(31): the corner just below the APM threshold, or
+	 * OSM_SEQ_MINUS_ONE when the threshold is corner 0 (downstream
+	 * writes apm_threshold_pre_vc here).
 	 */
-	osm_write(c, c->apm_threshold_vc, SEQ_REG(31));
+	osm_write(c, c->apm_threshold_pre_vc, SEQ_REG(31));
 	osm_write(c, 0x3b | (c->apm_threshold_vc << 6), SEQ_REG(73));
 	osm_write(c, 0x39 | (c->apm_threshold_vc << 6), SEQ_REG(76));
 	osm_mb(c);
@@ -518,7 +518,7 @@ static void clk_osm_program_mem_acc_regs(struct clk_osm *c)
 	curr_level = c->osm_table[0].spare_data;
 	for (i = 0; i < c->num_entries && curr_level < MAX_MEM_ACC_LEVELS; i++) {
 		if (c->osm_table[i].spare_data != curr_level) {
-			mem_acc_level_map[j++] = c->osm_table[i].virtual_corner;
+			mem_acc_level_map[j++] = c->osm_table[i].virtual_corner - 1;
 			curr_level = c->osm_table[i].spare_data;
 			if (j >= MAX_MEM_ACC_LEVELS)
 				break;
@@ -534,6 +534,8 @@ static void clk_osm_program_mem_acc_regs(struct clk_osm *c)
 	osm_write(c, mem_acc_level_map[0] + 1, SEQ_REG(56));
 	osm_write(c, mem_acc_level_map[1], SEQ_REG(57));
 	osm_write(c, mem_acc_level_map[1] + 1, SEQ_REG(58));
+	/* SEQ_REG(49): physical address of this cluster's SEQ_REG(28) */
+	osm_write(c, lower_32_bits(c->base_phys + SEQ_REG(28)), SEQ_REG(49));
 
 	for (i = 0; i < MAX_MEM_ACC_VALUES; i++)
 		osm_write(c, c->apcs_mem_acc_val[i], MEM_ACC_SEQ_REG_VAL_START(i));
@@ -701,27 +703,6 @@ static int clk_osm_determine_rate(struct clk_hw *hw,
 	req->rate = best;
 	return 0;
 }
-/*
-  static long clk_osm_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *parent_rate)
-{
-	struct clk_osm *c = to_clk_osm(hw);
-	unsigned int i;
-	long best = -1;
-
-	for (i = 0; i < c->num_entries; i++) {
-		unsigned int cores = CORE_COUNT_VAL(c->osm_table[i].freq_data);
-
-		if (cores != MAX_CORE_COUNT)
-			continue;
-		if (c->osm_table[i].frequency >= rate)
-			return c->osm_table[i].frequency;
-		best = c->osm_table[i].frequency;
-	}
-
-	return best;
-} old code
-*/
 
 static int clk_osm_enable(struct clk_hw *hw)
 {
@@ -739,7 +720,6 @@ static const struct clk_ops clk_osm_ops = {
 	.enable		= clk_osm_enable,
 	.set_rate	= clk_osm_set_rate,
 	.recalc_rate	= clk_osm_recalc_rate,
-	//.round_rate	= clk_osm_round_rate, old code :(
 	.determine_rate	= clk_osm_determine_rate,
 };
 
@@ -869,16 +849,28 @@ static int clk_osm_parse_corner_uv(struct platform_device *pdev,
 	return 0;
 }
 
-/* First virtual corner (0-based) whose open-loop uV reaches @uv. */
-static u32 clk_osm_find_vc_for_uv(const struct clk_osm *c, u32 uv)
+/*
+ * Resolve the APM threshold corner the way downstream does in
+ * clk_osm_resolve_crossover_corners(): the first corner whose open-loop
+ * voltage reaches @apm_uv, plus the corner just below it
+ * (OSM_SEQ_MINUS_ONE if the threshold is corner 0). If no corner reaches
+ * the threshold, fall back to the last corner of the OSM table.
+ */
+static void clk_osm_resolve_apm_corners(struct clk_osm *c, u32 apm_uv)
 {
 	unsigned int i;
 
-	for (i = 0; i < c->num_vc; i++)
-		if (c->vc_to_uv[i] >= uv)
-			return i;
+	for (i = 0; i < c->num_vc; i++) {
+		if (c->vc_to_uv[i] < apm_uv)
+			continue;
 
-	return c->num_vc ? c->num_vc - 1 : 0;
+		c->apm_threshold_vc = i;
+		c->apm_threshold_pre_vc = i ? i - 1 : OSM_SEQ_MINUS_ONE;
+		return;
+	}
+
+	c->apm_threshold_vc = MAX_VIRTUAL_CORNER;
+	c->apm_threshold_pre_vc = MAX_VIRTUAL_CORNER - 1;
 }
 
 
@@ -898,17 +890,24 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	u32 speedbin = 0;
 	u32 mem_acc_cfg[3];
 	struct clk_init_data init = {};
+	struct resource *res;
 	int ret;
 
 	c->dev = &pdev->dev;
 	c->cur_index = -1;
 	c->cluster_num = cell_idx;
-	/* Both clusters share one "osm" MMIO region (downstream: a single
-	 * qcom,cpu-clock-8998@0x179c0000 node drives pwrcl+perfcl together)
-	 * - see sdm660-whyred-cpu-osm.dtsi for why this replaced the
-	 * earlier (wrong) two-separate-region draft.
+	/* Both clusters live in one "osm" MMIO region, but each has its own
+	 * OSM_CORE_TABLE_SIZE window: pwrcl at +0, perfcl one window further
+	 * (downstream: perfcl base = pwrcl base + cluster_num *
+	 * OSM_CORE_TABLE_SIZE). The physical address is kept as well, since
+	 * SEQ_REG(8) and SEQ_REG(49) take physical addresses.
 	 */
-	c->base = osm_base;
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "osm");
+	if (!res)
+		return -EINVAL;
+
+	c->base = osm_base + cell_idx * OSM_CORE_TABLE_SIZE;
+	c->base_phys = res->start + cell_idx * OSM_CORE_TABLE_SIZE;
 	c->l_val_base = l_val_base;
 	c->apcs_pll_user_ctl = apcs_pll_user_ctl;
 	c->apcs_cfg_rcgr = apcs_cfg_rcgr;
@@ -951,11 +950,11 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	of_property_read_u32_index(pdev->dev.of_node, propname, cell_idx, &c->apm_mode_ctl);
 	of_property_read_u32_index(pdev->dev.of_node, "qcom,apm-ctrl-status", cell_idx, &c->apm_ctrl_status);
 
-	/* APM crossover: first virtual corner whose open-loop uV reaches the
-	 * 872000 uV threshold. With the msm8998 ceilings every corner is above
-	 * it, so this resolves to 0 (APC only). Safe; revisit with real
-	 * open-loop values. */
-	c->apm_threshold_vc = clk_osm_find_vc_for_uv(c, 872000);
+	/* APM threshold corner: first corner whose open-loop uV reaches 872000.
+	 * The corner-uv values are CPR ceilings, not real open-loop voltages;
+	 * on SDM636 every ceiling is above the threshold, so this resolves to
+	 * corner 0. Placeholder until real open-loop values are known. */
+	clk_osm_resolve_apm_corners(c, 872000);
 	c->apm_crossover_vc = c->apm_threshold_vc;
 
 	ret = of_property_read_u32_array(pdev->dev.of_node,
