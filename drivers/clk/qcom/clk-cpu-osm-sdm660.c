@@ -26,11 +26,6 @@
  *     we've confirmed by reading back OSM_BASE+VERSION_REG/ENABLE_REG
  *     state at early boot. See README.md, step 1.
  *
- *	 If we remove the ACD block, the device won't boot.
- *	 The hardware includes ACD, but it isn't actively used.
- *	 If you don't add the ACD block to your board dtsi, the driver
- *	 will return -EINVAL, but it will keep working.
- *
  *     Copyright (c) 2026, kulesha Evgeniy <voovdop@gmail.com>
  */
 
@@ -817,33 +812,73 @@ static int clk_osm_parse_lut(struct platform_device *pdev, struct clk_osm *c,
 }
 
 static int clk_osm_read_speedbin(struct platform_device *pdev,
-				  const char *nvmem_name, u32 shift, u32 mask,
+				  const char *efuse_name, u32 shift, u32 mask,
 				  u32 *speedbin)
 {
-	struct nvmem_cell *cell;
-	void *val;
-	size_t len;
-	u32 raw = 0;
+	struct resource *res;
+	void __iomem *base;
+	u32 raw;
 
-	if (!mask) {
-		*speedbin = 0;
+	*speedbin = 0;
+	if (!mask)
 		return 0;
+
+	/* Map without request_mem_region(): the efuse window lies inside the
+	 * qfprom node's range, which qcom,qfprom must still be able to claim. */
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, efuse_name);
+	if (!res)
+		return -EINVAL;
+
+	base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+	if (!base)
+		return -ENOMEM;
+
+	raw = readl_relaxed(base);
+	*speedbin = (raw >> shift) & mask;
+
+	dev_info(&pdev->dev, "%s: efuse 0x%08x -> speedbin %u\n",
+		 efuse_name, raw, *speedbin);
+	return 0;
+}
+
+/*
+ * Open-loop uV per virtual corner (0-based), from the CPR corner ceilings
+ * in DT. Must be filled before clk_osm_setup_hw_table().
+ */
+static int clk_osm_parse_corner_uv(struct platform_device *pdev,
+				   struct clk_osm *c, const char *propname)
+{
+	int count;
+	u32 *uv;
+
+	count = of_property_count_u32_elems(pdev->dev.of_node, propname);
+	if (count <= 0) {
+		dev_err(&pdev->dev, "missing/empty %s\n", propname);
+		return -EINVAL;
 	}
 
-	cell = nvmem_cell_get(&pdev->dev, nvmem_name);
-	if (IS_ERR(cell))
-		return PTR_ERR(cell);
+	uv = devm_kcalloc(&pdev->dev, count, sizeof(*uv), GFP_KERNEL);
+	if (!uv)
+		return -ENOMEM;
 
-	val = nvmem_cell_read(cell, &len);
-	nvmem_cell_put(cell);
-	if (IS_ERR(val))
-		return PTR_ERR(val);
+	if (of_property_read_u32_array(pdev->dev.of_node, propname, uv, count))
+		return -EINVAL;
 
-	memcpy(&raw, val, min(len, sizeof(raw)));
-	kfree(val);
-
-	*speedbin = (raw >> shift) & mask;
+	c->vc_to_uv = uv;
+	c->num_vc = count;
 	return 0;
+}
+
+/* First virtual corner (0-based) whose open-loop uV reaches @uv. */
+static u32 clk_osm_find_vc_for_uv(const struct clk_osm *c, u32 uv)
+{
+	unsigned int i;
+
+	for (i = 0; i < c->num_vc; i++)
+		if (c->vc_to_uv[i] >= uv)
+			return i;
+
+	return c->num_vc ? c->num_vc - 1 : 0;
 }
 
 
@@ -904,31 +939,23 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	dev_info(&pdev->dev, "%s: %u LUT rows loaded, speedbin=%u\n",
 		 name, c->num_entries, speedbin);
 
-	/* TODO: vc_to_uv[] should come from per-cluster opp-microvolt
-	 * values - THIS IS STILL THE ONE REMAINING REAL BLOCKER, see
-	 * README. clk_osm_setup_hw_table() will program 0mV open-loop
-	 * voltage for every row until this is filled in. DO NOT run this
-	 * on real silicon with vc_to_uv unpopulated.
-	 */
-	c->num_vc = 0;
-	c->vc_to_uv = NULL;
+	/* Open-loop uV per virtual corner from the CPR corner ceilings in DT.
+	 * Must run before clk_osm_setup_hw_table(). */
+	ret = clk_osm_parse_corner_uv(pdev, c, cell_idx ?
+				      "qcom,perfcl-corner-uv" :
+				      "qcom,pwrcl-corner-uv");
+	if (ret)
+		return ret;
 
 	snprintf(propname, sizeof(propname), "qcom,apm-mode-ctl");
 	of_property_read_u32_index(pdev->dev.of_node, propname, cell_idx, &c->apm_mode_ctl);
 	of_property_read_u32_index(pdev->dev.of_node, "qcom,apm-ctrl-status", cell_idx, &c->apm_ctrl_status);
 
-	/* apm_threshold_vc/apm_crossover_vc: downstream derives these from
-	 * a CPRh regulator's corner count (see clk_osm_resolve_crossover_
-	 * corners()), which we deliberately don't port (would require the
-	 * full CPR/rpmh regulator stack). Approximation used here instead:
-	 * both default to the highest LUT virtual corner, which is at
-	 * least a safe (if not necessarily optimal) crossover point - it
-	 * means APM switches to APC mode at/near the top of the table
-	 * rather than at the true CPR-measured threshold. Revisit once
-	 * vc_to_uv[] is populated: proper fix is "first vc whose uv >=
-	 * qcom,apm-threshold-voltage".
-	 */
-	c->apm_threshold_vc = c->num_entries ? c->osm_table[c->num_entries - 1].virtual_corner : 0;
+	/* APM crossover: first virtual corner whose open-loop uV reaches the
+	 * 872000 uV threshold. With the msm8998 ceilings every corner is above
+	 * it, so this resolves to 0 (APC only). Safe; revisit with real
+	 * open-loop values. */
+	c->apm_threshold_vc = clk_osm_find_vc_for_uv(c, 872000);
 	c->apm_crossover_vc = c->apm_threshold_vc;
 
 	ret = of_property_read_u32_array(pdev->dev.of_node,
@@ -943,12 +970,16 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 					     : "qcom,pwrcl-apcs-mem-acc-val",
 				    c->apcs_mem_acc_val, MAX_MEM_ACC_VALUES);
 
-	/* ACD - fully optional */
-	c->acd_base = devm_platform_ioremap_resource_byname(pdev,
+	/* ACD - fully optional: probe the region only if DT declares it */
+	c->acd_base = NULL;
+	if (platform_get_resource_byname(pdev, IORESOURCE_MEM,
+					 cell_idx ? "perfcl-acd" : "pwrcl-acd")) {
+		c->acd_base = devm_platform_ioremap_resource_byname(pdev,
 				cell_idx ? "perfcl-acd" : "pwrcl-acd");
-	if (IS_ERR(c->acd_base)) {
-		c->acd_base = NULL;
-	} else {
+		if (IS_ERR(c->acd_base))
+			c->acd_base = NULL;
+	}
+	if (c->acd_base) {
 		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdtd-val",
 					    cell_idx, &c->acd_td);
 		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdcr-val",

@@ -606,6 +606,14 @@
 			<  1747200000 0x0404005b 0x09480048 0x2  4 >,
 			<  1804800000 0x0404005e 0x094b004b 0x2  5 >;
 
+		/* Open-loop uV per virtual corner: CPR corner ceilings from the stock
+		 * SDM660 regulator dtsi (no fuse adjustment). pwrcl: 8, perfcl: 7. */
+		qcom,pwrcl-corner-uv =
+			<724000 724000 724000 788000 868000 1068000 1068000 1068000>;
+
+		qcom,perfcl-corner-uv =
+			<724000 724000 788000 868000 988000 988000 1068000>;
+
 		/* MEM-ACC trim is NOT provided here: the stock SDM660 tree carries
 		 * no qcom,*-apcs-mem-acc-* properties, so whyred's values must not
 		 * be reused for this SoC without a downstream source for them.
