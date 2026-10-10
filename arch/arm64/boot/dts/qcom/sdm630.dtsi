@@ -357,7 +357,7 @@
 		reg = <0x0 0x80000000 0x0 0x0>;
 	};
 
-	cpu_pwr_sdm630_opp_table: opp-table-cpu-pwr {
+	cpu_pwr_sdm630_opp_table: opp-table-pwrcl {
 		compatible = "operating-points-v2";
 		opp-shared;
 
@@ -394,7 +394,7 @@
 		};
 	};
 
-	cpu_perf_sdm630_opp_table: opp-table-cpu-perf {
+	cpu_perf_sdm630_opp_table: opp-table-perfcl {
 		compatible = "operating-points-v2";
 		opp-shared;
 

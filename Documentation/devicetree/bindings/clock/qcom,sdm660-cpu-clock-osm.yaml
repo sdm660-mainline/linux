@@ -38,8 +38,8 @@ properties:
         - pwrcl_efuse
         - perfcl_efuse
         - debug
-        - pwrcl_acd
-        - perfcl_acd
+        - pwrcl-acd
+        - perfcl-acd
 
   interrupts:
     maxItems: 2
@@ -97,6 +97,48 @@ properties:
   qcom,apm-ctrl-status:
     $ref: /schemas/types.yaml#/definitions/uint32-array
     description: Per-cluster APM control status register addresses.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdtd-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACDTD value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdcr-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACDCR value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdsscr-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACDSSCR value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdextint0-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACD_EXTINT_CFG (initial) value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdextint1-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACD_EXTINT_CFG (final) value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdautoxfer-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACD_AUTOXFER_CTL value, <pwrcl perfcl>.
     items:
       - description: pwrcl
       - description: perfcl
