@@ -89,6 +89,42 @@
 			io-channel-names = "usbin_i", "usbin_v";
 
 			status = "disabled";
+
+			/* power supplier for USB host */
+			pm660_vbus_vreg: vbus {
+				regulator-name = "pm660-vbus";
+				regulator-min-microvolt = <5000000>;
+				regulator-max-microvolt = <5000000>;
+
+				status = "disabled";
+			};
+		};
+
+		pm660_typec: typec@1300 {
+			compatible = "qcom,pm660-typec";
+			reg = <0x1300>,
+			      <0x1700>;
+
+			interrupts = <0x0 0x13 0x7 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x0 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x1 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x2 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x3 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x4 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x5 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x6 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x17 0x7 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "type-c-change",
+					  "sig-tx",
+					  "sig-rx",
+					  "msg-tx",
+					  "msg-rx",
+					  "msg-tx-failed",
+					  "msg-tx-discarded",
+					  "msg-rx-discarded",
+					  "fr-swap";
+
+			status = "disabled";
 		};
 
 		pm660_temp: temp-alarm@2400 {
