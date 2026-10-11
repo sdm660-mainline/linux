@@ -46,18 +46,27 @@ static int msm_gem_open(struct drm_gem_object *obj, struct drm_file *file)
 	return 0;
 }
 
+static void put_iova_spaces_locked(struct drm_gem_object *obj,
+				   struct drm_gpuvm *vm, bool close,
+				   const char *reason);
+
 static void put_iova_spaces(struct drm_gem_object *obj, struct drm_gpuvm *vm,
-			    bool close, const char *reason);
+			    bool close, const char *reason)
+{
+	struct drm_exec exec;
+
+	msm_gem_lock_vm_and_obj(&exec, obj, vm);
+	put_iova_spaces_locked(obj, vm, close, reason);
+	drm_exec_fini(&exec);     /* drop locks */
+}
 
 static void msm_gem_close(struct drm_gem_object *obj, struct drm_file *file)
 {
+	struct msm_drm_private *priv = obj->dev->dev_private;
 	struct msm_context *ctx = file->driver_priv;
-	struct drm_exec exec;
-	int refcount;
 
 	update_ctx_mem(file, -obj->size);
 	msm_gem_vma_put(obj);
-	refcount = atomic_dec_return(&to_msm_bo(obj)->handle_count);
 
 	/*
 	 * If VM isn't created yet, nothing to cleanup.  And in fact calling
@@ -75,7 +84,8 @@ static void msm_gem_close(struct drm_gem_object *obj, struct drm_file *file)
 	if (msm_context_is_vmbind(ctx))
 		return;
 
-	if (!to_msm_vm(ctx->vm)->pid && refcount > 0)
+	/* A global VM's VMAs are torn down by the @vma_ref drop above */
+	if (priv->gpu && ctx->vm == priv->gpu->vm)
 		return;
 
 	/*
@@ -85,13 +95,11 @@ static void msm_gem_close(struct drm_gem_object *obj, struct drm_file *file)
 	dma_resv_wait_timeout(obj->resv, DMA_RESV_USAGE_BOOKKEEP, false,
 			      MAX_SCHEDULE_TIMEOUT);
 
-	msm_gem_lock_vm_and_obj(&exec, obj, ctx->vm);
 	put_iova_spaces(obj, ctx->vm, true, "close");
-	drm_exec_fini(&exec);     /* drop locks */
 }
 
 /*
- * Get/put for kms->vm VMA
+ * Get/put for VMAs in VMs shared between contexts: kms->vm, gpu->vm
  */
 
 void msm_gem_vma_get(struct drm_gem_object *obj)
@@ -106,15 +114,17 @@ void msm_gem_vma_put(struct drm_gem_object *obj)
 	if (atomic_dec_return(&to_msm_bo(obj)->vma_ref))
 		return;
 
+	if (priv->gpu && priv->gpu->vm_shared) {
+		dma_resv_wait_timeout(obj->resv, DMA_RESV_USAGE_BOOKKEEP, false,
+				      MAX_SCHEDULE_TIMEOUT);
+		put_iova_spaces(obj, priv->gpu->vm, true, "vma_put");
+	}
+
 	if (!priv->kms)
 		return;
 
 #ifdef CONFIG_DRM_MSM_KMS
-	struct drm_exec exec;
-
-	msm_gem_lock_vm_and_obj(&exec, obj, priv->kms->vm);
 	put_iova_spaces(obj, priv->kms->vm, true, "vma_put");
-	drm_exec_fini(&exec);     /* drop locks */
 #endif
 }
 
@@ -413,8 +423,8 @@ static struct drm_gpuva *lookup_vma(struct drm_gem_object *obj,
  * mapping.
  */
 static void
-put_iova_spaces(struct drm_gem_object *obj, struct drm_gpuvm *vm,
-		bool close, const char *reason)
+put_iova_spaces_locked(struct drm_gem_object *obj, struct drm_gpuvm *vm,
+		       bool close, const char *reason)
 {
 	struct drm_gpuvm_bo *vm_bo, *tmp;
 
@@ -673,7 +683,7 @@ void msm_gem_unpin_iova(struct drm_gem_object *obj, struct drm_gpuvm *vm)
 		msm_gem_unpin_locked(obj);
 	}
 	if (!is_kms_vm(vm))
-		put_iova_spaces(obj, vm, true, "close");
+		put_iova_spaces_locked(obj, vm, true, "close");
 	drm_exec_fini(&exec);     /* drop locks */
 }
 
@@ -835,7 +845,7 @@ void msm_gem_purge(struct drm_gem_object *obj)
 	GEM_WARN_ON(!is_purgeable(msm_obj));
 
 	/* Get rid of any iommu mapping(s): */
-	put_iova_spaces(obj, NULL, false, "purge");
+	put_iova_spaces_locked(obj, NULL, false, "purge");
 
 	msm_gem_vunmap(obj);
 
@@ -873,7 +883,7 @@ void msm_gem_evict(struct drm_gem_object *obj)
 	GEM_WARN_ON(is_unevictable(msm_obj));
 
 	/* Get rid of any iommu mapping(s): */
-	put_iova_spaces(obj, NULL, false, "evict");
+	put_iova_spaces_locked(obj, NULL, false, "evict");
 
 	drm_vma_node_unmap(&obj->vma_node, dev->anon_inode->i_mapping);
 
@@ -1086,7 +1096,7 @@ static void msm_gem_free_object(struct drm_gem_object *obj)
 				drm_exec_retry_on_contention(&exec);
 			}
 		}
-		put_iova_spaces(obj, NULL, true, "free");
+		put_iova_spaces_locked(obj, NULL, true, "free");
 		drm_exec_fini(&exec);     /* drop locks */
 	}
 
@@ -1228,7 +1238,6 @@ static int msm_gem_new_impl(struct drm_device *dev, uint32_t flags,
 
 	msm_obj->flags = flags;
 	msm_obj->madv = MSM_MADV_WILLNEED;
-	atomic_set(&msm_obj->handle_count, 1);
 
 	INIT_LIST_HEAD(&msm_obj->node);
 

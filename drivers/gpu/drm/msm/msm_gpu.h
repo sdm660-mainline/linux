@@ -223,6 +223,9 @@ struct msm_gpu {
 
 	struct drm_gpuvm *vm;
 
+	/** @vm_shared: Has @vm been handed out as a context VM? */
+	bool vm_shared;
+
 	/* Power Control: */
 	struct regulator *gpu_reg, *gpu_cx;
 	struct clk_bulk_data *grp_clks;
