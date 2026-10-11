@@ -20,9 +20,8 @@
 #include <linux/of.h>
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
-#include <linux/regulator/driver.h>
-#include <linux/usb/role.h>
 #include <linux/types.h>
+#include <linux/usb/role.h>
 #include <linux/workqueue.h>
 
 /* clang-format off */
@@ -1016,55 +1015,25 @@ static void smb_restore_charge_enable(void *data)
 		dev_err(chip->dev, "Couldn't restore charging state: %d\n", rc);
 }
 
-static int smb_vbus_enable(struct regulator_dev *rdev)
+static int smb_otg_set(struct smb_chip *chip, bool on)
 {
-	struct smb_chip *chip = rdev_get_drvdata(rdev);
 	int rc;
 
-	/* Set the boost current limit before turning it on, matching the
-	 * downstream default for this board (qcom,otg-cl-ua = 1500000). */
-	rc = regmap_update_bits(chip->regmap,
-				chip->base + OTG_CURRENT_LIMIT_CFG_REG,
-				OTG_CURRENT_LIMIT_MASK,
-				OTG_CURRENT_LIMIT_1500MA);
-	if (rc < 0)
-		return rc;
+	if (on) {
+		/* Set the boost current limit before turning it on, matching
+		 * the downstream default for this board
+		 * (qcom,otg-cl-ua = 1500000). */
+		rc = regmap_update_bits(chip->regmap,
+					chip->base + OTG_CURRENT_LIMIT_CFG_REG,
+					OTG_CURRENT_LIMIT_MASK,
+					OTG_CURRENT_LIMIT_1500MA);
+		if (rc < 0)
+			return rc;
+	}
 
-	return regmap_write(chip->regmap, chip->base + CMD_OTG_REG, OTG_EN_BIT);
+	return regmap_write(chip->regmap, chip->base + CMD_OTG_REG,
+			    on ? OTG_EN_BIT : 0);
 }
-
-static int smb_vbus_disable(struct regulator_dev *rdev)
-{
-	struct smb_chip *chip = rdev_get_drvdata(rdev);
-
-	return regmap_write(chip->regmap, chip->base + CMD_OTG_REG, 0);
-}
-
-static int smb_vbus_is_enabled(struct regulator_dev *rdev)
-{
-	struct smb_chip *chip = rdev_get_drvdata(rdev);
-	unsigned int val;
-	int rc;
-
-	rc = regmap_read(chip->regmap, chip->base + CMD_OTG_REG, &val);
-	if (rc < 0)
-		return rc;
-
-	return !!(val & OTG_EN_BIT);
-}
-
-static const struct regulator_ops smb_vbus_reg_ops = {
-	.enable = smb_vbus_enable,
-	.disable = smb_vbus_disable,
-	.is_enabled = smb_vbus_is_enabled,
-};
-
-static const struct regulator_desc smb_vbus_rdesc = {
-	.name = "otg-vbus",
-	.ops = &smb_vbus_reg_ops,
-	.owner = THIS_MODULE,
-	.type = REGULATOR_VOLTAGE,
-};
 
 static void smb_role_update_work(struct work_struct *work)
 {
@@ -1093,31 +1062,12 @@ static void smb_role_update_work(struct work_struct *work)
 		stat, role);
 
 	/*
-	 * Registering the "otg-vbus" regulator alone doesn't enable it for
-	 * anyone - nothing else in this DT/driver combo consumes it as a
-	 * "vbus-supply". Since we're also the ones deciding the role here,
-	 * drive the boost directly alongside the role switch, matching how
-	 * the downstream smblib_uusb_otg_work() does both together.
-	 *
-	 * smb_vbus_enable() also (re)configures the current limit to
-	 * OTG_CURRENT_LIMIT_1500MA every time - without this the boost runs
-	 * at whatever the hardware POR default is (likely the lowest step,
-	 * 250mA), which is enough for a single low-draw device like a mouse
-	 * but browns out under a hub + keyboard + mouse combo, causing the
-	 * repeated connect/disconnect ("blinking") symptom.
+	 * The VBUS boost is driven here, together with the role switch, the
+	 * same way downstream smblib_uusb_otg_work() does it. The current
+	 * limit is programmed on every enable: the hardware default is too low
+	 * for a hub with several devices behind it.
 	 */
-	if (role == USB_ROLE_HOST)
-		rc = regmap_update_bits(chip->regmap,
-					chip->base + OTG_CURRENT_LIMIT_CFG_REG,
-					OTG_CURRENT_LIMIT_MASK,
-					OTG_CURRENT_LIMIT_1500MA);
-	else
-		rc = 0;
-	if (rc < 0)
-		dev_err(chip->dev, "Couldn't set OTG current limit rc=%d\n", rc);
-
-	rc = regmap_write(chip->regmap, chip->base + CMD_OTG_REG,
-			   role == USB_ROLE_HOST ? OTG_EN_BIT : 0);
+	rc = smb_otg_set(chip, role == USB_ROLE_HOST);
 	if (rc < 0)
 		dev_err(chip->dev, "Couldn't %s VBUS boost rc=%d\n",
 			role == USB_ROLE_HOST ? "enable" : "disable", rc);
@@ -1140,6 +1090,11 @@ static void smb_update_usb_role(struct smb_chip *chip)
 
 	mod_delayed_work(system_power_efficient_wq, &chip->role_update_work,
 			  msecs_to_jiffies(150));
+}
+
+static void smb_put_role_switch(void *data)
+{
+	usb_role_switch_put(data);
 }
 
 static int smb_init_irq(struct smb_chip *chip, int *irq, const char *name,
@@ -1218,7 +1173,7 @@ static int smb_probe(struct platform_device *pdev)
 	if (rc < 0)
 		return rc;
 
-	{
+/*	{
 		struct regulator_config rconfig = {
 			.dev = chip->dev,
 			.driver_data = chip,
@@ -1230,14 +1185,14 @@ static int smb_probe(struct platform_device *pdev)
 			return dev_err_probe(chip->dev, PTR_ERR(rdev),
 					     "Couldn't register otg-vbus regulator\n");
 	}
+*/
 
 	chip->role_sw = usb_role_switch_get(chip->dev);
 	if (IS_ERR(chip->role_sw))
 		return dev_err_probe(chip->dev, PTR_ERR(chip->role_sw),
 				     "Couldn't get usb role switch\n");
 
-	rc = devm_add_action_or_reset(chip->dev,
-				       (void (*)(void *))usb_role_switch_put,
+	rc = devm_add_action_or_reset(chip->dev, smb_put_role_switch,
 				       chip->role_sw);
 	if (rc < 0)
 		return rc;
@@ -1318,10 +1273,19 @@ skip_float_voltage:
 	if (rc < 0)
 		return rc;
 
-	rc = smb_init_irq(chip, &irq, "type-c-change",
-			   smb_handle_usb_plugin);
-	if (rc < 0)
+	/* Optional: only boards with USB role switching describe this IRQ */
+	rc = platform_get_irq_byname_optional(pdev, "type-c-change");
+	if (rc == -EPROBE_DEFER)
 		return rc;
+	if (rc > 0) {
+		rc = smb_init_irq(chip, &irq, "type-c-change",
+				   smb_handle_usb_plugin);
+		if (rc < 0)
+			return rc;
+	}
+
+	/* Pick up a cable that was already plugged in at boot */
+	smb_update_usb_role(chip);
 
 	rc = smb_init_irq(chip, &irq, "usbin-icl-change",
 			   smb_handle_usb_icl_change);

@@ -235,10 +235,6 @@
 	monitored-battery = <&battery>;
 	status = "okay";
 	usb-role-switch = <&usb3_dwc3>;
-
-	usb_otg_vbus: otg-vbus {
-		regulator-name = "usb_otg_vbus";
-	};
 };
 
 &pm660_fg {
@@ -679,7 +675,11 @@
 	vqmmc-supply = <&vreg_l2b_2p95>;
 };
 
-// idk, but it's working
+/*
+ * Audio is shared with xiaomi-tulip (same codec and speaker amplifier).
+ * The card model is deliberately kept as tulip's: it is the name the ALSA
+ * UCM profile is matched by, and there is no whyred profile yet.
+ */
 &sound {
 	compatible = "qcom,sdm660-sndcard";
 	model = "Xiaomi Redmi Note 6 Pro";

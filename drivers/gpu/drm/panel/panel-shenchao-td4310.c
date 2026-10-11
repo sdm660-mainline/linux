@@ -172,6 +172,8 @@ static int td4310_shenchao_probe(struct mipi_dsi_device *dsi)
 					    ARRAY_SIZE(td4310_shenchao_supplies),
 					    td4310_shenchao_supplies,
 					    &ctx->supplies);
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to get regulators\n");
 
 	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio))

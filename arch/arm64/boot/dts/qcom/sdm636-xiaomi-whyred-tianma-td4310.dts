@@ -29,7 +29,7 @@
 
 	reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>; /* TP_RESET_N */
 	syna,reset-delay-ms = <400>;
-        syna,startup-delay-ms = <700>;
+        syna,startup-delay-ms = <750>;
 
         rmi4-f01@1 {
             reg = <0x01>;
