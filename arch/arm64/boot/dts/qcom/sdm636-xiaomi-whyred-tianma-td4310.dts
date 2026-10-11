@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2026, Kulesha Evgeniy <voovdop@gmail.com>
+ */
+
+/dts-v1/;
+
+#include "sdm636-xiaomi-whyred-common.dtsi"
+
+/ {
+	model = "Xiaomi Redmi Note 5 Pro (Tianma TD4310)";
+	compatible = "xiaomi,whyred-tianma", "xiaomi,whyred", "qcom,sdm636";
+};
+
+/* Touchscreen: Synaptics DSX S3320 — same as Shenchao variant */
+&blsp_i2c1 {
+    touchscreen@20 {
+        compatible = "syna,rmi4-i2c";
+        reg = <0x20>;
+
+        #address-cells = <1>;
+        #size-cells = <0>;
+        interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
+
+        pinctrl-0 = <&ts_int_active &ts_reset_active>;
+        pinctrl-1 = <&ts_int_sleep &ts_reset_sleep>;
+        pinctrl-names = "default", "sleep";
+        vio-supply = <&vreg_l11a_1p8>;
+
+	reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>; /* TP_RESET_N */
+	syna,reset-delay-ms = <400>;
+        syna,startup-delay-ms = <700>;
+
+        rmi4-f01@1 {
+            reg = <0x01>;
+            syna,nosleep-mode = <1>;
+        };
+
+        rmi4-f11@11 {
+            reg = <0x11>;
+            syna,sensor-type = <1>;
+        };
+    };
+};
+
+&panel {
+    compatible = "tianma,td4310-xiaomi-whyred";
+};
+
+&tlmm {
+	ts_int_active: ts-int-active-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	ts_reset_active: ts-reset-active-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	ts_int_sleep: ts-int-sleep-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	ts_reset_sleep: ts-reset-sleep-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+};
+
