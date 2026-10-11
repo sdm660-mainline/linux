@@ -885,7 +885,8 @@ properties:
               - sony,mermaid-row
               - asus,x00td
               - xiaomi,tulip
-              - xiaomi,whyred
+              - xiaomi,whyred-tianma
+              - xiaomi,whyred-shenchao
               - motorola,beckham
               - bbry,luna-boe
               - bbry,luna-syna
