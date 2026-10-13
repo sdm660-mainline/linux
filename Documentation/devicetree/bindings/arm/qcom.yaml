@@ -935,6 +935,7 @@ properties:
           - enum:
               - sony,mermaid-row
               - asus,x00td
+              - lenovo,sprout
               - xiaomi,tulip
               - xiaomi,whyred-shenchao
               - xiaomi,whyred-tianma
