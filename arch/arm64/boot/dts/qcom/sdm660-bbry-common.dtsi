@@ -272,11 +272,46 @@
 	status = "okay";
 };
 
-
 &blsp_i2c1 {
 	#address-cells = <1>;
 	#size-cells = <0>;
+
 	status = "okay";
+
+	sgm31323: nav-leds@30
+	{
+		compatible = "sgmicro,sgm31323";
+		reg = <0x30>;
+		vdd-supply = <&vreg_bob>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/*
+		 * these two led channels are each half of the nav-btns
+		 * there are 3 buttons so the middle one is chopped in half
+		 * the 3rd channel was unused on my sdm636-bbry-luna-boe
+		 */
+		led@0 {
+			reg = <0>;
+			label = "nav-left";
+			color = <LED_COLOR_ID_WHITE>;
+			led-max-microamp = <5000>;
+			/*
+			 * I wish backlight made it follow the screen but it doesn't seem
+			 * to, so this is the best I can do
+			 */
+			linux,default-trigger = "default-on";
+		};
+
+		led@1 {
+			reg = <1>;
+			label = "nav-right";
+			color = <LED_COLOR_ID_WHITE>;
+			led-max-microamp = <5000>;
+			linux,default-trigger = "default-on";
+		};
+	};
 
 	stmpe1801: port-expander@40
 	{
@@ -361,9 +396,36 @@
 		iovcc-supply = <&vreg_l9a_1p8>;
 		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
 		touchscreen-size-x = <1080>;
-		touchscreen-size-y = <1620>;
+		touchscreen-size-y = <1700>;
 		wakeup-source;
 		status = "disabled";
+
+		touch-overlay {
+			segment-1 {
+				x-origin = <150>;
+				y-origin = <1620>;
+				x-size = <100>;
+				y-size = <100>;
+				linux,code = <KEY_BACK>;
+				label = "key-back";
+			};
+			segment-2 {
+				x-origin = <450>;
+				y-origin = <1620>;
+				x-size = <100>;
+				y-size = <100>;
+				linux,code = <KEY_HOMEPAGE>;
+				label = "key-homepage";
+			};
+			segment-3 {
+				x-origin = <750>;
+				y-origin = <1620>;
+				x-size = <100>;
+				y-size = <100>;
+				linux,code = <KEY_APPSELECT>;
+				label = "key-appselect";
+			};
+		};
 	};
 
 	synaptics_touchscreen: touchscreen@70 {
@@ -380,7 +442,6 @@
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
 		syna,reset-delay-ms = <220>;
 		syna,startup-delay-ms = <2000>;
-
 		status = "disabled";
 
 		rmi4-f01@1 {
@@ -391,6 +452,12 @@
 		rmi4-f11@11 {
 			reg = <0x11>;
 			syna,sensor-type = <1>;
+		};
+
+		 rmi4-f1a@1a {
+			reg = <0x1a>;
+			/* Keys listed from right to left, rightmost key is KEY_APPSELECT */
+			linux,keycodes = <KEY_APPSELECT KEY_HOMEPAGE KEY_BACK>;
 		};
 	};
 };
