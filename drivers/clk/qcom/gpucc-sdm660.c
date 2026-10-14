@@ -105,7 +105,7 @@ static const struct clk_parent_data gpucc_parent_data_1[] = {
  *  ====================================================
  *  | F         | PLL SRC Freq | PLL postdiv | RCG Div |
  *  ====================================================
- *  | 160000000 | 640000000    |    2        |    2    |
+ *  | 160000000 | 640000000    |    1        |    4    |
  *  | 266000000 | 532000000    |    1        |    2    |
  *  | 370000000 | 740000000    |    1        |    2    |
  *  | 465000000 | 930000000    |    1        |    2    |
@@ -359,6 +359,12 @@ static int gpucc_sdm660_probe(struct platform_device *pdev)
 		.vco_val = 0x2 << 20,
 		.vco_mask = 0x3 << 20,
 		.main_output_mask = 0x1,
+		/*
+		 * PLL_USER_CTL bits 11:8 are the main output's post-divider;
+		 * the frequency tables assume both PLLs divide by 1 there.
+		 */
+		.post_div_mask = GENMASK(11, 8),
+		.post_div_val = 0,
 		.l = 0x29,
 		.alpha_hi = 0xaa,
 	};
