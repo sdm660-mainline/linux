@@ -3172,6 +3172,7 @@ static void ath10k_bss_assoc(struct ieee80211_hw *hw,
 	}
 
 	arvif->is_up = true;
+	arvif->u.sta.was_up = true;
 
 	ath10k_mac_set_sar_power(ar);
 
@@ -9025,6 +9026,9 @@ ath10k_mac_op_assign_vif_chanctx(struct ieee80211_hw *hw,
 
 	arvif->is_started = true;
 
+	if (arvif->vdev_type == WMI_VDEV_TYPE_STA)
+		arvif->u.sta.was_up = false;
+
 	ret = ath10k_mac_vif_setup_ps(arvif);
 	if (ret) {
 		ath10k_warn(ar, "failed to update vdev %i ps: %d\n",
@@ -9107,6 +9111,23 @@ ath10k_mac_op_unassign_vif_chanctx(struct ieee80211_hw *hw,
 	if (ret)
 		ath10k_warn(ar, "failed to stop vdev %i: %d\n",
 			    arvif->vdev_id, ret);
+
+	/* A connection attempt that fails before the vdev is up never reaches
+	 * ath10k_bss_disassoc(), so the station vdev would be stopped without
+	 * ever being brought down. At least WCN3990 firmware then holds the
+	 * Auth frames of the next attempt for about 20 seconds. Bring it down
+	 * here, after the peer is gone and the vdev is stopped: a down while
+	 * the peer still exists asserts the firmware.
+	 */
+	if (arvif->vdev_type == WMI_VDEV_TYPE_STA && !arvif->u.sta.was_up) {
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i down (never up)\n",
+			   arvif->vdev_id);
+
+		ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
+		if (ret)
+			ath10k_warn(ar, "failed to down vdev %i after stop: %d\n",
+				    arvif->vdev_id, ret);
+	}
 
 	arvif->is_started = false;
 

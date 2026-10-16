@@ -605,6 +605,8 @@ struct ath10k_vif {
 	union {
 		struct {
 			u32 uapsd;
+			/* vdev was brought up since it was last started */
+			bool was_up;
 		} sta;
 		struct {
 			/* 512 stations */
