@@ -3201,10 +3201,21 @@ static void ath10k_bss_disassoc(struct ieee80211_hw *hw,
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i disassoc bssid %pM\n",
 		   arvif->vdev_id, arvif->bssid);
 
-	ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
-	if (ret)
-		ath10k_warn(ar, "failed to down vdev %i: %d\n",
-			    arvif->vdev_id, ret);
+	/* During hw restart reconfiguration, mac80211 replays disassociation
+	 * for a station with a pending connection attempt. The vdev is started
+	 * but not up, and the AP peer exists. A down then asserts at least
+	 * WCN3990 firmware.
+	 */
+	if (arvif->is_up) {
+		ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
+		if (ret)
+			ath10k_warn(ar, "failed to down vdev %i: %d\n",
+				    arvif->vdev_id, ret);
+	} else {
+		ath10k_dbg(ar, ATH10K_DBG_MAC,
+			   "mac vdev %i disassoc bssid %pM skip down (not up)\n",
+			   arvif->vdev_id, arvif->bssid);
+	}
 
 	arvif->def_wep_key_idx = -1;
 
