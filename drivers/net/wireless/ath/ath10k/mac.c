@@ -2256,8 +2256,9 @@ static void ath10k_peer_assoc_h_crypto(struct ath10k *ar,
 	}
 
 	if (sta->mfp &&
-	    test_bit(ATH10K_FW_FEATURE_MFP_SUPPORT,
-		     ar->running_fw->fw_file.fw_features)) {
+	    (test_bit(ATH10K_FW_FEATURE_MFP_SUPPORT,
+		      ar->running_fw->fw_file.fw_features) ||
+	     ar->hw_params.peer_pmf_support)) {
 		arg->peer_flags |= ar->wmi.peer_flags->pmf;
 	}
 }

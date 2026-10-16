@@ -638,6 +638,12 @@ struct ath10k_hw_params {
 
 	/* The hardware support multicast frame registrations */
 	bool mcast_frame_registration;
+
+	/* The firmware handles PMF for a peer that has the PMF peer flag,
+	 * although the firmware file does not advertise
+	 * ATH10K_FW_FEATURE_MFP_SUPPORT.
+	 */
+	bool peer_pmf_support;
 };
 
 struct htt_resp;
