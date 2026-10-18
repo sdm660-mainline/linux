@@ -132,6 +132,16 @@
 	};
 };
 
+&pm660l_wled {
+	qcom,switching-freq = <800>;
+	qcom,current-limit-microamp = <20000>;
+	qcom,current-boost-limit = <970>;
+	qcom,ovp-millivolt = <31100>;
+	qcom,num-strings = <2>;
+
+	status = "okay";
+};
+
 &pon_pwrkey {
 	status = "okay";
 };
