@@ -738,6 +738,7 @@ static inline struct msm_context *msm_context_get(
 void msm_devfreq_init(struct msm_gpu *gpu);
 void msm_devfreq_cleanup(struct msm_gpu *gpu);
 void msm_devfreq_resume(struct msm_gpu *gpu);
+void msm_devfreq_resample_busy(struct msm_gpu *gpu);
 void msm_devfreq_suspend(struct msm_gpu *gpu);
 void msm_devfreq_boost(struct msm_gpu *gpu, unsigned factor);
 void msm_devfreq_active(struct msm_gpu *gpu);
