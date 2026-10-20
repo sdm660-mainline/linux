@@ -242,6 +242,23 @@ void msm_devfreq_resume(struct msm_gpu *gpu)
 	devfreq_resume_device(df->devfreq);
 }
 
+/*
+ * Take a new busy cycles baseline, for a GPU that resets its busy counter
+ * after msm_devfreq_resume() has sampled it.
+ */
+void msm_devfreq_resample_busy(struct msm_gpu *gpu)
+{
+	struct msm_gpu_devfreq *df = &gpu->devfreq;
+	unsigned long sample_rate;
+
+	if (!has_devfreq(gpu))
+		return;
+
+	mutex_lock(&df->lock);
+	df->busy_cycles = gpu->funcs->gpu_busy(gpu, &sample_rate);
+	mutex_unlock(&df->lock);
+}
+
 void msm_devfreq_suspend(struct msm_gpu *gpu)
 {
 	struct msm_gpu_devfreq *df = &gpu->devfreq;
