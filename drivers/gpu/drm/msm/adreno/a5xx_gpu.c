@@ -1060,6 +1060,10 @@ static void a5xx_destroy(struct msm_gpu *gpu)
 		drm_gem_object_put(a5xx_gpu->shadow_bo);
 	}
 
+	/* Still held if suspending the GPU failed before it was destroyed */
+	if (cpu_latency_qos_request_active(&a5xx_gpu->pm_qos_req))
+		cpu_latency_qos_remove_request(&a5xx_gpu->pm_qos_req);
+
 	adreno_gpu_cleanup(adreno_gpu);
 	kfree(a5xx_gpu);
 }
@@ -1355,12 +1359,18 @@ static void a5xx_dump(struct msm_gpu *gpu)
 static int a5xx_pm_resume(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+	struct a5xx_gpu *a5xx_gpu = to_a5xx_gpu(adreno_gpu);
 	int ret;
 
 	/* Turn on the core power */
 	ret = msm_gpu_pm_resume(gpu);
 	if (ret)
 		return ret;
+
+	if (adreno_gpu->info->cpu_latency_us &&
+	    !cpu_latency_qos_request_active(&a5xx_gpu->pm_qos_req))
+		cpu_latency_qos_add_request(&a5xx_gpu->pm_qos_req,
+					    adreno_gpu->info->cpu_latency_us);
 
 	/*
 	 * The GX power domain is not necessarily switched off while we are
@@ -1444,6 +1454,9 @@ static int a5xx_pm_suspend(struct msm_gpu *gpu)
 	ret = msm_gpu_pm_suspend(gpu);
 	if (ret)
 		return ret;
+
+	if (cpu_latency_qos_request_active(&a5xx_gpu->pm_qos_req))
+		cpu_latency_qos_remove_request(&a5xx_gpu->pm_qos_req);
 
 	if (a5xx_gpu->has_whereami)
 		for (i = 0; i < gpu->nr_rings; i++)
