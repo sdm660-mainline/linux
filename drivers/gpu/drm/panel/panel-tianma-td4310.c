@@ -7,6 +7,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
+#include <linux/property.h>
 #include <linux/regulator/consumer.h>
 
 #include <video/mipi_display.h>
@@ -16,11 +17,16 @@
 #include <drm/drm_panel.h>
 #include <drm/drm_probe_helper.h>
 
+struct td4310_variant {
+	const struct drm_display_mode *display_mode;
+};
+
 struct td4310_tianma {
 	struct drm_panel panel;
 	struct mipi_dsi_device *dsi;
 	struct gpio_desc *reset_gpio;
 	struct regulator_bulk_data *supplies;
+	const struct td4310_variant *variant;
 };
 
 static const struct regulator_bulk_data td4310_tianma_supplies[] = {
@@ -145,10 +151,28 @@ static const struct drm_display_mode td4310_tianma_mode = {
 	.type = DRM_MODE_TYPE_DRIVER,
 };
 
+static const struct drm_display_mode td4310_shenchao_mode = {
+	.clock = (1080 + 130 + 12 + 16) * (2160 + 8 + 10 + 50) * 60 / 1000,
+	.hdisplay = 1080,
+	.hsync_start = 1080 + 130,
+	.hsync_end = 1080 + 130 + 12,
+	.htotal = 1080 + 130 + 12 + 16,
+	.vdisplay = 2160,
+	.vsync_start = 2160 + 8,
+	.vsync_end = 2160 + 8 + 10,
+	.vtotal = 2160 + 8 + 10 + 50,
+	.width_mm = 68,
+	.height_mm = 136,
+	.type = DRM_MODE_TYPE_DRIVER,
+};
+
 static int td4310_tianma_get_modes(struct drm_panel *panel,
 				   struct drm_connector *connector)
 {
-	return drm_connector_helper_get_modes_fixed(connector, &td4310_tianma_mode);
+	struct td4310_tianma *ctx = to_td4310_tianma(panel);
+
+	return drm_connector_helper_get_modes_fixed(connector,
+						    ctx->variant->display_mode);
 }
 
 static const struct drm_panel_funcs td4310_tianma_panel_funcs = {
@@ -169,10 +193,16 @@ static int td4310_tianma_probe(struct mipi_dsi_device *dsi)
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
 
+	ctx->variant = device_get_match_data(dev);
+	if (!ctx->variant)
+		return -ENODEV;
+
 	ret = devm_regulator_bulk_get_const(dev,
 					    ARRAY_SIZE(td4310_tianma_supplies),
 					    td4310_tianma_supplies,
 					    &ctx->supplies);
+	if (ret < 0)
+		return dev_err_probe(dev, ret, "Failed to get regulators\n");
 
 	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio))
@@ -216,8 +246,17 @@ static void td4310_tianma_remove(struct mipi_dsi_device *dsi)
 	drm_panel_remove(&ctx->panel);
 }
 
+static const struct td4310_variant shenchao_td4310_data = {
+	.display_mode = &td4310_shenchao_mode,
+};
+
+static const struct td4310_variant tianma_td4310_data = {
+	.display_mode = &td4310_tianma_mode,
+};
+
 static const struct of_device_id td4310_tianma_of_match[] = {
-	{ .compatible = "tianma,td4310-xiaomi-whyred" },
+	{ .compatible = "tianma,td4310-xiaomi-whyred", .data = &tianma_td4310_data },
+	{ .compatible = "shenchao,td4310-xiaomi-whyred", .data = &shenchao_td4310_data },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, td4310_tianma_of_match);
