@@ -44,7 +44,7 @@
 };
 
 &panel {
-    compatible = "tianma,td4310-xiaomi-whyred";
+    compatible = "tianma,tl060fvms47-00";
 };
 
 &tlmm {

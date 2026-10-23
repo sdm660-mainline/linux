@@ -39,7 +39,7 @@
     };
 };
 &panel {
-    compatible = "shenchao,td4310-xiaomi-whyred";
+    compatible = "shenchao,pt060jc-04n";
 };
 &tlmm {
     ts_int_active: ts-int-active-state {
