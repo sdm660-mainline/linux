@@ -93,6 +93,17 @@
 		#size-cells = <2>;
 		ranges;
 
+		/*
+		 * The stock firmware reserves 0x85800000-0x8aafffff
+		 * ("removed_regions"), sdm630.dtsi only up to 0x89500000.
+		 * SD card DMA into the rest stalls the SDHCI controller and
+		 * locks up the system.
+		 */
+		memory@89500000 {
+			reg = <0x0 0x89500000 0x0 0x1600000>;
+			no-map;
+		};
+
 		framebuffer_mem: memory@9d400000 {
 			reg = <0x0 0x9d400000 0x0 (1080 * 2246 * 4)>;
 			no-map;
