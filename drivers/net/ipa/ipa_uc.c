@@ -67,25 +67,51 @@
  * communication with the microcontroller.  The region is 128 bytes in
  * size, but only the first 40 bytes (structured this way) are used.
  */
-struct ipa_uc_mem_area {
-	u8 command;		/* enum ipa_uc_command */
-	u8 reserved0[3];
-	__le32 command_param;
-	__le32 command_param_hi;
-	u8 response;		/* enum ipa_uc_response */
-	u8 reserved1[3];
-	__le32 response_param;
-	u8 event;		/* enum ipa_uc_event */
-	u8 reserved2[3];
+union ipa_uc_mem_area {
+	struct {
+		u8 command;		/* enum ipa_uc_command */
+		u8 reserved0[3];
+		__le32 command_param;
+		u8 response;		/* enum ipa_uc_response */
+		u8 reserved1[3];
+		__le32 response_param;
+		u8 event;		/* enum ipa_uc_event */
+		u8 reserved2[3];
 
-	__le32 event_param;
-	__le32 first_error_address;
-	u8 hw_state;
-	u8 warning_counter;
-	__le16 reserved3;
-	__le16 interface_version;
-	__le16 reserved4;
+		__le32 event_param;
+		__le32 reserved3;
+		__le32 first_error_address;
+		u8 hw_state;
+		u8 warning_counter;
+		__le16 reserved4;
+		__le16 interface_version;
+		__le16 reserved5;
+	} v2;
+	struct {
+		u8 command;		/* enum ipa_uc_command */
+		u8 reserved0[3];
+		__le32 command_param;
+		__le32 command_param_hi;
+		u8 response;		/* enum ipa_uc_response */
+		u8 reserved1[3];
+		__le32 response_param;
+		u8 event;		/* enum ipa_uc_event */
+		u8 reserved2[3];
+
+		__le32 event_param;
+		__le32 first_error_address;
+		u8 hw_state;
+		u8 warning_counter;
+		__le16 reserved3;
+		__le16 interface_version;
+		__le16 reserved4;
+	} v3;
 };
+
+#define UC_FIELD(_ipa, _field)					\
+	*(((_ipa->version >= IPA_VERSION_3_0) ?			\
+	  &(ipa_uc_shared(_ipa)->v3._field) :			\
+	  &(ipa_uc_shared(_ipa)->v2._field)))
 
 /** enum ipa_uc_command - commands from the AP to the microcontroller */
 enum ipa_uc_command {
@@ -117,7 +143,7 @@ enum ipa_uc_event {
 	IPA_UC_EVENT_LOG_INFO		= 0x2,
 };
 
-static struct ipa_uc_mem_area *ipa_uc_shared(struct ipa *ipa)
+static union ipa_uc_mem_area *ipa_uc_shared(struct ipa *ipa)
 {
 	const struct ipa_mem *mem = ipa_mem_find(ipa, IPA_MEM_UC_SHARED);
 	u32 offset = ipa->mem_offset + mem->offset;
@@ -128,22 +154,22 @@ static struct ipa_uc_mem_area *ipa_uc_shared(struct ipa *ipa)
 /* Microcontroller event IPA interrupt handler */
 static void ipa_uc_event_handler(struct ipa *ipa)
 {
-	struct ipa_uc_mem_area *shared = ipa_uc_shared(ipa);
 	struct device *dev = ipa->dev;
+	u32 event = UC_FIELD(ipa, event);
 
-	if (shared->event == IPA_UC_EVENT_ERROR)
+	if (event == IPA_UC_EVENT_ERROR)
 		dev_err(dev, "microcontroller error event\n");
-	else if (shared->event != IPA_UC_EVENT_LOG_INFO)
+	else if (event != IPA_UC_EVENT_LOG_INFO)
 		dev_err(dev, "unsupported microcontroller event %u\n",
-			shared->event);
+			event);
 	/* The LOG_INFO event can be safely ignored */
 }
 
 /* Microcontroller response IPA interrupt handler */
 static void ipa_uc_response_hdlr(struct ipa *ipa)
 {
-	struct ipa_uc_mem_area *shared = ipa_uc_shared(ipa);
 	struct device *dev = ipa->dev;
+	u32 response = UC_FIELD(ipa, response);
 
 	/* An INIT_COMPLETED response message is sent to the AP by the
 	 * microcontroller when it is operational.  Other than this, the AP
@@ -153,20 +179,21 @@ static void ipa_uc_response_hdlr(struct ipa *ipa)
 	 * We can drop the power reference taken in ipa_uc_power() once we
 	 * know the microcontroller has finished its initialization.
 	 */
-	switch (shared->response) {
+	switch (response) {
 	case IPA_UC_RESPONSE_INIT_COMPLETED:
 		if (ipa->uc_powered) {
 			ipa->uc_loaded = true;
 			ipa_power_retention(ipa, true);
 			(void)pm_runtime_put_autosuspend(dev);
 			ipa->uc_powered = false;
+			ipa_qmi_signal_uc_loaded(ipa);
 		} else {
 			dev_warn(dev, "unexpected init_completed response\n");
 		}
 		break;
 	default:
 		dev_warn(dev, "unsupported microcontroller response %u\n",
-			 shared->response);
+			 response);
 		break;
 	}
 }
@@ -229,16 +256,16 @@ void ipa_uc_power(struct ipa *ipa)
 /* Send a command to the microcontroller */
 static void send_uc_command(struct ipa *ipa, u32 command, u32 command_param)
 {
-	struct ipa_uc_mem_area *shared = ipa_uc_shared(ipa);
 	const struct reg *reg;
 	u32 val;
 
 	/* Fill in the command data */
-	shared->command = command;
-	shared->command_param = cpu_to_le32(command_param);
-	shared->command_param_hi = 0;
-	shared->response = 0;
-	shared->response_param = 0;
+	UC_FIELD(ipa, command) = command;
+	UC_FIELD(ipa, command_param) = cpu_to_le32(command_param);
+	if (ipa->version >= IPA_VERSION_3_0)
+		ipa_uc_shared(ipa)->v3.command_param_hi = 0;
+	UC_FIELD(ipa, response) = 0;
+	UC_FIELD(ipa, response_param) = 0;
 
 	/* Use an interrupt to tell the microcontroller the command is ready */
 	reg = ipa_reg(ipa, IPA_IRQ_UC);
