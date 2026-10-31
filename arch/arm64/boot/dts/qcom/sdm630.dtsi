@@ -2345,6 +2345,62 @@
 			status = "disabled";
 		};
 
+		ipa: ipa@147c0000 {
+			compatible = "qcom,msm8953-ipa";	/* v2.6L (SDM630/636/660/632) */
+								/* or "qcom,msm8996-ipa" for v2.5 */
+
+			/*
+			* v2.x has no GSI, so only the IPA register and shared-memory
+			* regions are needed.  Split of the 0x47000-byte IPA block at
+			* 0x14780000 is illustrative -- verify against the SoC memory map.
+			*/
+			reg = <0x147c0000 0x2000>,	/* "ipa-reg"  : IPA registers */
+			      <0x147c5000 0x2000>;	/* "ipa-shared": IPA SRAM */
+			reg-names = "ipa-reg", "ipa-shared";
+
+			/* IPA interrupt only; no "gsi" and no SMP2P interrupts on v2.x */
+			interrupts = <GIC_SPI 333 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 432 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "ipa", "dma";
+
+			clocks = <&rpmcc RPM_SMD_IPA_CLK>;
+			clock-names = "core";
+
+			/*
+			* Three interconnects, matching the driver's "memory"/"imem"/"config"
+			* names.  The endpoint phandles/macros are SoC-specific.
+			*/
+			interconnects = <&a2noc MASTER_IPA &bimc SLAVE_EBI>,
+					<&a2noc MASTER_IPA &snoc SLAVE_IMEM>,
+					<&gnoc MASTER_APSS_PROC &snoc SLAVE_IPA>;
+			interconnect-names = "memory", "imem", "config";
+
+			/* The four AP BAM pipes, named to match the driver's channel names.
+			* Pipe numbers equal the IPA channel IDs (see data/ipa_data-v2.5.c):
+			*   ap_lan_rx=2, cmd_tx=3, ap_modem_tx=4, ap_modem_rx=5
+			*/
+			dmas = <&ipa_bam 2>, <&ipa_bam 3>, <&ipa_bam 4>, <&ipa_bam 5>;
+			dma-names = "ap_lan_rx", "cmd_tx", "ap_modem_tx", "ap_modem_rx";
+
+			/* No GSI firmware to load on IPA v2.x */
+			qcom,gsi-loader = "skip";
+
+			/* Keep if IPA sits behind the SMMU (SDM630 does). */
+			iommus = <&anoc2_smmu 0x19c0>, <&anoc2_smmu 0x19c2>;
+
+			status = "okay";
+		};
+
+		ipa_bam: dma-controller@14784000 {	/* address is illustrative */
+			compatible = "qcom,bam-v1.7.0";
+			reg = <0x14784000 0x17000>;
+			interrupts = <GIC_SPI 335 IRQ_TYPE_EDGE_RISING>;
+			clocks = <&rpmcc RPM_SMD_IPA_CLK>;
+			clock-names = "bam_clk";
+			#dma-cells = <1>;
+			qcom,ee = <0>;
+		};
+
 		lpi_tlmm: pinctrl@15070000 {
 			compatible = "qcom,sdm660-lpass-lpi-pinctrl";
 			reg = <0x15070000 0x20000>;
