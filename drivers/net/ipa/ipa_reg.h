@@ -53,6 +53,7 @@ struct ipa;
 /* enum ipa_reg_id - IPA register IDs */
 enum ipa_reg_id {
 	COMP_CFG,
+	COMP_SW_RESET,				/* IPA v2.x */
 	CLKON_CFG,
 	ROUTE,
 	SHARED_MEM_SIZE,
@@ -68,6 +69,7 @@ enum ipa_reg_id {
 	COUNTER_CFG,					/* Not IPA v4.5+ */
 	IPA_TX_CFG,					/* IPA v3.5+ */
 	FLAVOR_0,					/* IPA v3.5+ */
+	V2_ENABLED_PIPES,				/* IPA v2.x */
 	IDLE_INDICATION_CFG,				/* IPA v3.5+ */
 	QTIME_TIMESTAMP_CFG,				/* IPA v4.5+ */
 	TIMERS_XO_CLK_DIV_CFG,				/* IPA v4.5+ */
@@ -629,6 +631,7 @@ enum ipa_reg_ipa_irq_uc_field_id {
 	UC_INTR,
 };
 
+extern const struct regs ipa_regs_v2_5;
 extern const struct regs ipa_regs_v3_1;
 extern const struct regs ipa_regs_v3_5_1;
 extern const struct regs ipa_regs_v4_2;

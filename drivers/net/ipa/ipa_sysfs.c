@@ -13,6 +13,10 @@
 static const char *ipa_version_string(struct ipa *ipa)
 {
 	switch (ipa->version) {
+	case IPA_VERSION_2_5:
+		return "2.5";
+	case IPA_VERSION_2_6L:
+		return "2.6L";
 	case IPA_VERSION_3_0:
 		return "3.0";
 	case IPA_VERSION_3_1:
