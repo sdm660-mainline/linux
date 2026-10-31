@@ -134,4 +134,13 @@ void gsi_trans_tx_committed(struct ipa_trans *trans);
  */
 void gsi_trans_tx_queued(struct ipa_trans *trans);
 
+/**
+ * gsi_trans_tx_completed() - Report completed TX transactions
+ * @trans:	TX channel transaction that has completed
+ *
+ * Report to the network stack that a TX transaction has completed,
+ * used to manage transmit rates.
+ */
+void gsi_trans_tx_completed(struct ipa_trans *trans);
+
 #endif /* _GSI_PRIVATE_H_ */
