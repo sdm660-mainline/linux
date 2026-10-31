@@ -10,6 +10,9 @@
 
 /**
  * enum ipa_version
+ * @IPA_VERSION_2_0:	IPA version 2.0
+ * @IPA_VERSION_2_5:	IPA version 2.5
+ * @IPA_VERSION_2_6L:	IPA version 2.6L
  * @IPA_VERSION_3_0:	IPA version 3.0/GSI version 1.0
  * @IPA_VERSION_3_1:	IPA version 3.1/GSI version 1.0
  * @IPA_VERSION_3_5:	IPA version 3.5/GSI version 1.2
@@ -29,8 +32,14 @@
  *
  * Defines the version of IPA (and GSI) hardware present on the platform.
  * Please update ipa_version_string() whenever a new version is added.
+ *
+ * IPA v2.x hardware uses BAM rather than GSI as its DMA transport, and its
+ * IPA-resident table entries and command fields are 32 bits wide.
  */
 enum ipa_version {
+	IPA_VERSION_2_0,
+	IPA_VERSION_2_5,
+	IPA_VERSION_2_6L,
 	IPA_VERSION_3_0,
 	IPA_VERSION_3_1,
 	IPA_VERSION_3_5,
@@ -48,6 +57,17 @@ enum ipa_version {
 	IPA_VERSION_5_5,
 	IPA_VERSION_COUNT,			/* Last; not a version */
 };
+
+/* IPA v2.x uses BAM; v3.0+ uses GSI as its DMA transport */
+#define IPA_HAS_GSI(version)		((version) > IPA_VERSION_2_6L)
+
+/* IPA v2.x hardware is 32-bit; v3.0+ is 64-bit */
+#define IPA_IS_64BIT(version)		((version) > IPA_VERSION_2_6L)
+
+/* True if the IPA version is in the inclusive range [from, to] */
+#define IPA_VERSION_RANGE(_version, _from, _to)				\
+	((_version) >= (IPA_VERSION_##_from) &&				\
+	 (_version) <= (IPA_VERSION_##_to))
 
 /* Execution environment IDs */
 enum gsi_ee_id {
