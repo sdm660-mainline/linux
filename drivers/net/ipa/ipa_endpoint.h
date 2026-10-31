@@ -15,7 +15,7 @@
 struct net_device;
 struct sk_buff;
 
-struct gsi_trans;
+struct ipa_trans;
 struct ipa;
 struct ipa_gsi_endpoint_data;
 
@@ -200,8 +200,8 @@ int ipa_endpoint_init(struct ipa *ipa, u32 count,
 void ipa_endpoint_exit(struct ipa *ipa);
 
 void ipa_endpoint_trans_complete(struct ipa_endpoint *endpoint,
-				 struct gsi_trans *trans);
+				 struct ipa_trans *trans);
 void ipa_endpoint_trans_release(struct ipa_endpoint *endpoint,
-				struct gsi_trans *trans);
+				struct ipa_trans *trans);
 
 #endif /* _IPA_ENDPOINT_H_ */

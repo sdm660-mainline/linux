@@ -11,8 +11,8 @@
 #include <linux/io.h>
 #include <linux/types.h>
 
-#include "gsi.h"
-#include "gsi_trans.h"
+#include "ipa_dma.h"
+#include "ipa_trans.h"
 #include "ipa.h"
 #include "ipa_cmd.h"
 #include "ipa_endpoint.h"
@@ -202,10 +202,10 @@ static dma_addr_t ipa_table_addr(struct ipa *ipa, bool filter_mask, u16 count)
 	return ipa->table_addr + skip * sizeof(*ipa->table_virt);
 }
 
-static void ipa_table_reset_add(struct gsi_trans *trans, bool filter,
+static void ipa_table_reset_add(struct ipa_trans *trans, bool filter,
 				bool hashed, bool ipv6, u16 first, u16 count)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	const struct ipa_mem *mem;
 	dma_addr_t addr;
 	u32 offset;
@@ -234,7 +234,7 @@ static int
 ipa_filter_reset_table(struct ipa *ipa, bool hashed, bool ipv6, bool modem)
 {
 	u64 ep_mask = ipa->filtered;
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	enum gsi_ee_id ee_id;
 
 	trans = ipa_cmd_trans_alloc(ipa, hweight64(ep_mask));
@@ -258,7 +258,7 @@ ipa_filter_reset_table(struct ipa *ipa, bool hashed, bool ipv6, bool modem)
 		ipa_table_reset_add(trans, true, hashed, ipv6, endpoint_id, 1);
 	}
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }
@@ -294,7 +294,7 @@ static int ipa_route_reset(struct ipa *ipa, bool modem)
 {
 	bool hash_support = ipa_table_hash_support(ipa);
 	u32 modem_route_count = ipa->modem_route_count;
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	u16 first;
 	u16 count;
 
@@ -321,7 +321,7 @@ static int ipa_route_reset(struct ipa *ipa, bool modem)
 		ipa_table_reset_add(trans, false, true, true, first, count);
 	}
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }
@@ -348,7 +348,7 @@ void ipa_table_reset(struct ipa *ipa, bool modem)
 
 int ipa_table_hash_flush(struct ipa *ipa)
 {
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	const struct reg *reg;
 	u32 val;
 
@@ -378,14 +378,14 @@ int ipa_table_hash_flush(struct ipa *ipa)
 
 	ipa_cmd_register_write_add(trans, reg_offset(reg), val, val, false);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }
 
-static void ipa_table_init_add(struct gsi_trans *trans, bool filter, bool ipv6)
+static void ipa_table_init_add(struct ipa_trans *trans, bool filter, bool ipv6)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	const struct ipa_mem *hash_mem;
 	enum ipa_cmd_opcode opcode;
 	const struct ipa_mem *mem;
@@ -453,7 +453,7 @@ static void ipa_table_init_add(struct gsi_trans *trans, bool filter, bool ipv6)
 
 int ipa_table_setup(struct ipa *ipa)
 {
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 
 	/* We will need at most 8 TREs:
 	 * - IPv4:
@@ -479,7 +479,7 @@ int ipa_table_setup(struct ipa *ipa)
 	ipa_table_init_add(trans, true, false);
 	ipa_table_init_add(trans, true, true);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }

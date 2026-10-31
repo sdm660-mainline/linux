@@ -13,7 +13,7 @@
 
 #include <linux/soc/qcom/smem.h>
 
-#include "gsi_trans.h"
+#include "ipa_trans.h"
 #include "ipa.h"
 #include "ipa_cmd.h"
 #include "ipa_data.h"
@@ -45,9 +45,9 @@ const struct ipa_mem *ipa_mem_find(struct ipa *ipa, enum ipa_mem_id mem_id)
 
 /* Add an immediate command to a transaction that zeroes a memory region */
 static void
-ipa_mem_zero_region_add(struct gsi_trans *trans, enum ipa_mem_id mem_id)
+ipa_mem_zero_region_add(struct ipa_trans *trans, enum ipa_mem_id mem_id)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	const struct ipa_mem *mem = ipa_mem_find(ipa, mem_id);
 	dma_addr_t addr = ipa->zero_addr;
 
@@ -79,7 +79,7 @@ int ipa_mem_setup(struct ipa *ipa)
 {
 	dma_addr_t addr = ipa->zero_addr;
 	const struct ipa_mem *mem;
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	const struct reg *reg;
 	u32 offset;
 	u16 size;
@@ -111,7 +111,7 @@ int ipa_mem_setup(struct ipa *ipa)
 	ipa_mem_zero_region_add(trans, IPA_MEM_AP_PROC_CTX);
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	/* Tell the hardware where the processing context area is located */
 	mem = ipa_mem_find(ipa, IPA_MEM_MODEM_PROC_CTX);
@@ -416,7 +416,7 @@ void ipa_mem_deconfig(struct ipa *ipa)
  */
 int ipa_mem_zero_modem(struct ipa *ipa)
 {
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 
 	/* Get a transaction to zero the modem memory, modem header,
 	 * and modem processing context regions.
@@ -431,7 +431,7 @@ int ipa_mem_zero_modem(struct ipa *ipa)
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM_PROC_CTX);
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }

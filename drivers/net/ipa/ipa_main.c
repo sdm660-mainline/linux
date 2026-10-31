@@ -115,7 +115,7 @@ int ipa_setup(struct ipa *ipa)
 	struct device *dev = ipa->dev;
 	int ret;
 
-	ret = gsi_setup(&ipa->gsi);
+	ret = ipa_dma_setup(&ipa->dma_subsys);
 	if (ret)
 		return ret;
 
@@ -165,7 +165,7 @@ err_command_disable:
 	ipa_endpoint_disable_one(command_endpoint);
 err_endpoint_teardown:
 	ipa_endpoint_teardown(ipa);
-	gsi_teardown(&ipa->gsi);
+	ipa_dma_teardown(&ipa->dma_subsys);
 
 	return ret;
 }
@@ -189,7 +189,7 @@ static void ipa_teardown(struct ipa *ipa)
 	command_endpoint = ipa->name_map[IPA_ENDPOINT_AP_COMMAND_TX];
 	ipa_endpoint_disable_one(command_endpoint);
 	ipa_endpoint_teardown(ipa);
-	gsi_teardown(&ipa->gsi);
+	ipa_dma_teardown(&ipa->dma_subsys);
 }
 
 static void
@@ -868,7 +868,7 @@ static int ipa_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_mem_exit;
 
-	ret = gsi_init(&ipa->gsi, pdev, ipa->version, data->endpoint_count,
+	ret = gsi_init(&ipa->dma_subsys, pdev, ipa->version, data->endpoint_count,
 		       data->endpoint_data);
 	if (ret)
 		goto err_mem_exit;
@@ -876,7 +876,7 @@ static int ipa_probe(struct platform_device *pdev)
 	/* Result is a non-zero mask of endpoints that support filtering */
 	ret = ipa_endpoint_init(ipa, data->endpoint_count, data->endpoint_data);
 	if (ret)
-		goto err_gsi_exit;
+		goto err_dma_exit;
 
 	ret = ipa_table_init(ipa);
 	if (ret)
@@ -928,8 +928,8 @@ err_table_exit:
 	ipa_table_exit(ipa);
 err_endpoint_exit:
 	ipa_endpoint_exit(ipa);
-err_gsi_exit:
-	gsi_exit(&ipa->gsi);
+err_dma_exit:
+	ipa_dma_exit(&ipa->dma_subsys);
 err_mem_exit:
 	ipa_mem_exit(ipa);
 err_reg_exit:
@@ -995,7 +995,7 @@ out_power_put:
 	ipa_smp2p_exit(ipa);
 	ipa_table_exit(ipa);
 	ipa_endpoint_exit(ipa);
-	gsi_exit(&ipa->gsi);
+	ipa_dma_exit(&ipa->dma_subsys);
 	ipa_mem_exit(ipa);
 	ipa_reg_exit(ipa);
 	kfree(ipa);
