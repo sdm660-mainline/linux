@@ -8,7 +8,13 @@
 
 #include <linux/types.h>
 
+#include "ipa_version.h"
+
 struct ipa;
+
+/* The size of a filter or route table entry */
+#define IPA_TABLE_ENTRY_SIZE(version)	\
+	(IPA_IS_64BIT(version) ? sizeof(__le64) : sizeof(__le32))
 
 /**
  * ipa_filtered_valid() - Validate a filter table endpoint bitmap
