@@ -30,13 +30,6 @@
  * transfer.
  */
 
-/* Report that a TX transaction on a channel has completed */
-static void bam_channel_tx_update(struct ipa_channel *channel,
-				  struct ipa_trans *trans)
-{
-	gsi_trans_tx_completed(trans);
-}
-
 /* Consult hardware, move any newly completed transactions to completed state */
 static void bam_channel_update(struct ipa_channel *channel)
 {
@@ -68,7 +61,7 @@ static void bam_channel_update(struct ipa_channel *channel)
 	 * network stack.
 	 */
 	if (channel->toward_ipa)
-		bam_channel_tx_update(channel, trans);
+		gsi_trans_tx_completed(trans);
 
 	ipa_trans_move_complete(trans);
 
