@@ -18,6 +18,8 @@ properties:
       - azoteq,iqs525
       # Himax hx83100a touchscreen controller
       - himax,hx83100a
+      # Himax hx83112a touchscreen controller
+      - himax,hx83112a
       # Himax hx83112b touchscreen controller
       - himax,hx83112b
       # Hynitron cstxxx series touchscreen controller
