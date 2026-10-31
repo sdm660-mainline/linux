@@ -1,0 +1,233 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/clock/qcom,sdm660-cpu-clock-osm.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm SDM660-Family CPU clock controller (OSM)
+
+maintainers:
+  - Kulesha Evgeniy <voovdop@gmail.com>
+
+description: |
+  Operating State Manager (OSM) based CPU clock controller found on
+  SDM630, SDM636 and SDM660. It provides one clock per CPU cluster:
+  index 0 is the power cluster (pwrcl, CPU4-7 in the mainline numbering)
+  and index 1 is the performance cluster (perfcl, CPU0-3).
+
+  The frequency lookup tables (LUTs) are selected at probe time by the
+  speed bin fused in QFPROM, so a node carries one table per bin.
+
+properties:
+  compatible:
+    const: qcom,sdm660-cpu-clock-osm
+
+  reg:
+    minItems: 5
+    maxItems: 9
+
+  reg-names:
+    minItems: 5
+    maxItems: 9
+    items:
+      enum:
+        - osm
+        - pwrcl_pll
+        - perfcl_pll
+        - apcs_common
+        - pwrcl_efuse
+        - perfcl_efuse
+        - debug
+        - pwrcl-acd
+        - perfcl-acd
+
+  interrupts:
+    maxItems: 2
+
+  interrupt-names:
+    items:
+      - const: pwrcl-irq
+      - const: perfcl-irq
+
+  '#clock-cells':
+    const: 1
+
+  qcom,l-val-base:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster PLL L-value register addresses, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,apcs-pll-user-ctl:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster APCS PLL user control register addresses.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,apcs-cfg-rcgr:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster APCS RCG configuration register addresses.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,apcs-cmd-rcgr:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster APCS RCG command register addresses.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,apcs-itm-present:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster APCS ITM-present register addresses.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,apm-mode-ctl:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster APM mode control register addresses.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,apm-ctrl-status:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster APM control status register addresses.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdtd-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACDTD value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdcr-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACDCR value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdsscr-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACDSSCR value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdextint0-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACD_EXTINT_CFG (initial) value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdextint1-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACD_EXTINT_CFG (final) value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,acdautoxfer-val:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Per-cluster ACD_AUTOXFER_CTL value, <pwrcl perfcl>.
+    items:
+      - description: pwrcl
+      - description: perfcl
+
+  qcom,pwrcl-corner-uv:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      Open-loop voltage in uV for each virtual corner of the power cluster,
+      index 0 is virtual corner 1. Taken from the CPR corner ceilings.
+    minItems: 1
+    maxItems: 32
+
+  qcom,perfcl-corner-uv:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      Open-loop voltage in uV for each virtual corner of the performance
+      cluster, index 0 is virtual corner 1. Taken from the CPR corner ceilings.
+    minItems: 1
+    maxItems: 32
+
+patternProperties:
+  '^qcom,(pwrcl|perfcl)-speedbin[0-9]+-v[0-9]+$':
+    $ref: /schemas/types.yaml#/definitions/uint32-matrix
+    description:
+      OSM LUT for one cluster and speed bin. Each row is
+      <frequency_hz freq_data override_data spare_data virtual_corner>,
+      with the virtual corner numbered from 1.
+    items:
+      items:
+        - description: Frequency in Hz
+        - description: Value written to the FREQ_DATA register
+        - description: Value written to the OVERRIDE_DATA register
+        - description: Value written to the SPARE_DATA register
+        - description: Virtual corner (1-based)
+
+  '^qcom,(pwrcl|perfcl)-apcs-mem-acc-cfg$':
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: Addresses of the MEM-ACC configuration registers.
+    minItems: 3
+    maxItems: 3
+
+  '^qcom,(pwrcl|perfcl)-apcs-mem-acc-val$':
+    $ref: /schemas/types.yaml#/definitions/uint32-matrix
+    description: MEM-ACC trim values, one row per level, three values per row.
+    items:
+      minItems: 3
+      maxItems: 3
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - '#clock-cells'
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+
+    clock-controller@179c0000 {
+        compatible = "qcom,sdm660-cpu-clock-osm";
+        reg = <0x179c0000 0x4000>,
+              <0x17916000 0x1000>,
+              <0x17816000 0x1000>,
+              <0x179d1000 0x1000>,
+              <0x00784130 0x8>;
+        reg-names = "osm", "pwrcl_pll", "perfcl_pll",
+                    "apcs_common", "perfcl_efuse";
+
+        interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
+                     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
+        interrupt-names = "pwrcl-irq", "perfcl-irq";
+
+        #clock-cells = <1>;
+
+        qcom,l-val-base = <0x17916004 0x17816004>;
+        qcom,apcs-pll-user-ctl = <0x1791600c 0x1781600c>;
+        qcom,apcs-cfg-rcgr = <0x17911054 0x17811054>;
+        qcom,apcs-cmd-rcgr = <0x17911050 0x17811050>;
+        qcom,apcs-itm-present = <0x179d143c 0x179d143c>;
+        qcom,apm-mode-ctl = <0x179d0004 0x179d0010>;
+        qcom,apm-ctrl-status = <0x179d000c 0x179d0018>;
+
+        qcom,pwrcl-speedbin0-v0 =
+            <300000000 0x0004000f 0x01200020 0x1 1>,
+            <614400000 0x05040020 0x03200020 0x1 2>;
+
+        qcom,perfcl-speedbin0-v0 =
+            <300000000 0x0004000f 0x01200020 0x1 1>,
+            <787200000 0x05040029 0x04200020 0x1 2>;
+    };

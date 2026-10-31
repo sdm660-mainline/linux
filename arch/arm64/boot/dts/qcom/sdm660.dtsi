@@ -10,6 +10,8 @@
 #include "sdm630.dtsi"
 
 /delete-node/ &buffer_mem;
+/delete-node/ &cpu_pwr_sdm630_opp_table;
+/delete-node/ &cpu_perf_sdm630_opp_table;
 
 / {
 	smp2p-cdsp {
@@ -36,6 +38,212 @@
 		cdsp_region: cdsp@94a00000 {
 			reg = <0x0 0x94a00000 0x00 0x600000>;
 			no-map;
+		};
+	};
+
+	cpu_pwr_sdm660_opp_table: opp-table-pwrcl {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-364800000 {
+			opp-hz = /bits/ 64 <364800000>;
+		};
+
+		opp-441600000 {
+			opp-hz = /bits/ 64 <441600000>;
+		};
+
+		opp-518400000 {
+			opp-hz = /bits/ 64 <518400000>;
+		};
+
+		opp-595200000 {
+			opp-hz = /bits/ 64 <595200000>;
+		};
+
+		opp-672000000 {
+			opp-hz = /bits/ 64 <672000000>;
+		};
+
+		opp-748800000 {
+			opp-hz = /bits/ 64 <748800000>;
+		};
+
+		opp-825600000 {
+			opp-hz = /bits/ 64 <825600000>;
+		};
+
+		opp-883200000 {
+			opp-hz = /bits/ 64 <883200000>;
+		};
+
+		opp-960000000 {
+			opp-hz = /bits/ 64 <960000000>;
+		};
+
+		opp-1036800000 {
+			opp-hz = /bits/ 64 <1036800000>;
+		};
+
+		opp-1094400000 {
+			opp-hz = /bits/ 64 <1094400000>;
+		};
+
+		opp-1171200000 {
+			opp-hz = /bits/ 64 <1171200000>;
+		};
+
+		opp-1248000000 {
+			opp-hz = /bits/ 64 <1248000000>;
+		};
+
+		opp-1324800000 {
+			opp-hz = /bits/ 64 <1324800000>;
+		};
+
+		opp-1401600000 {
+			opp-hz = /bits/ 64 <1401600000>;
+		};
+
+		opp-1478400000 {
+			opp-hz = /bits/ 64 <1478400000>;
+		};
+
+		opp-1555200000 {
+			opp-hz = /bits/ 64 <1555200000>;
+		};
+
+		opp-1670400000 {
+			opp-hz = /bits/ 64 <1670400000>;
+		};
+
+		opp-1747200000 {
+			opp-hz = /bits/ 64 <1747200000>;
+		};
+
+		opp-1824000000 {
+			opp-hz = /bits/ 64 <1824000000>;
+		};
+	};
+
+	cpu_perf_sdm660_opp_table: opp-table-perfcl {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+		};
+
+		opp-345600000 {
+			opp-hz = /bits/ 64 <345600000>;
+		};
+
+		opp-422400000 {
+			opp-hz = /bits/ 64 <422400000>;
+		};
+
+		opp-499200000 {
+			opp-hz = /bits/ 64 <499200000>;
+		};
+
+		opp-576000000 {
+			opp-hz = /bits/ 64 <576000000>;
+		};
+
+		opp-652800000 {
+			opp-hz = /bits/ 64 <652800000>;
+		};
+
+		opp-729600000 {
+			opp-hz = /bits/ 64 <729600000>;
+		};
+
+		opp-806400000 {
+			opp-hz = /bits/ 64 <806400000>;
+		};
+
+		opp-902400000 {
+			opp-hz = /bits/ 64 <902400000>;
+		};
+
+		opp-979200000 {
+			opp-hz = /bits/ 64 <979200000>;
+		};
+
+		opp-1056000000 {
+			opp-hz = /bits/ 64 <1056000000>;
+		};
+
+		opp-1132800000 {
+			opp-hz = /bits/ 64 <1132800000>;
+		};
+
+		opp-1190400000 {
+			opp-hz = /bits/ 64 <1190400000>;
+		};
+
+		opp-1267200000 {
+			opp-hz = /bits/ 64 <1267200000>;
+		};
+
+		opp-1344000000 {
+			opp-hz = /bits/ 64 <1344000000>;
+		};
+
+		opp-1420800000 {
+			opp-hz = /bits/ 64 <1420800000>;
+		};
+
+		opp-1497600000 {
+			opp-hz = /bits/ 64 <1497600000>;
+		};
+
+		opp-1574400000 {
+			opp-hz = /bits/ 64 <1574400000>;
+		};
+
+		opp-1651200000 {
+			opp-hz = /bits/ 64 <1651200000>;
+		};
+
+		opp-1728000000 {
+			opp-hz = /bits/ 64 <1728000000>;
+		};
+
+		opp-1804800000 {
+			opp-hz = /bits/ 64 <1804800000>;
+		};
+
+		opp-1881600000 {
+			opp-hz = /bits/ 64 <1881600000>;
+		};
+
+		opp-1958400000 {
+			opp-hz = /bits/ 64 <1958400000>;
+		};
+
+		opp-2035200000 {
+			opp-hz = /bits/ 64 <2035200000>;
+		};
+
+		opp-2112000000 {
+			opp-hz = /bits/ 64 <2112000000>;
+		};
+
+		opp-2188800000 {
+			opp-hz = /bits/ 64 <2188800000>;
+		};
+
+		opp-2265600000 {
+			opp-hz = /bits/ 64 <2265600000>;
+		};
+
+		opp-2342400000 {
+			opp-hz = /bits/ 64 <2342400000>;
 		};
 	};
 };
@@ -148,49 +356,49 @@
 &cpu0 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu1 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu2 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu3 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <1024>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_perf_sdm660_opp_table>;
 };
 
 &cpu4 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &cpu5 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &cpu6 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &cpu7 {
 	compatible = "qcom,kryo260";
 	capacity-dmips-mhz = <640>;
-	/delete-property/ operating-points-v2;
+	operating-points-v2 = <&cpu_pwr_sdm660_opp_table>;
 };
 
 &gcc {
@@ -434,6 +642,220 @@
 				};
 			};
 		};
+	};
+
+	cpu_clock_osm: clock-controller@179c0000 {
+		compatible = "qcom,sdm660-cpu-clock-osm";
+		reg = <0x179c0000 0x4000>,	/* osm - shared by both clusters */
+		      <0x17916000 0x1000>,	/* pwrcl_pll */
+		      <0x17816000 0x1000>,	/* perfcl_pll */
+		      <0x179d1000 0x1000>,	/* apcs_common */
+		      <0x00784130 0x8>,		/* pwrcl_efuse (QFPROM) */
+		      <0x00784130 0x8>;		/* perfcl_efuse (QFPROM) */
+		reg-names = "osm", "pwrcl_pll", "perfcl_pll",
+			    "apcs_common", "pwrcl_efuse", "perfcl_efuse";
+
+		/delete-property/ qcom,perfcl-speedbin2-v0;
+
+		interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "pwrcl-irq", "perfcl-irq";
+
+		#clock-cells = <1>;	/* 0 = pwrcl, 1 = perfcl */
+
+		/* <pwrcl perfcl> - additional_setup() inputs, taken from the
+		 * stock SDM660 clk-cpu-osm node (identical to SDM630/SDM636). */
+		qcom,l-val-base        = <0x17916004 0x17816004>;
+		qcom,apcs-pll-user-ctl = <0x1791600c 0x1781600c>;
+		qcom,apcs-cfg-rcgr     = <0x17911054 0x17811054>;
+		qcom,apcs-cmd-rcgr     = <0x17911050 0x17811050>;
+		qcom,apcs-itm-present  = <0x179d143c 0x179d143c>;
+		qcom,apm-mode-ctl      = <0x179d0004 0x179d0010>;
+		qcom,apm-ctrl-status   = <0x179d000c 0x179d0018>;
+
+		/* sdm660: OSM LUT rows for the finer OPP tables (patches 09/10).
+		 * Rows: msm8998-v2-interposer-sdm660.dtsi (whyred-o-oss), filtered to the OPP freqs and to each
+		 * speed bin's stock top frequency. corner-uv: CPR ceiling of the first stock corner with
+		 * freq >= row freq (rounded up, so never below stock), max over bins. Not measured values. */
+
+		qcom,perfcl-speedbin0-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   345600000 0x05040012 0x01200020 0x1  2 >,
+			<   422400000 0x05040016 0x02200020 0x1  3 >,
+			<   499200000 0x0504001a 0x02200020 0x1  4 >,
+			<   576000000 0x0504001e 0x02200020 0x1  5 >,
+			<   652800000 0x05040022 0x03200020 0x1  6 >,
+			<   729600000 0x05040026 0x03200020 0x1  7 >,
+			<   806400000 0x0504002a 0x03220022 0x1  8 >,
+			<   902400000 0x0404002f 0x04260026 0x1  9 >,
+			<   979200000 0x04040033 0x04290029 0x1 10 >,
+			<  1056000000 0x04040037 0x052c002c 0x1 11 >,
+			<  1132800000 0x0404003b 0x052f002f 0x1 12 >,
+			<  1190400000 0x0404003e 0x05320032 0x2 13 >,
+			<  1267200000 0x04040042 0x06350035 0x2 14 >,
+			<  1344000000 0x04040046 0x06380038 0x2 15 >,
+			<  1420800000 0x0404004a 0x063b003b 0x2 16 >,
+			<  1497600000 0x0404004e 0x073e003e 0x2 17 >,
+			<  1574400000 0x04040052 0x07420042 0x2 18 >,
+			<  1651200000 0x04040056 0x07450045 0x2 19 >,
+			<  1728000000 0x0404005a 0x08480048 0x2 20 >,
+			<  1804800000 0x0404005e 0x084b004b 0x2 21 >,
+			<  1881600000 0x04040062 0x094e004e 0x2 22 >,
+			<  1958400000 0x04040066 0x09520052 0x2 23 >,
+			<  2035200000 0x0404006a 0x09550055 0x3 24 >,
+			<  2112000000 0x0404006e 0x0a580058 0x3 25 >,
+			<  2188800000 0x04040072 0x0a5b005b 0x3 26 >,
+			<  2265600000 0x04040076 0x0a5e005e 0x3 27 >,
+			<  2342400000 0x0404007a 0x0a620062 0x3 28 >;
+
+		qcom,perfcl-speedbin1-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   345600000 0x05040012 0x01200020 0x1  2 >,
+			<   422400000 0x05040016 0x02200020 0x1  3 >,
+			<   499200000 0x0504001a 0x02200020 0x1  4 >,
+			<   576000000 0x0504001e 0x02200020 0x1  5 >,
+			<   652800000 0x05040022 0x03200020 0x1  6 >,
+			<   729600000 0x05040026 0x03200020 0x1  7 >,
+			<   806400000 0x0504002a 0x03220022 0x1  8 >,
+			<   902400000 0x0404002f 0x04260026 0x1  9 >,
+			<   979200000 0x04040033 0x04290029 0x1 10 >,
+			<  1056000000 0x04040037 0x052c002c 0x1 11 >,
+			<  1132800000 0x0404003b 0x052f002f 0x1 12 >,
+			<  1190400000 0x0404003e 0x05320032 0x2 13 >,
+			<  1267200000 0x04040042 0x06350035 0x2 14 >,
+			<  1344000000 0x04040046 0x06380038 0x2 15 >,
+			<  1420800000 0x0404004a 0x063b003b 0x2 16 >,
+			<  1497600000 0x0404004e 0x073e003e 0x2 17 >,
+			<  1574400000 0x04040052 0x07420042 0x2 18 >,
+			<  1651200000 0x04040056 0x07450045 0x2 19 >,
+			<  1728000000 0x0404005a 0x08480048 0x2 20 >,
+			<  1804800000 0x0404005e 0x084b004b 0x2 21 >,
+			<  1881600000 0x04040062 0x094e004e 0x2 22 >,
+			<  1958400000 0x04040066 0x09520052 0x2 23 >,
+			<  2035200000 0x0404006a 0x09550055 0x3 24 >,
+			<  2112000000 0x0404006e 0x0a580058 0x3 25 >,
+			<  2208000000 0x04040073 0x0a5c005c 0x3 26 >;
+
+		qcom,perfcl-speedbin3-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   345600000 0x05040012 0x01200020 0x1  2 >,
+			<   422400000 0x05040016 0x02200020 0x1  3 >,
+			<   499200000 0x0504001a 0x02200020 0x1  4 >,
+			<   576000000 0x0504001e 0x02200020 0x1  5 >,
+			<   652800000 0x05040022 0x03200020 0x1  6 >,
+			<   729600000 0x05040026 0x03200020 0x1  7 >,
+			<   806400000 0x0504002a 0x03220022 0x1  8 >,
+			<   902400000 0x0404002f 0x04260026 0x1  9 >,
+			<   979200000 0x04040033 0x04290029 0x1 10 >,
+			<  1056000000 0x04040037 0x052c002c 0x1 11 >,
+			<  1132800000 0x0404003b 0x052f002f 0x1 12 >,
+			<  1190400000 0x0404003e 0x05320032 0x2 13 >,
+			<  1267200000 0x04040042 0x06350035 0x2 14 >,
+			<  1344000000 0x04040046 0x06380038 0x2 15 >,
+			<  1420800000 0x0404004a 0x063b003b 0x2 16 >,
+			<  1497600000 0x0404004e 0x073e003e 0x2 17 >,
+			<  1574400000 0x04040052 0x07420042 0x2 18 >,
+			<  1651200000 0x04040056 0x07450045 0x2 19 >,
+			<  1728000000 0x0404005a 0x08480048 0x2 20 >,
+			<  1804800000 0x0404005e 0x084b004b 0x2 21 >;
+
+		qcom,pwrcl-speedbin0-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   364800000 0x05040013 0x01200020 0x1  2 >,
+			<   441600000 0x05040017 0x02200020 0x1  3 >,
+			<   518400000 0x0504001b 0x02200020 0x1  4 >,
+			<   595200000 0x0504001f 0x02200020 0x1  5 >,
+			<   672000000 0x05040023 0x03200020 0x1  6 >,
+			<   748800000 0x05040027 0x03200020 0x1  7 >,
+			<   825600000 0x0404002b 0x03220022 0x1  8 >,
+			<   883200000 0x0404002e 0x04250025 0x1  9 >,
+			<   960000000 0x04040032 0x04280028 0x1 10 >,
+			<  1036800000 0x04040036 0x042b002b 0x1 11 >,
+			<  1094400000 0x04040039 0x052e002e 0x2 12 >,
+			<  1171200000 0x0404003d 0x05310031 0x2 13 >,
+			<  1248000000 0x04040041 0x05340034 0x2 14 >,
+			<  1324800000 0x04040045 0x06370037 0x2 15 >,
+			<  1401600000 0x04040049 0x063a003a 0x2 16 >,
+			<  1478400000 0x0404004d 0x073e003e 0x2 17 >,
+			<  1555200000 0x04040051 0x07410041 0x2 18 >,
+			<  1670400000 0x04040057 0x08460046 0x2 19 >,
+			<  1747200000 0x0404005b 0x08490049 0x2 20 >,
+			<  1824000000 0x0404005f 0x084c004c 0x3 21 >;
+
+		qcom,pwrcl-speedbin1-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   364800000 0x05040013 0x01200020 0x1  2 >,
+			<   441600000 0x05040017 0x02200020 0x1  3 >,
+			<   518400000 0x0504001b 0x02200020 0x1  4 >,
+			<   595200000 0x0504001f 0x02200020 0x1  5 >,
+			<   672000000 0x05040023 0x03200020 0x1  6 >,
+			<   748800000 0x05040027 0x03200020 0x1  7 >,
+			<   825600000 0x0404002b 0x03220022 0x1  8 >,
+			<   883200000 0x0404002e 0x04250025 0x1  9 >,
+			<   960000000 0x04040032 0x04280028 0x1 10 >,
+			<  1036800000 0x04040036 0x042b002b 0x1 11 >,
+			<  1094400000 0x04040039 0x052e002e 0x2 12 >,
+			<  1171200000 0x0404003d 0x05310031 0x2 13 >,
+			<  1248000000 0x04040041 0x05340034 0x2 14 >,
+			<  1324800000 0x04040045 0x06370037 0x2 15 >,
+			<  1401600000 0x04040049 0x063a003a 0x2 16 >,
+			<  1478400000 0x0404004d 0x073e003e 0x2 17 >,
+			<  1555200000 0x04040051 0x07410041 0x2 18 >,
+			<  1670400000 0x04040057 0x08460046 0x2 19 >,
+			<  1747200000 0x0404005b 0x08490049 0x2 20 >,
+			<  1824000000 0x0404005f 0x084c004c 0x3 21 >;
+
+		qcom,pwrcl-speedbin3-v0 =
+			<   300000000 0x0004000f 0x01200020 0x1  1 >,
+			<   364800000 0x05040013 0x01200020 0x1  2 >,
+			<   441600000 0x05040017 0x02200020 0x1  3 >,
+			<   518400000 0x0504001b 0x02200020 0x1  4 >,
+			<   595200000 0x0504001f 0x02200020 0x1  5 >,
+			<   672000000 0x05040023 0x03200020 0x1  6 >,
+			<   748800000 0x05040027 0x03200020 0x1  7 >,
+			<   825600000 0x0404002b 0x03220022 0x1  8 >,
+			<   883200000 0x0404002e 0x04250025 0x1  9 >,
+			<   960000000 0x04040032 0x04280028 0x1 10 >,
+			<  1036800000 0x04040036 0x042b002b 0x1 11 >,
+			<  1094400000 0x04040039 0x052e002e 0x2 12 >,
+			<  1171200000 0x0404003d 0x05310031 0x2 13 >,
+			<  1248000000 0x04040041 0x05340034 0x2 14 >,
+			<  1324800000 0x04040045 0x06370037 0x2 15 >,
+			<  1401600000 0x04040049 0x063a003a 0x2 16 >,
+			<  1478400000 0x0404004d 0x073e003e 0x2 17 >,
+			<  1555200000 0x04040051 0x07410041 0x2 18 >;
+
+		qcom,pwrcl-corner-uv =
+			<724000 724000 724000 724000 724000 724000 724000 724000 724000 788000 788000 788000 868000 868000 868000 868000 1068000 1068000 1068000 1068000 1068000>;  /* 21 corners */
+
+		qcom,perfcl-corner-uv =
+			<724000 724000 724000 724000 724000 724000 724000 724000 724000 724000 724000 788000 788000 788000 788000 868000 868000 868000 868000 868000 988000 988000 988000 988000 988000 1068000 1068000 1068000>;  /* 28 corners */
+
+
+
+
+		/* MEM-ACC trim is NOT provided here: the stock SDM660 tree carries
+		 * no qcom,*-apcs-mem-acc-* properties, so whyred's values must not
+		 * be reused for this SoC without a downstream source for them.
+		 */
+
+		/* qcom,apm-threshold-voltage = <872000>; (uV) in the stock tree,
+		 * not wired into the driver - see the SDM636 fragment for how the
+		 * crossover corner is approximated instead.
+		 */
+
+		/* ACD is optional. The stock SDM660 tree does enable it, with one
+		 * register window and identical values for both clusters:
+		 *   reg = ..., <0x17914800 0x800>;	(pwrcl_acd)
+		 *   qcom,acdtd-val      = <0x0000a111 0x0000a111>;
+		 *   qcom,acdcr-val      = <0x002c5ffd 0x002c5ffd>;
+		 *   qcom,acdsscr-val    = <0x00000901 0x00000901>;
+		 *   qcom,acdextint0-val = <0x02cf9ae8 0x02cf9ae8>;
+		 *   qcom,acdextint1-val = <0x02cf9afe 0x02cf9afe>;
+		 *   qcom,acdautoxfer-val = <0x00000015 0x00000015>;
+		 * The stock tree lists no perfcl_acd window, so it is left out
+		 * until its physical address is confirmed on hardware.
+		 */
 	};
 };
 
