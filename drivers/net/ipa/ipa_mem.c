@@ -258,8 +258,9 @@ static bool ipa_mem_valid_one(struct ipa *ipa, const struct ipa_mem *mem)
 	if (mem->size % size_multiple)
 		dev_err(dev, "region %u size not a multiple of %u bytes\n",
 			mem_id, size_multiple);
-	else if (mem->offset % 8)
-		dev_err(dev, "region %u offset not 8-byte aligned\n", mem_id);
+	else if (mem->offset % size_multiple)
+		dev_err(dev, "region %u offset not %u-byte aligned\n",
+			mem_id, size_multiple);
 	else if (mem->offset < mem->canary_count * sizeof(__le32))
 		dev_err(dev, "region %u offset too small for %hu canaries\n",
 			mem_id, mem->canary_count);
