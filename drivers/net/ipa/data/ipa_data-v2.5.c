@@ -222,6 +222,7 @@ static const struct ipa_mem_data ipa_mem_data_v2_5 = {
 /* Configuration data for an SoC having IPA v2.5 */
 const struct ipa_data ipa_data_v2_5 = {
 	.version		= IPA_VERSION_2_5,
+	.modem_route_count	= 8,
 	.endpoint_count		= ARRAY_SIZE(ipa_gsi_endpoint_data),
 	.endpoint_data		= ipa_gsi_endpoint_data,
 	.mem_data		= &ipa_mem_data_v2_5,
@@ -304,6 +305,7 @@ const struct ipa_data ipa_data_v2_6L = {
 	.version		= IPA_VERSION_2_6L,
 	/* Unfortunately we don't know what this BCR value corresponds to */
 	.backward_compat	= 0x1fff7f,
+	.modem_route_count	= 8,
 	.endpoint_count		= ARRAY_SIZE(ipa_gsi_endpoint_data),
 	.endpoint_data		= ipa_gsi_endpoint_data,
 	.mem_data		= &ipa_mem_data_v2_6L,
