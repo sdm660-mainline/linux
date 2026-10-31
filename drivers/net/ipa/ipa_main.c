@@ -494,6 +494,22 @@ static void ipa_hardware_dcd_deconfig(struct ipa *ipa)
  */
 static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 {
+	const struct reg *reg;
+
+	/* IPA v2.x requires a software reset and the core clock enabled */
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		reg = ipa_reg(ipa, COMP_SW_RESET);
+		iowrite32(1, ipa->reg_virt + reg_offset(reg));
+		iowrite32(0, ipa->reg_virt + reg_offset(reg));
+
+		reg = ipa_reg(ipa, COMP_CFG);
+		iowrite32(1, ipa->reg_virt + reg_offset(reg));
+
+		ipa_hardware_config_bcr(ipa, data);
+
+		return;
+	}
+
 	ipa_hardware_config_bcr(ipa, data);
 	ipa_hardware_config_tx(ipa);
 	ipa_hardware_config_clkon(ipa);
@@ -513,7 +529,8 @@ static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 static void ipa_hardware_deconfig(struct ipa *ipa)
 {
 	/* Mostly we just leave things as we set them. */
-	ipa_hardware_dcd_deconfig(ipa);
+	if (ipa->version > IPA_VERSION_2_6L)
+		ipa_hardware_dcd_deconfig(ipa);
 }
 
 /**
@@ -908,8 +925,11 @@ static int ipa_probe(struct platform_device *pdev)
 		goto done;
 
 	if (loader == IPA_LOADER_SELF) {
-		/* The AP is loading GSI firmware; do so now */
-		ret = ipa_firmware_load(dev);
+		/* The AP is loading GSI firmware; do so now.  IPA v2.x
+		 * (BAM) has no GSI firmware to load.
+		 */
+		if (ipa->version > IPA_VERSION_2_6L)
+			ret = ipa_firmware_load(dev);
 		if (ret)
 			goto err_deconfig;
 	} /* Otherwise loader == IPA_LOADER_SKIP */

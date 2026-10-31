@@ -579,6 +579,10 @@ void ipa_endpoint_modem_pause_all(struct ipa *ipa, bool enable)
 {
 	u32 endpoint_id = 0;
 
+	/* Pausing is not supported on IPA v2.6L */
+	if (ipa->version <= IPA_VERSION_2_6L)
+		return;
+
 	while (endpoint_id < ipa->endpoint_count) {
 		struct ipa_endpoint *endpoint = &ipa->endpoint[endpoint_id++];
 
@@ -601,6 +605,8 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 {
 	struct ipa_trans *trans;
 	u32 endpoint_id;
+	u32 value = 0;
+	u32 value_mask = ~0;
 	u32 count;
 
 	/* We need one command per modem TX endpoint, plus the commands
@@ -613,6 +619,12 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 			"no transaction to reset modem exception endpoints\n");
 		return -EBUSY;
 	}
+
+	/* On IPA v2.x, the endpoint status register's low-order bit forces
+	 * aggregation closed rather than enabling status.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L)
+		value = value_mask = 1;
 
 	for_each_set_bit(endpoint_id, ipa->defined, ipa->endpoint_count) {
 		struct ipa_endpoint *endpoint;
@@ -627,11 +639,12 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 		reg = ipa_reg(ipa, ENDP_STATUS);
 		offset = reg_n_offset(reg, endpoint_id);
 
-		/* Value written is 0, and all bits are updated.  That
-		 * means status is disabled on the endpoint, and as a
-		 * result all other fields in the register are ignored.
+		/* Value written is 0 (force close on IPA v2.x), and all bits
+		 * are updated.  That means status is disabled on the endpoint,
+		 * and as a result all other fields in the register are ignored.
 		 */
-		ipa_cmd_register_write_add(trans, offset, 0, ~0, false);
+		ipa_cmd_register_write_add(trans, offset, value, value_mask,
+					   false);
 	}
 
 	ipa_cmd_pipeline_clear_add(trans);
@@ -1793,7 +1806,8 @@ static void ipa_endpoint_program(struct ipa_endpoint *endpoint)
 		(void)ipa_endpoint_program_suspend(endpoint, false);
 	}
 	ipa_endpoint_init_cfg(endpoint);
-	ipa_endpoint_init_nat(endpoint);
+	if (endpoint->ipa->version > IPA_VERSION_2_6L)
+		ipa_endpoint_init_nat(endpoint);
 	ipa_endpoint_init_hdr(endpoint);
 	ipa_endpoint_init_hdr_ext(endpoint);
 	ipa_endpoint_init_hdr_metadata_mask(endpoint);
@@ -1806,8 +1820,10 @@ static void ipa_endpoint_program(struct ipa_endpoint *endpoint)
 			ipa_endpoint_init_hol_block_disable(endpoint);
 	}
 	ipa_endpoint_init_deaggr(endpoint);
-	ipa_endpoint_init_rsrc_grp(endpoint);
-	ipa_endpoint_init_seq(endpoint);
+	if (endpoint->ipa->version > IPA_VERSION_2_6L) {
+		ipa_endpoint_init_rsrc_grp(endpoint);
+		ipa_endpoint_init_seq(endpoint);
+	}
 	ipa_endpoint_status(endpoint);
 }
 
@@ -2175,6 +2191,10 @@ int ipa_endpoint_init(struct ipa *ipa, u32 count,
 		if (data->ee_id == GSI_EE_MODEM && data->toward_ipa)
 			ipa->modem_tx_count++;
 	}
+
+	/* IPA v2.x uses a fixed filter map */
+	if (ipa->version <= IPA_VERSION_2_6L)
+		filtered = 0x1fffff;
 
 	/* Make sure the set of filtered endpoints is valid */
 	if (!ipa_filtered_valid(ipa, filtered)) {
