@@ -559,9 +559,6 @@ static int ipa_smem_init(struct ipa *ipa, size_t size)
 	void *virt;
 	int ret;
 
-	if (ipa->version <= IPA_VERSION_2_6L)
-		return 0;	/* IPA v2.x does not use the IOMMU */
-
 	if (!size)
 		return 0;	/* SMEM memory not used */
 
@@ -622,9 +619,6 @@ static void ipa_smem_exit(struct ipa *ipa)
 {
 	struct device *dev = ipa->dev;
 	struct iommu_domain *domain;
-
-	if (ipa->version <= IPA_VERSION_2_6L)
-		return;
 
 	domain = iommu_get_domain_for_dev(dev);
 	if (domain) {
