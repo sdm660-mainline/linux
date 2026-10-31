@@ -9,7 +9,7 @@
 #include <linux/notifier.h>
 #include <linux/types.h>
 
-#include "gsi.h"
+#include "ipa_dma.h"
 #include "ipa_endpoint.h"
 #include "ipa_mem.h"
 #include "ipa_qmi.h"
@@ -71,7 +71,7 @@ struct ipa_smp2p;
  * @qmi:		QMI information
  */
 struct ipa {
-	struct gsi gsi;
+	struct ipa_dma dma_subsys;
 	enum ipa_version version;
 	struct device *dev;
 	struct completion completion;
