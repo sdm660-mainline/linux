@@ -154,12 +154,12 @@ static bool ipa_mem_id_valid(struct ipa *ipa, enum ipa_mem_id mem_id)
 	case IPA_MEM_PDN_CONFIG:
 	case IPA_MEM_STATS_QUOTA_MODEM:
 	case IPA_MEM_STATS_QUOTA_AP:
-	case IPA_MEM_ZIP:
-		if (version == IPA_VERSION_2_6L)
-			return true;
+	case IPA_MEM_END_MARKER:	/* pseudo region */
 		break;
 
-	case IPA_MEM_END_MARKER:	/* pseudo region */
+	case IPA_MEM_ZIP:
+		if (version != IPA_VERSION_2_6L)
+			return false;
 		break;
 
 	case IPA_MEM_STATS_TETHERING:
