@@ -18,12 +18,12 @@ static const u32 reg_comp_cfg_fmask[] = {
 						/* Bits 5-31 reserved */
 };
 
-REG_FIELDS(COMP_CFG, comp_cfg, 0x00000038);
+REG_FIELDS(COMP_CFG, comp_cfg, 0x00040038);
 
 /* Software reset and endpoint availability registers (IPA v2.x) */
-REG(COMP_SW_RESET, comp_sw_reset, 0x0000003c);
+REG(COMP_SW_RESET, comp_sw_reset, 0x0004003c);
 
-REG(V2_ENABLED_PIPES, v2_enabled_pipes, 0x000005dc);
+REG(V2_ENABLED_PIPES, v2_enabled_pipes, 0x000405dc);
 
 static const u32 reg_route_fmask[] = {
 	[ROUTE_DIS]					= BIT(0),
@@ -36,19 +36,19 @@ static const u32 reg_route_fmask[] = {
 						/* Bits 25-31 reserved */
 };
 
-REG_FIELDS(ROUTE, route, 0x00000044);
+REG_FIELDS(ROUTE, route, 0x00040044);
 
 static const u32 reg_shared_mem_size_fmask[] = {
 	[MEM_SIZE]					= GENMASK(15, 0),
 	[MEM_BADDR]					= GENMASK(31, 16),
 };
 
-REG_FIELDS(SHARED_MEM_SIZE, shared_mem_size, 0x00000050);
+REG_FIELDS(SHARED_MEM_SIZE, shared_mem_size, 0x00040050);
 
 /* Valid bits defined by ipa->available */
-REG_STRIDE(STATE_AGGR_ACTIVE, state_aggr_active, 0x0000010c, 0x0004);
+REG_STRIDE(STATE_AGGR_ACTIVE, state_aggr_active, 0x0004010c, 0x0004);
 
-REG(IPA_BCR, ipa_bcr, 0x000005b0);
+REG(IPA_BCR, ipa_bcr, 0x000405b0);
 
 static const u32 reg_local_pkt_proc_cntxt_fmask[] = {
 	[IPA_BASE_ADDR]					= GENMASK(16, 0),
@@ -56,10 +56,10 @@ static const u32 reg_local_pkt_proc_cntxt_fmask[] = {
 };
 
 /* Offset must be a multiple of 8 */
-REG_FIELDS(LOCAL_PKT_PROC_CNTXT, local_pkt_proc_cntxt, 0x000005e0);
+REG_FIELDS(LOCAL_PKT_PROC_CNTXT, local_pkt_proc_cntxt, 0x000405e0);
 
 /* Valid bits defined by ipa->available */
-REG_STRIDE(AGGR_FORCE_CLOSE, aggr_force_close, 0x000001ec, 0x0004);
+REG_STRIDE(AGGR_FORCE_CLOSE, aggr_force_close, 0x000401ec, 0x0004);
 
 static const u32 reg_counter_cfg_fmask[] = {
 	[EOT_COAL_GRANULARITY]				= GENMASK(3, 0),
@@ -67,7 +67,7 @@ static const u32 reg_counter_cfg_fmask[] = {
 						/* Bits 5-31 reserved */
 };
 
-REG_FIELDS(COUNTER_CFG, counter_cfg, 0x000005e8);
+REG_FIELDS(COUNTER_CFG, counter_cfg, 0x000405e8);
 
 static const u32 reg_endp_init_ctrl_fmask[] = {
 	[ENDP_SUSPEND]					= BIT(0),
@@ -75,7 +75,7 @@ static const u32 reg_endp_init_ctrl_fmask[] = {
 						/* Bits 2-31 reserved */
 };
 
-REG_STRIDE_FIELDS(ENDP_INIT_CTRL, endp_init_ctrl, 0x00000070, 0x0004);
+REG_STRIDE_FIELDS(ENDP_INIT_CTRL, endp_init_ctrl, 0x00040070, 0x0004);
 
 static const u32 reg_endp_init_cfg_fmask[] = {
 	[FRAG_OFFLOAD_EN]				= BIT(0),
@@ -86,7 +86,7 @@ static const u32 reg_endp_init_cfg_fmask[] = {
 						/* Bits 9-31 reserved */
 };
 
-REG_STRIDE_FIELDS(ENDP_INIT_CFG, endp_init_cfg, 0x000000c0, 0x0004);
+REG_STRIDE_FIELDS(ENDP_INIT_CFG, endp_init_cfg, 0x000400c0, 0x0004);
 
 static const u32 reg_endp_init_hdr_fmask[] = {
 	[HDR_LEN]					= GENMASK(5, 0),
@@ -101,7 +101,7 @@ static const u32 reg_endp_init_hdr_fmask[] = {
 						/* Bits 29-31 reserved */
 };
 
-REG_STRIDE_FIELDS(ENDP_INIT_HDR, endp_init_hdr, 0x00000170, 0x0004);
+REG_STRIDE_FIELDS(ENDP_INIT_HDR, endp_init_hdr, 0x00040170, 0x0004);
 
 static const u32 reg_endp_init_hdr_ext_fmask[] = {
 	[HDR_ENDIANNESS]				= BIT(0),
@@ -113,10 +113,10 @@ static const u32 reg_endp_init_hdr_ext_fmask[] = {
 						/* Bits 14-31 reserved */
 };
 
-REG_STRIDE_FIELDS(ENDP_INIT_HDR_EXT, endp_init_hdr_ext, 0x000001c0, 0x0004);
+REG_STRIDE_FIELDS(ENDP_INIT_HDR_EXT, endp_init_hdr_ext, 0x000401c0, 0x0004);
 
 REG_STRIDE(ENDP_INIT_HDR_METADATA_MASK, endp_init_hdr_metadata_mask,
-	   0x00000220, 0x0004);
+	   0x00040220, 0x0004);
 
 static const u32 reg_endp_init_mode_fmask[] = {
 	[ENDP_MODE]					= GENMASK(2, 0),
@@ -130,7 +130,7 @@ static const u32 reg_endp_init_mode_fmask[] = {
 						/* Bit 31 reserved */
 };
 
-REG_STRIDE_FIELDS(ENDP_INIT_MODE, endp_init_mode, 0x000002c0, 0x0004);
+REG_STRIDE_FIELDS(ENDP_INIT_MODE, endp_init_mode, 0x000402c0, 0x0004);
 
 static const u32 reg_endp_init_aggr_fmask[] = {
 	[AGGR_EN]					= GENMASK(1, 0),
@@ -145,7 +145,7 @@ static const u32 reg_endp_init_aggr_fmask[] = {
 						/* Bits 25-31 reserved */
 };
 
-REG_STRIDE_FIELDS(ENDP_INIT_AGGR, endp_init_aggr, 0x00000320, 0x0004);
+REG_STRIDE_FIELDS(ENDP_INIT_AGGR, endp_init_aggr, 0x00040320, 0x0004);
 
 static const u32 reg_endp_init_hol_block_en_fmask[] = {
 	[HOL_BLOCK_EN]					= BIT(0),
@@ -153,7 +153,7 @@ static const u32 reg_endp_init_hol_block_en_fmask[] = {
 };
 
 REG_STRIDE_FIELDS(ENDP_INIT_HOL_BLOCK_EN, endp_init_hol_block_en,
-		  0x000003c0, 0x0004);
+		  0x000403c0, 0x0004);
 
 /* Entire register is a tick count */
 static const u32 reg_endp_init_hol_block_timer_fmask[] = {
@@ -161,7 +161,7 @@ static const u32 reg_endp_init_hol_block_timer_fmask[] = {
 };
 
 REG_STRIDE_FIELDS(ENDP_INIT_HOL_BLOCK_TIMER, endp_init_hol_block_timer,
-		  0x00000420, 0x0004);
+		  0x00040420, 0x0004);
 
 static const u32 reg_endp_init_deaggr_fmask[] = {
 	[DEAGGR_HDR_LEN]				= GENMASK(5, 0),
@@ -173,7 +173,7 @@ static const u32 reg_endp_init_deaggr_fmask[] = {
 	[MAX_PACKET_LEN]				= GENMASK(31, 16),
 };
 
-REG_STRIDE_FIELDS(ENDP_INIT_DEAGGR, endp_init_deaggr, 0x00000470, 0x0004);
+REG_STRIDE_FIELDS(ENDP_INIT_DEAGGR, endp_init_deaggr, 0x00040470, 0x0004);
 
 static const u32 reg_endp_status_fmask[] = {
 	[STATUS_EN]					= BIT(0),
@@ -183,27 +183,27 @@ static const u32 reg_endp_status_fmask[] = {
 						/* Bits 9-31 reserved */
 };
 
-REG_STRIDE_FIELDS(ENDP_STATUS, endp_status, 0x000004c0, 0x0004);
+REG_STRIDE_FIELDS(ENDP_STATUS, endp_status, 0x000404c0, 0x0004);
 
 /* Valid bits defined by enum ipa_irq_id; only used for GSI_EE_AP */
-REG(IPA_IRQ_STTS, ipa_irq_stts, 0x00001008 + 0x1000 * GSI_EE_AP);
+REG(IPA_IRQ_STTS, ipa_irq_stts, 0x00041008 + 0x1000 * GSI_EE_AP);
 
 /* Valid bits defined by enum ipa_irq_id; only used for GSI_EE_AP */
-REG(IPA_IRQ_EN, ipa_irq_en, 0x0000100c + 0x1000 * GSI_EE_AP);
+REG(IPA_IRQ_EN, ipa_irq_en, 0x0004100c + 0x1000 * GSI_EE_AP);
 
 /* Valid bits defined by enum ipa_irq_id; only used for GSI_EE_AP */
-REG(IPA_IRQ_CLR, ipa_irq_clr, 0x00001010 + 0x1000 * GSI_EE_AP);
+REG(IPA_IRQ_CLR, ipa_irq_clr, 0x00041010 + 0x1000 * GSI_EE_AP);
 
 static const u32 reg_ipa_irq_uc_fmask[] = {
 	[UC_INTR]					= BIT(0),
 						/* Bits 1-31 reserved */
 };
 
-REG_FIELDS(IPA_IRQ_UC, ipa_irq_uc, 0x0000101c + 0x1000 * GSI_EE_AP);
+REG_FIELDS(IPA_IRQ_UC, ipa_irq_uc, 0x0004101c + 0x1000 * GSI_EE_AP);
 
 /* Valid bits defined by ipa->available */
 REG_STRIDE(IRQ_SUSPEND_INFO, irq_suspend_info,
-	   0x00001098 + 0x1000 * GSI_EE_AP, 0x0004);
+	   0x00041098 + 0x1000 * GSI_EE_AP, 0x0004);
 
 static const struct reg *reg_array[] = {
 	[COMP_CFG]			= &reg_comp_cfg,
