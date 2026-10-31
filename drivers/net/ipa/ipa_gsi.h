@@ -8,8 +8,8 @@
 
 #include <linux/types.h>
 
-struct gsi;
-struct gsi_trans;
+struct ipa_dma;
+struct ipa_trans;
 struct ipa_gsi_endpoint_data;
 
 /**
@@ -19,7 +19,7 @@ struct ipa_gsi_endpoint_data;
  * This called from the GSI layer to notify the IPA layer that a
  * transaction has completed.
  */
-void ipa_gsi_trans_complete(struct gsi_trans *trans);
+void ipa_gsi_trans_complete(struct ipa_trans *trans);
 
 /**
  * ipa_gsi_trans_release() - GSI transaction release callback
@@ -29,7 +29,7 @@ void ipa_gsi_trans_complete(struct gsi_trans *trans);
  * transaction is about to be freed, so any resources associated
  * with it should be released.
  */
-void ipa_gsi_trans_release(struct gsi_trans *trans);
+void ipa_gsi_trans_release(struct ipa_trans *trans);
 
 /**
  * ipa_gsi_channel_tx_queued() - GSI queued to hardware notification
@@ -41,7 +41,7 @@ void ipa_gsi_trans_release(struct gsi_trans *trans);
  * This called from the GSI layer to notify the IPA layer that some
  * number of transactions have been queued to hardware for execution.
  */
-void ipa_gsi_channel_tx_queued(struct gsi *gsi, u32 channel_id, u32 count,
+void ipa_gsi_channel_tx_queued(struct ipa_dma *gsi, u32 channel_id, u32 count,
 			       u32 byte_count);
 
 /**
@@ -54,7 +54,7 @@ void ipa_gsi_channel_tx_queued(struct gsi *gsi, u32 channel_id, u32 count,
  * This called from the GSI layer to notify the IPA layer that the hardware
  * has reported the completion of some number of transactions.
  */
-void ipa_gsi_channel_tx_completed(struct gsi *gsi, u32 channel_id, u32 count,
+void ipa_gsi_channel_tx_completed(struct ipa_dma *gsi, u32 channel_id, u32 count,
 				  u32 byte_count);
 
 /* ipa_gsi_endpoint_data_empty() - Empty endpoint config data test

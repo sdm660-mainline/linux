@@ -12,7 +12,7 @@
 
 struct platform_device;
 
-struct gsi;
+struct ipa_dma;
 
 /**
  * DOC: GSI Registers
@@ -362,7 +362,7 @@ extern const struct regs gsi_regs_v5_0;
  * @gsi:	GSI pointer
  * @reg_id:	GSI register ID
  */
-const struct reg *gsi_reg(struct gsi *gsi, enum gsi_reg_id reg_id);
+const struct reg *gsi_reg(struct ipa_dma *gsi, enum gsi_reg_id reg_id);
 
 /**
  * gsi_reg_init() - Perform GSI register initialization
@@ -372,12 +372,12 @@ const struct reg *gsi_reg(struct gsi *gsi, enum gsi_reg_id reg_id);
  * Initialize GSI registers, including looking up and I/O mapping
  * the "gsi" memory space.
  */
-int gsi_reg_init(struct gsi *gsi, struct platform_device *pdev);
+int gsi_reg_init(struct ipa_dma *gsi, struct platform_device *pdev);
 
 /**
  * gsi_reg_exit() - Inverse of gsi_reg_init()
  * @gsi:	GSI pointer
  */
-void gsi_reg_exit(struct gsi *gsi);
+void gsi_reg_exit(struct ipa_dma *gsi);
 
 #endif	/* _GSI_REG_H_ */
