@@ -51,7 +51,7 @@ ipa_mem_zero_region_add(struct ipa_trans *trans, enum ipa_mem_id mem_id)
 	const struct ipa_mem *mem = ipa_mem_find(ipa, mem_id);
 	dma_addr_t addr = ipa->zero_addr;
 
-	if (!mem->size)
+	if (!mem || !mem->size)
 		return;
 
 	ipa_cmd_dma_shared_mem_add(trans, mem->offset, mem->size, addr, true);
@@ -88,7 +88,7 @@ int ipa_mem_setup(struct ipa *ipa)
 	/* Get a transaction to define the header memory region and to zero
 	 * the processing context and modem memory regions.
 	 */
-	trans = ipa_cmd_trans_alloc(ipa, 4);
+	trans = ipa_cmd_trans_alloc(ipa, 5);
 	if (!trans) {
 		dev_err(ipa->dev, "no transaction for memory setup\n");
 		return -EBUSY;
@@ -109,9 +109,14 @@ int ipa_mem_setup(struct ipa *ipa)
 
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM_PROC_CTX);
 	ipa_mem_zero_region_add(trans, IPA_MEM_AP_PROC_CTX);
+	ipa_mem_zero_region_add(trans, IPA_MEM_ZIP);
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM);
 
 	ipa_trans_commit_wait(trans);
+
+	/* On IPA version <=2.6L (except 2.5) there is no PROC_CTX. */
+	if (ipa->version != IPA_VERSION_2_5 && ipa->version <= IPA_VERSION_2_6L)
+		return 0;
 
 	/* Tell the hardware where the processing context area is located */
 	mem = ipa_mem_find(ipa, IPA_MEM_MODEM_PROC_CTX);
@@ -149,6 +154,11 @@ static bool ipa_mem_id_valid(struct ipa *ipa, enum ipa_mem_id mem_id)
 	case IPA_MEM_PDN_CONFIG:
 	case IPA_MEM_STATS_QUOTA_MODEM:
 	case IPA_MEM_STATS_QUOTA_AP:
+	case IPA_MEM_ZIP:
+		if (version == IPA_VERSION_2_6L)
+			return true;
+		break;
+
 	case IPA_MEM_END_MARKER:	/* pseudo region */
 		break;
 
@@ -191,19 +201,24 @@ static bool ipa_mem_id_required(struct ipa *ipa, enum ipa_mem_id mem_id)
 	switch (mem_id) {
 	case IPA_MEM_UC_SHARED:
 	case IPA_MEM_UC_INFO:
-	case IPA_MEM_V4_FILTER_HASHED:
 	case IPA_MEM_V4_FILTER:
-	case IPA_MEM_V6_FILTER_HASHED:
 	case IPA_MEM_V6_FILTER:
-	case IPA_MEM_V4_ROUTE_HASHED:
 	case IPA_MEM_V4_ROUTE:
-	case IPA_MEM_V6_ROUTE_HASHED:
 	case IPA_MEM_V6_ROUTE:
 	case IPA_MEM_MODEM_HEADER:
-	case IPA_MEM_MODEM_PROC_CTX:
-	case IPA_MEM_AP_PROC_CTX:
 	case IPA_MEM_MODEM:
 		return true;
+
+	case IPA_MEM_V4_FILTER_HASHED:
+	case IPA_MEM_V6_FILTER_HASHED:
+	case IPA_MEM_V4_ROUTE_HASHED:
+	case IPA_MEM_V6_ROUTE_HASHED:
+		return ipa_table_hash_support(ipa);
+
+	case IPA_MEM_MODEM_PROC_CTX:
+	case IPA_MEM_AP_PROC_CTX:
+		return ipa->version >= IPA_VERSION_3_0 ||
+		       ipa->version == IPA_VERSION_2_5;
 
 	case IPA_MEM_PDN_CONFIG:
 	case IPA_MEM_STATS_QUOTA_MODEM:
@@ -235,8 +250,11 @@ static bool ipa_mem_valid_one(struct ipa *ipa, const struct ipa_mem *mem)
 		return false;
 	}
 
-	/* Other than modem memory, sizes must be a multiple of 8 */
-	size_multiple = mem_id == IPA_MEM_MODEM ? 4 : 8;
+	/* Other than modem memory, sizes must be a multiple of 8 (or 4 on
+	 * IPA v2.x, whose table entries are 32 bits wide).
+	 */
+	size_multiple = mem_id == IPA_MEM_MODEM ||
+			ipa->version <= IPA_VERSION_2_6L ? 4 : 8;
 	if (mem->size % size_multiple)
 		dev_err(dev, "region %u size not a multiple of %u bytes\n",
 			mem_id, size_multiple);
@@ -536,6 +554,9 @@ static int ipa_smem_init(struct ipa *ipa, size_t size)
 	void *virt;
 	int ret;
 
+	if (ipa->version <= IPA_VERSION_2_6L)
+		return 0;	/* IPA v2.x does not use the IOMMU */
+
 	if (!size)
 		return 0;	/* SMEM memory not used */
 
@@ -597,6 +618,9 @@ static void ipa_smem_exit(struct ipa *ipa)
 	struct device *dev = ipa->dev;
 	struct iommu_domain *domain;
 
+	if (ipa->version <= IPA_VERSION_2_6L)
+		return;
+
 	domain = iommu_get_domain_for_dev(dev);
 	if (domain) {
 		size_t size;
@@ -637,7 +661,8 @@ int ipa_mem_init(struct ipa *ipa, struct platform_device *pdev,
 	if (!ipa_table_mem_valid(ipa, true))
 		return -EINVAL;
 
-	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
+	ret = dma_set_mask_and_coherent(dev, IPA_IS_64BIT(ipa->version) ?
+					 DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
 	if (ret) {
 		dev_err(dev, "error %d setting DMA mask\n", ret);
 		return ret;

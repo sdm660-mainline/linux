@@ -342,7 +342,12 @@ init_modem_driver_req(struct ipa_qmi *ipa_qmi)
 			req.hdr_proc_ctx_tbl_info.start + mem->size - 1;
 	}
 
-	/* Nothing to report for the compression table (zip_tbl_info) */
+	mem = ipa_mem_find(ipa, IPA_MEM_ZIP);
+	if (mem && mem->size) {
+		req.zip_tbl_info_valid = 1;
+		req.zip_tbl_info.start = ipa->mem_offset + mem->offset;
+		req.zip_tbl_info.end = ipa->mem_offset + mem->size - 1;
+	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V4_ROUTE_HASHED);
 	if (mem->size) {
@@ -518,6 +523,22 @@ err_server_handle_release:
 	memset(&ipa_qmi->server_handle, 0, sizeof(ipa_qmi->server_handle));
 
 	return ret;
+}
+
+/* With IPA v2.x the modem is not required to send a DRIVER_INIT_COMPLETE
+ * request to the AP.  We start operation as soon as the
+ * IPA_UC_RESPONSE_INIT_COMPLETED interrupt is triggered.
+ */
+void ipa_qmi_signal_uc_loaded(struct ipa *ipa)
+{
+	struct ipa_qmi *ipa_qmi = &ipa->qmi;
+
+	/* This is needed only on IPA v2.x */
+	if (ipa->version > IPA_VERSION_2_6L)
+		return;
+
+	ipa_qmi->uc_ready = true;
+	ipa_qmi_ready(ipa_qmi);
 }
 
 /* Tear down IPA QMI handles */
