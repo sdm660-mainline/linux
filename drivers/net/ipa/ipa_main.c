@@ -868,8 +868,12 @@ static int ipa_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_mem_exit;
 
-	ret = gsi_init(&ipa->dma_subsys, pdev, ipa->version, data->endpoint_count,
-		       data->endpoint_data);
+	if (IPA_HAS_GSI(ipa->version))
+		ret = gsi_init(&ipa->dma_subsys, pdev, ipa->version,
+			       data->endpoint_count, data->endpoint_data);
+	else
+		ret = bam_init(&ipa->dma_subsys, pdev, ipa->version,
+			       data->endpoint_count, data->endpoint_data);
 	if (ret)
 		goto err_mem_exit;
 

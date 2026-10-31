@@ -16,12 +16,14 @@
 /* Maximum number of channels and event rings supported by the driver */
 #define GSI_CHANNEL_COUNT_MAX	28
 #define GSI_EVT_RING_COUNT_MAX	28
+#define BAM_CHANNEL_COUNT_MAX	20
 
 /* Maximum TLV FIFO size for a channel; 64 here is arbitrary (and high) */
 #define GSI_TLV_MAX		64
 
 struct device;
 struct platform_device;
+struct dma_chan;
 
 struct ipa_dma;
 struct ipa_trans;
@@ -108,6 +110,8 @@ struct ipa_channel {
 	struct gsi_ring tre_ring;
 	u32 evt_ring_id;
 
+	struct dma_chan *dma_chan;
+
 	/* The following counts are used only for TX endpoints */
 	u64 byte_count;			/* total # bytes transferred */
 	u64 trans_count;		/* total # transactions */
@@ -162,6 +166,7 @@ struct ipa_dma {
 			      bool doorbell);
 	int (*channel_suspend)(struct ipa_dma *dma_subsys, u32 channel_id);
 	int (*channel_resume)(struct ipa_dma *dma_subsys, u32 channel_id);
+	void (*channel_update)(struct ipa_channel *channel);
 	void (*trans_commit)(struct ipa_trans *trans, bool ring_db);
 
 	struct ipa_channel channel[GSI_CHANNEL_COUNT_MAX];
@@ -314,6 +319,23 @@ static inline int ipa_channel_resume(struct ipa_dma *dma_subsys,
  * that can be done before the GSI hardware is ready to use.
  */
 int gsi_init(struct ipa_dma *dma_subsys, struct platform_device *pdev,
+	     enum ipa_version version, u32 count,
+	     const struct ipa_gsi_endpoint_data *data);
+
+/**
+ * bam_init() - Initialize the BAM subsystem
+ * @dma_subsys:	Address of ipa_dma structure embedded in an IPA structure
+ * @pdev:	IPA platform device
+ * @version:	IPA hardware version (implies BAM version)
+ * @count:	Number of entries in the configuration data array
+ * @data:	Endpoint and channel configuration data
+ *
+ * Return:	0 if successful, or a negative error code
+ *
+ * Early stage initialization of the BAM subsystem, performing tasks
+ * that can be done before the BAM hardware is ready to use.
+ */
+int bam_init(struct ipa_dma *dma_subsys, struct platform_device *pdev,
 	     enum ipa_version version, u32 count,
 	     const struct ipa_gsi_endpoint_data *data);
 

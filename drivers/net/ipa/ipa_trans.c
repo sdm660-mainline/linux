@@ -242,7 +242,7 @@ struct ipa_trans *ipa_channel_trans_complete(struct ipa_channel *channel)
 	u16 trans_id = trans_info->completed_id;
 
 	if (trans_id == trans_info->pending_id) {
-		gsi_channel_update(channel);
+		channel->dma_subsys->channel_update(channel);
 		if (trans_id == trans_info->pending_id)
 			return NULL;
 	}
