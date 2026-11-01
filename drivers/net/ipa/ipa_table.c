@@ -9,6 +9,7 @@
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
+#include <linux/iommu.h>
 #include <linux/types.h>
 
 #include "ipa_dma.h"

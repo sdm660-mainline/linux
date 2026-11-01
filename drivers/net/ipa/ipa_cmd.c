@@ -7,6 +7,7 @@
 #include <linux/bitfield.h>
 #include <linux/bits.h>
 #include <linux/device.h>
+#include <linux/iommu.h>
 #include <linux/dma-direction.h>
 #include <linux/types.h>
 
@@ -500,9 +501,6 @@ void ipa_cmd_hdr_init_system_add(struct ipa_trans *trans, dma_addr_t addr)
 	payload->hdr_table_addr = cpu_to_le32(addr);
 	payload->reserved = 0;
 
-	dev_info(ipa->dev, "hdr_init_system: addr=%pad payload=%pad\n",
-		 &addr, &payload_addr);
-
 	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  opcode);
 }
@@ -628,6 +626,7 @@ void ipa_cmd_dma_shared_mem_add(struct ipa_trans *trans, u32 offset, u16 size,
 	 */
 	flags = toward_ipa ? 0 : DMA_SHARED_MEM_FLAGS_DIRECTION_FMASK;
 	CMD_FIELD(version, payload, flags) = cpu_to_le16(flags);
+
 	SET_DMA_FIELD(version, payload, system_addr, addr);
 
 	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,

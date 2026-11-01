@@ -1395,7 +1395,8 @@ static void ipa_endpoint_replenish_enable(struct ipa_endpoint *endpoint)
 	set_bit(IPA_REPLENISH_ENABLED, endpoint->replenish_flags);
 
 	/* Start replenishing if hardware currently has no buffers */
-	if (gsi_channel_trans_idle(&endpoint->ipa->dma_subsys, endpoint->channel_id))
+	if (gsi_channel_trans_idle(&endpoint->ipa->dma_subsys,
+				   endpoint->channel_id))
 		ipa_endpoint_replenish(endpoint);
 }
 

@@ -6,6 +6,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/bits.h>
+#include <linux/device.h>
 #include <linux/dma-direction.h>
 #include <linux/refcount.h>
 #include <linux/scatterlist.h>
@@ -634,9 +635,10 @@ out_trans_free:
 void ipa_trans_complete(struct ipa_trans *trans)
 {
 	/* If the entire SGL was mapped when added, unmap it now */
-	if (trans->direction != DMA_NONE)
+	if (trans->direction != DMA_NONE) {
 		dma_unmap_sg(trans->dma_subsys->dev, trans->sgl, trans->used_count,
 			     trans->direction);
+	}
 
 	ipa_gsi_trans_complete(trans);
 
