@@ -715,18 +715,20 @@ int ipa_mem_init(struct ipa *ipa, struct platform_device *pdev,
 		struct page *page;
 
 		if (domain) {
+			size_t size = SZ_1M;
+
 			page = alloc_pages(GFP_KERNEL | __GFP_ZERO |
-					   __GFP_DMA32, get_order(SZ_64K));
+					   __GFP_DMA32, get_order(size));
 			if (page) {
 				phys_addr_t phys = page_to_phys(page);
-				int r = iommu_map(domain, 0xfd930000, phys,
-						  SZ_64K,
+				int r = iommu_map(domain, 0xfd900000, phys,
+						  size,
 						  IOMMU_READ | IOMMU_WRITE,
 						  GFP_KERNEL);
 
 				dev_info(dev,
-					 "spurious window 0xfd930000 -> phys 0x%llx: %d\n",
-					 (u64)phys, r);
+					 "spurious window 0xfd900000+0x%zx -> phys 0x%llx: %d\n",
+					 size, (u64)phys, r);
 				ipa->spurious_page = page;
 			}
 		}
