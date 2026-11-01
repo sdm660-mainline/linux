@@ -622,7 +622,7 @@ void ipa_trans_commit_wait(struct ipa_trans *trans)
 	trans->dma_subsys->trans_commit(trans, true);
 
 	if (!wait_for_completion_timeout(&trans->completion,
-					 msecs_to_jiffies(2000)))
+					 msecs_to_jiffies(100)))
 		dev_err(dev, "transaction timeout (ch%u, %u TREs)\n",
 			trans->channel_id, trans->used_count);
 
