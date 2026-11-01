@@ -386,6 +386,7 @@ int ipa_mem_config(struct ipa *ipa)
 	virt = dma_alloc_coherent(dev, IPA_MEM_MAX, &addr, GFP_KERNEL);
 	if (!virt)
 		return -ENOMEM;
+
 	ipa->zero_addr = addr;
 	ipa->zero_virt = virt;
 	ipa->zero_size = IPA_MEM_MAX;
@@ -706,9 +707,11 @@ int ipa_mem_init(struct ipa *ipa, struct platform_device *pdev,
 		return ret;
 	}
 
-	/* Diagnostic: the IPA v2.x hardware accesses a fixed DRAM address
-	 * (0xfd930000) that the driver never maps.  Map a zeroed window
-	 * there to see whether that access is spurious.
+	/* IPA v2.x keeps its system route/filter/header tables in DRAM at
+	 * a fixed, firmware-reserved address range.  The hardware walks
+	 * them during setup and at run time, so the range must be mapped
+	 * even though the driver does not own its contents.  Map a zeroed
+	 * window covering it.
 	 */
 	if (ipa->version <= IPA_VERSION_2_6L) {
 		struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
@@ -716,21 +719,21 @@ int ipa_mem_init(struct ipa *ipa, struct platform_device *pdev,
 
 		if (domain) {
 			size_t size = SZ_1M;
+			phys_addr_t phys;
 
 			page = alloc_pages(GFP_KERNEL | __GFP_ZERO |
 					   __GFP_DMA32, get_order(size));
-			if (page) {
-				phys_addr_t phys = page_to_phys(page);
-				int r = iommu_map(domain, 0xfd900000, phys,
-						  size,
-						  IOMMU_READ | IOMMU_WRITE,
-						  GFP_KERNEL);
+			if (!page)
+				return -ENOMEM;
 
-				dev_info(dev,
-					 "spurious window 0xfd900000+0x%zx -> phys 0x%llx: %d\n",
-					 size, (u64)phys, r);
-				ipa->spurious_page = page;
+			phys = page_to_phys(page);
+			if (iommu_map(domain, IPA_V2_SYSTEM_WINDOW, phys, size,
+				      IOMMU_READ | IOMMU_WRITE, GFP_KERNEL)) {
+				__free_pages(page, get_order(size));
+				return -ENOMEM;
 			}
+
+			ipa->system_window_page = page;
 		}
 	}
 
@@ -790,6 +793,16 @@ err_unmap:
 /* Inverse of ipa_mem_init() */
 void ipa_mem_exit(struct ipa *ipa)
 {
+	if (ipa->system_window_page) {
+		struct device *dev = ipa->dev;
+		struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+
+		if (domain)
+			iommu_unmap(domain, IPA_V2_SYSTEM_WINDOW, SZ_1M);
+		__free_pages(ipa->system_window_page, get_order(SZ_1M));
+		ipa->system_window_page = NULL;
+	}
+
 	ipa_smem_exit(ipa);
 	ipa_imem_exit(ipa);
 	memunmap(ipa->mem_virt);

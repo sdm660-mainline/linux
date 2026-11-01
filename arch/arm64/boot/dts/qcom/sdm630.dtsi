@@ -2391,10 +2391,10 @@
 			status = "okay";
 		};
 
-		ipa_bam: dma-controller@14784000 {	/* address is illustrative */
+		ipa_bam: dma-controller@14784000 {
 			compatible = "qcom,bam-v1.7.0";
-			reg = <0x14784000 0x17000>;
-			interrupts = <GIC_SPI 335 IRQ_TYPE_EDGE_RISING>;
+			reg = <0x14784000 0x27000>;
+			interrupts = <GIC_SPI 432 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rpmcc RPM_SMD_IPA_CLK>;
 			clock-names = "bam_clk";
 			#dma-cells = <1>;

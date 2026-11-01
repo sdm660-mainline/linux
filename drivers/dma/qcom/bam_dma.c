@@ -45,6 +45,7 @@
 struct dma_chan;
 
 void bam_dma_poll(struct dma_chan *chan);
+
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 
