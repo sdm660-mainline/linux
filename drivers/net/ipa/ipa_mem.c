@@ -706,6 +706,32 @@ int ipa_mem_init(struct ipa *ipa, struct platform_device *pdev,
 		return ret;
 	}
 
+	/* Diagnostic: the IPA v2.x hardware accesses a fixed DRAM address
+	 * (0xfd930000) that the driver never maps.  Map a zeroed window
+	 * there to see whether that access is spurious.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+		struct page *page;
+
+		if (domain) {
+			page = alloc_pages(GFP_KERNEL | __GFP_ZERO |
+					   __GFP_DMA32, get_order(SZ_64K));
+			if (page) {
+				phys_addr_t phys = page_to_phys(page);
+				int r = iommu_map(domain, 0xfd930000, phys,
+						  SZ_64K,
+						  IOMMU_READ | IOMMU_WRITE,
+						  GFP_KERNEL);
+
+				dev_info(dev,
+					 "spurious window 0xfd930000 -> phys 0x%llx: %d\n",
+					 (u64)phys, r);
+				ipa->spurious_page = page;
+			}
+		}
+	}
+
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ipa-shared");
 	if (!res) {
 		dev_err(dev,

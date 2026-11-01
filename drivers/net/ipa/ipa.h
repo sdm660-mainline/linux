@@ -115,6 +115,9 @@ struct ipa {
 	void *system_hdr_virt;
 	size_t system_hdr_size;
 
+	/* Diagnostic: window mapped at a hardware-accessed DRAM address */
+	struct page *spurious_page;
+
 	/* Bitmaps indicating endpoint state */
 	u32 endpoint_count;
 	u32 available_count;
