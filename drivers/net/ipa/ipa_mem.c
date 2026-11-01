@@ -594,8 +594,12 @@ static int ipa_smem_init(struct ipa *ipa, size_t size)
 
 	domain = iommu_get_domain_for_dev(dev);
 	if (!domain) {
-		dev_err(dev, "no IOMMU domain found for SMEM\n");
-		return -EINVAL;
+		/* No IOMMU for this device: the SMEM is accessed using its
+		 * physical address directly, so no mapping is needed.
+		 */
+		ipa->smem_iova = qcom_smem_virt_to_phys(virt);
+		ipa->smem_size = size;
+		return 0;
 	}
 
 	/* Align the address down and the size up to a page boundary */
