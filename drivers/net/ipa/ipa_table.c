@@ -189,7 +189,8 @@ static dma_addr_t ipa_table_addr(struct ipa *ipa, bool filter_mask, u16 count)
 	if (!count)
 		return 0;
 
-	WARN_ON(count > max_t(u32, ipa->filter_count, ipa->route_count));
+	/* filter_count excludes the filter map entry at the start */
+	WARN_ON(count > max_t(u32, ipa->filter_count + 1, ipa->route_count));
 
 	/* Skip over the zero rule and possibly the filter mask */
 	skip = filter_mask ? 1 : 2;
@@ -434,16 +435,18 @@ static void ipa_table_init_add(struct ipa_trans *trans, bool filter, bool ipv6)
 	/* Zero the unused space in the filter table */
 	zero_offset = mem->offset + size;
 	zero_size = mem->size - size;
-	ipa_cmd_dma_shared_mem_add(trans, zero_offset, zero_size,
-				   ipa->zero_addr, true);
+	if (zero_size)
+		ipa_cmd_dma_shared_mem_add(trans, zero_offset, zero_size,
+					   ipa->zero_addr, true);
 	if (!hash_size)
 		return;
 
 	/* Zero the unused space in the hashed filter table */
 	zero_offset = hash_offset + hash_size;
 	zero_size = hash_mem->size - hash_size;
-	ipa_cmd_dma_shared_mem_add(trans, zero_offset, zero_size,
-				   ipa->zero_addr, true);
+	if (zero_size)
+		ipa_cmd_dma_shared_mem_add(trans, zero_offset, zero_size,
+					   ipa->zero_addr, true);
 }
 
 int ipa_table_setup(struct ipa *ipa)
