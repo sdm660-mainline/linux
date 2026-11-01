@@ -53,14 +53,18 @@ void a5xx_flush(struct msm_gpu *gpu, struct msm_ringbuffer *ring,
 	/* Make sure to wrap wptr if we need to */
 	wptr = get_wptr(ring);
 
-	spin_unlock_irqrestore(&ring->preempt_lock, flags);
-
 	/* Make sure everything is posted before making a decision */
 	mb();
 
-	/* Update HW if this is the current ring and we are not in preempt */
+	/*
+	 * Update HW if this is the current ring and we are not in preempt.
+	 * Under the lock, so that update_wptr() cannot write an older wptr
+	 * after this one.
+	 */
 	if (a5xx_gpu->cur_ring == ring && !a5xx_in_preempt(a5xx_gpu))
 		gpu_write(gpu, REG_A5XX_CP_RB_WPTR, wptr);
+
+	spin_unlock_irqrestore(&ring->preempt_lock, flags);
 }
 
 static void a5xx_submit_in_rb(struct msm_gpu *gpu, struct msm_gem_submit *submit)
