@@ -10,6 +10,7 @@
 #include "pm660l.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
+#include <dt-bindings/input/qcom,spmi-haptics.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 #include <dt-bindings/sound/qcom,q6afe.h>
 #include <dt-bindings/sound/qcom,q6asm.h>
@@ -261,6 +262,11 @@
 };
 
 &pm660_haptics {
+	qcom,actuator-type = <HAP_TYPE_LRA>;
+	qcom,play-mode = <HAP_PLAY_BUFFER>;
+	qcom,wave-play-rate-us = <4878>;
+	qcom,wave-shape = <HAP_WAVE_SINE>;
+
 	status = "okay";
 };
 
