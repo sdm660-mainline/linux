@@ -612,6 +612,8 @@ void ipa_trans_commit(struct ipa_trans *trans, bool ring_db)
 /* Commit a GSI transaction and wait for it to complete */
 void ipa_trans_commit_wait(struct ipa_trans *trans)
 {
+	struct device *dev = trans->dma_subsys->dev;
+
 	if (!trans->used_count)
 		goto out_trans_free;
 
@@ -619,7 +621,10 @@ void ipa_trans_commit_wait(struct ipa_trans *trans)
 
 	trans->dma_subsys->trans_commit(trans, true);
 
-	wait_for_completion(&trans->completion);
+	if (!wait_for_completion_timeout(&trans->completion,
+					 msecs_to_jiffies(2000)))
+		dev_err(dev, "transaction timeout (ch%u, %u TREs)\n",
+			trans->channel_id, trans->used_count);
 
 out_trans_free:
 	ipa_trans_free(trans);
