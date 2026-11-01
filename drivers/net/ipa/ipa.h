@@ -110,6 +110,11 @@ struct ipa {
 	void *zero_virt;
 	size_t zero_size;
 
+	/* System (DRAM) header table used by IPA v2.x */
+	dma_addr_t system_hdr_addr;
+	void *system_hdr_virt;
+	size_t system_hdr_size;
+
 	/* Bitmaps indicating endpoint state */
 	u32 endpoint_count;
 	u32 available_count;
