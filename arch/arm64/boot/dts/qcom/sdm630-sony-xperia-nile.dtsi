@@ -215,6 +215,15 @@
 	/* HCI Bluetooth */
 };
 
+&pm660_haptics {
+	qcom,actuator-type = <HAP_TYPE_ERM>;
+	qcom,play-mode = <HAP_PLAY_BUFFER>;
+	qcom,wave-play-rate-us = <6667>;
+	qcom,wave-shape = <HAP_WAVE_SQUARE>;
+
+	status = "okay";
+};
+
 &pm660l_gpios {
 	vol_down_default: vol-down-default-state {
 		pins = "gpio7";
