@@ -229,32 +229,46 @@ static void ipa_table_reset_add(struct ipa_trans *trans, bool filter,
 static int
 ipa_filter_reset_table(struct ipa *ipa, bool hashed, bool ipv6, bool modem)
 {
+	enum gsi_ee_id ee_id = modem ? GSI_EE_MODEM : GSI_EE_AP;
+	u32 channel_id = ipa->name_map[IPA_ENDPOINT_AP_COMMAND_TX]->channel_id;
+	u32 tre_max = ipa->dma_subsys.channel[channel_id].trans_tre_max;
+	struct ipa_trans *trans = NULL;
 	u64 ep_mask = ipa->filtered;
-	struct ipa_trans *trans;
-	enum gsi_ee_id ee_id;
+	u32 used = 0;
 
-	trans = ipa_cmd_trans_alloc(ipa, hweight64(ep_mask));
-	if (!trans) {
-		dev_err(ipa->dev, "no transaction for %s filter reset\n",
-			modem ? "modem" : "AP");
-		return -EBUSY;
-	}
-
-	ee_id = modem ? GSI_EE_MODEM : GSI_EE_AP;
+	/* A transaction can hold at most trans_tre_max commands, which can
+	 * be fewer than the number of filtered endpoints, so reset the
+	 * table in batches of that size.
+	 */
 	while (ep_mask) {
 		u32 endpoint_id = __ffs(ep_mask);
-		struct ipa_endpoint *endpoint;
 
 		ep_mask ^= BIT(endpoint_id);
 
-		endpoint = &ipa->endpoint[endpoint_id];
-		if (endpoint->ee_id != ee_id)
+		if (ipa->endpoint[endpoint_id].ee_id != ee_id)
 			continue;
 
+		if (!trans) {
+			trans = ipa_cmd_trans_alloc(ipa, tre_max);
+			if (!trans) {
+				dev_err(ipa->dev,
+					"no transaction for %s filter reset\n",
+					modem ? "modem" : "AP");
+				return -EBUSY;
+			}
+			used = 0;
+		}
+
 		ipa_table_reset_add(trans, true, hashed, ipv6, endpoint_id, 1);
+
+		if (++used == tre_max) {
+			ipa_trans_commit_wait(trans);
+			trans = NULL;
+		}
 	}
 
-	ipa_trans_commit_wait(trans);
+	if (trans)
+		ipa_trans_commit_wait(trans);
 
 	return 0;
 }
