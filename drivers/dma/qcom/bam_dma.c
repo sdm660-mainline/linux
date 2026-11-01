@@ -41,6 +41,10 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+
+struct dma_chan;
+
+void bam_dma_poll(struct dma_chan *chan);
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 
@@ -898,10 +902,82 @@ static int bam_resume(struct dma_chan *chan)
  * This function processes the channel interrupts
  *
  */
+/* Retire descriptors the hardware has finished with on one channel */
+static void bam_chan_process_done(struct bam_chan *bchan)
+{
+	struct bam_device *bdev = bchan->bdev;
+	u32 pipe_stts, offset, avail;
+	struct bam_async_desc *async_desc, *tmp;
+	u32 i = bchan->id;
+
+	/* clear pipe irq */
+	pipe_stts = readl_relaxed(bam_addr(bdev, i, BAM_P_IRQ_STTS));
+
+	writel_relaxed(pipe_stts, bam_addr(bdev, i, BAM_P_IRQ_CLR));
+
+	guard(spinlock_irqsave)(&bchan->vc.lock);
+
+	offset = readl_relaxed(bam_addr(bdev, i, BAM_P_SW_OFSTS)) &
+			       P_SW_OFSTS_MASK;
+	offset /= sizeof(struct bam_desc_hw);
+
+	/* Number of bytes available to read */
+	avail = CIRC_CNT(offset, bchan->head, MAX_DESCRIPTORS + 1);
+
+	if (offset < bchan->head)
+		avail--;
+
+	list_for_each_entry_safe(async_desc, tmp,
+				 &bchan->desc_list, desc_node) {
+		/* Not enough data to read */
+		if (avail < async_desc->xfer_len)
+			break;
+
+		bam_update_metadata(bchan, async_desc);
+
+		/* manage FIFO */
+		bchan->head += async_desc->xfer_len;
+		bchan->head %= MAX_DESCRIPTORS;
+
+		async_desc->num_desc -= async_desc->xfer_len;
+		async_desc->curr_desc += async_desc->xfer_len;
+		avail -= async_desc->xfer_len;
+
+		/*
+		 * if complete, process cookie. Otherwise
+		 * push back to front of desc_issued so that
+		 * it gets restarted by the tasklet
+		 */
+		if (!async_desc->num_desc) {
+			vchan_cookie_complete(&async_desc->vd);
+		} else {
+			list_add(&async_desc->vd.node,
+				 &bchan->vc.desc_issued);
+		}
+		list_del(&async_desc->desc_node);
+	}
+}
+
+/**
+ * bam_dma_poll() - retire completed descriptors without an interrupt
+ * @chan: BAM DMA channel
+ *
+ * Some BAM instances never raise their completion interrupt (the IPA BAM
+ * on some Qualcomm SoCs is one).  Clients can call this periodically to
+ * process finished descriptors and complete their cookies.
+ */
+void bam_dma_poll(struct dma_chan *chan)
+{
+	struct bam_chan *bchan = to_bam_chan(chan);
+
+	if (bchan->initialized)
+		bam_chan_process_done(bchan);
+}
+EXPORT_SYMBOL_GPL(bam_dma_poll);
+
 static u32 process_channel_irqs(struct bam_device *bdev)
 {
-	u32 i, srcs, pipe_stts, offset, avail;
-	struct bam_async_desc *async_desc, *tmp;
+	u32 i, srcs;
 
 	srcs = readl_relaxed(bam_addr(bdev, 0, BAM_IRQ_SRCS_EE));
 
@@ -910,57 +986,8 @@ static u32 process_channel_irqs(struct bam_device *bdev)
 		return srcs;
 
 	for (i = 0; i < bdev->num_channels; i++) {
-		struct bam_chan *bchan = &bdev->channels[i];
-
-		if (!(srcs & BIT(i)))
-			continue;
-
-		/* clear pipe irq */
-		pipe_stts = readl_relaxed(bam_addr(bdev, i, BAM_P_IRQ_STTS));
-
-		writel_relaxed(pipe_stts, bam_addr(bdev, i, BAM_P_IRQ_CLR));
-
-		guard(spinlock_irqsave)(&bchan->vc.lock);
-
-		offset = readl_relaxed(bam_addr(bdev, i, BAM_P_SW_OFSTS)) &
-				       P_SW_OFSTS_MASK;
-		offset /= sizeof(struct bam_desc_hw);
-
-		/* Number of bytes available to read */
-		avail = CIRC_CNT(offset, bchan->head, MAX_DESCRIPTORS + 1);
-
-		if (offset < bchan->head)
-			avail--;
-
-		list_for_each_entry_safe(async_desc, tmp,
-					 &bchan->desc_list, desc_node) {
-			/* Not enough data to read */
-			if (avail < async_desc->xfer_len)
-				break;
-
-			bam_update_metadata(bchan, async_desc);
-
-			/* manage FIFO */
-			bchan->head += async_desc->xfer_len;
-			bchan->head %= MAX_DESCRIPTORS;
-
-			async_desc->num_desc -= async_desc->xfer_len;
-			async_desc->curr_desc += async_desc->xfer_len;
-			avail -= async_desc->xfer_len;
-
-			/*
-			 * if complete, process cookie. Otherwise
-			 * push back to front of desc_issued so that
-			 * it gets restarted by the tasklet
-			 */
-			if (!async_desc->num_desc) {
-				vchan_cookie_complete(&async_desc->vd);
-			} else {
-				list_add(&async_desc->vd.node,
-					 &bchan->vc.desc_issued);
-			}
-			list_del(&async_desc->desc_node);
-		}
+		if (srcs & BIT(i))
+			bam_chan_process_done(&bdev->channels[i]);
 	}
 
 	return srcs;

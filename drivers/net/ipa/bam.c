@@ -16,6 +16,13 @@
 #include "ipa_cmd.h"
 #include "ipa_data.h"
 #include "ipa_dma.h"
+
+/* The IPA BAM does not raise its completion interrupt on all SoCs, so
+ * retire completed descriptors by polling instead.
+ */
+#define BAM_POLL_MS	2
+
+void bam_dma_poll(struct dma_chan *chan);
 #include "ipa_dma_private.h"
 #include "ipa_endpoint.h"
 #include "ipa_gsi.h"
@@ -300,13 +307,37 @@ static void bam_channel_teardown(struct ipa_dma *bam)
 	mutex_unlock(&bam->mutex);
 }
 
+static void bam_poll_work(struct work_struct *work)
+{
+	struct ipa_dma *bam = container_of(to_delayed_work(work),
+					   struct ipa_dma, poll_work);
+	u32 channel_id;
+
+	for (channel_id = 0; channel_id < bam->channel_count; channel_id++) {
+		struct ipa_channel *channel = &bam->channel[channel_id];
+
+		if (channel->dma_chan)
+			bam_dma_poll(channel->dma_chan);
+	}
+
+	schedule_delayed_work(&bam->poll_work, msecs_to_jiffies(BAM_POLL_MS));
+}
+
 static int bam_setup(struct ipa_dma *bam)
 {
-	return bam_channel_setup(bam);
+	int ret = bam_channel_setup(bam);
+
+	if (ret)
+		return ret;
+
+	schedule_delayed_work(&bam->poll_work, msecs_to_jiffies(BAM_POLL_MS));
+
+	return 0;
 }
 
 static void bam_teardown(struct ipa_dma *bam)
 {
+	cancel_delayed_work_sync(&bam->poll_work);
 	bam_channel_teardown(bam);
 }
 
@@ -473,6 +504,7 @@ int bam_init(struct ipa_dma *bam, struct platform_device *pdev,
 		goto err_free_netdev;
 
 	mutex_init(&bam->mutex);
+	INIT_DELAYED_WORK(&bam->poll_work, bam_poll_work);
 
 	return 0;
 
