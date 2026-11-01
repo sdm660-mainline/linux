@@ -969,9 +969,21 @@ static void bam_chan_process_done(struct bam_chan *bchan)
 void bam_dma_poll(struct dma_chan *chan)
 {
 	struct bam_chan *bchan = to_bam_chan(chan);
+	struct bam_device *bdev = bchan->bdev;
+	int ret;
 
-	if (bchan->initialized)
-		bam_chan_process_done(bchan);
+	if (!bchan->initialized)
+		return;
+
+	/* Register access requires the BAM clock, held via runtime PM */
+	ret = pm_runtime_get_sync(bdev->dev);
+	if (ret < 0)
+		return;
+
+	bam_chan_process_done(bchan);
+
+	pm_runtime_mark_last_busy(bdev->dev);
+	pm_runtime_put_autosuspend(bdev->dev);
 }
 EXPORT_SYMBOL_GPL(bam_dma_poll);
 
