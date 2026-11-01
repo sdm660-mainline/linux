@@ -47,8 +47,9 @@ static inline void update_wptr(struct msm_gpu *gpu, struct msm_ringbuffer *ring)
 
 	spin_lock_irqsave(&ring->preempt_lock, flags);
 	wptr = get_wptr(ring);
-	gpu_write(gpu, REG_A5XX_CP_RB_WPTR, wptr);
 	spin_unlock_irqrestore(&ring->preempt_lock, flags);
+
+	gpu_write(gpu, REG_A5XX_CP_RB_WPTR, wptr);
 }
 
 /* Return the highest priority ringbuffer with something in it */
