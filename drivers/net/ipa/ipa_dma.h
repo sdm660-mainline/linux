@@ -172,6 +172,9 @@ struct ipa_dma {
 	struct ipa_channel channel[GSI_CHANNEL_COUNT_MAX];
 	struct gsi_evt_ring evt_ring[GSI_EVT_RING_COUNT_MAX];
 	struct net_device *dummy_dev;	/* needed for NAPI */
+
+	/* BAM channels may not deliver their completion interrupt; poll */
+	struct delayed_work poll_work;
 };
 
 /**
