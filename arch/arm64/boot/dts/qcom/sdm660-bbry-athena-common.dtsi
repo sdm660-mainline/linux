@@ -36,3 +36,7 @@
 &wifi {
 	qcom,ath10k-calibration-variant = "bbry_athena";
 };
+
+&battery {
+	charge-full-design-microamp-hours = <3500000>;
+};
