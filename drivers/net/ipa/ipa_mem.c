@@ -88,11 +88,17 @@ int ipa_mem_setup(struct ipa *ipa)
 	/* Get a transaction to define the header memory region and to zero
 	 * the processing context and modem memory regions.
 	 */
-	trans = ipa_cmd_trans_alloc(ipa, 5);
+	trans = ipa_cmd_trans_alloc(ipa, 6);
 	if (!trans) {
 		dev_err(ipa->dev, "no transaction for memory setup\n");
 		return -EBUSY;
 	}
+
+	/* IPA v2.x keeps a header table in system (DRAM) memory as well;
+	 * tell the hardware where it is before initializing local headers.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L)
+		ipa_cmd_hdr_init_system_add(trans, ipa->system_hdr_addr);
 
 	/* Initialize IPA-local header memory.  The AP header region, if
 	 * present, is contiguous with and follows the modem header region,
@@ -384,6 +390,27 @@ int ipa_mem_config(struct ipa *ipa)
 	ipa->zero_virt = virt;
 	ipa->zero_size = IPA_MEM_MAX;
 
+	/* IPA v2.x also keeps a header table in system (DRAM) memory; the
+	 * IPA needs to know where it is.  Allocate it now so the address is
+	 * stable before it is programmed during setup.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		size_t size = IPA_SYSTEM_HDR_SIZE;
+
+		virt = dma_alloc_coherent(dev, size, &addr, GFP_KERNEL);
+		if (!virt) {
+			dma_free_coherent(dev, ipa->zero_size, ipa->zero_virt,
+					  ipa->zero_addr);
+			ipa->zero_size = 0;
+			return -ENOMEM;
+		}
+
+		memset(virt, 0, size);
+		ipa->system_hdr_addr = addr;
+		ipa->system_hdr_virt = virt;
+		ipa->system_hdr_size = size;
+	}
+
 	/* For each defined region, write "canary" values in the
 	 * space prior to the region's base address if indicated.
 	 */
@@ -425,6 +452,14 @@ void ipa_mem_deconfig(struct ipa *ipa)
 	ipa->zero_size = 0;
 	ipa->zero_virt = NULL;
 	ipa->zero_addr = 0;
+
+	if (ipa->system_hdr_size) {
+		dma_free_coherent(dev, ipa->system_hdr_size,
+				  ipa->system_hdr_virt, ipa->system_hdr_addr);
+		ipa->system_hdr_size = 0;
+		ipa->system_hdr_virt = NULL;
+		ipa->system_hdr_addr = 0;
+	}
 }
 
 /**

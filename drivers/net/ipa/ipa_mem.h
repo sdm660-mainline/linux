@@ -45,6 +45,9 @@ struct ipa_mem_data;
 /* The maximum allowed size for any memory region */
 #define IPA_MEM_MAX	(2 * PAGE_SIZE)
 
+/* Size of the IPA v2.x system (DRAM) header table */
+#define IPA_SYSTEM_HDR_SIZE	2048
+
 /* IPA-resident memory region ids */
 enum ipa_mem_id {
 	IPA_MEM_UC_SHARED,		/* 0 canaries */
