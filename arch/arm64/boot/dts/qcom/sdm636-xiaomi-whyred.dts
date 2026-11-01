@@ -10,6 +10,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/input/gpio-keys.h>
+#include <dt-bindings/input/qcom,spmi-haptics.h>
 #include <dt-bindings/leds/common.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
@@ -273,6 +274,11 @@
 };
 
 &pm660_haptics {
+	qcom,actuator-type = <HAP_TYPE_ERM>;
+	qcom,play-mode = <HAP_PLAY_DIRECT>;
+	qcom,wave-play-rate-us = <6667>;
+	qcom,wave-shape = <HAP_WAVE_SQUARE>;
+
 	status = "okay";
 };
 
