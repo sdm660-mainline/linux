@@ -231,7 +231,9 @@ ipa_filter_reset_table(struct ipa *ipa, bool hashed, bool ipv6, bool modem)
 {
 	enum gsi_ee_id ee_id = modem ? GSI_EE_MODEM : GSI_EE_AP;
 	u32 channel_id = ipa->name_map[IPA_ENDPOINT_AP_COMMAND_TX]->channel_id;
-	u32 tre_max = ipa->dma_subsys.channel[channel_id].trans_tre_max;
+	u32 tre_max = min_t(u32,
+			    ipa->dma_subsys.channel[channel_id].trans_tre_max,
+			    IPA_COMMAND_TRANS_TRE_MAX);
 	struct ipa_trans *trans = NULL;
 	u64 ep_mask = ipa->filtered;
 	u32 used = 0;
