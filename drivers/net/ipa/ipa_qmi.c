@@ -296,32 +296,40 @@ init_modem_driver_req(struct ipa_qmi *ipa_qmi)
 	req.platform_type = IPA_QMI_PLATFORM_TYPE_MSM_ANDROID;
 
 	mem = ipa_mem_find(ipa, IPA_MEM_MODEM_HEADER);
-	if (mem->size) {
+	if (mem && mem->size) {
 		req.hdr_tbl_info_valid = 1;
 		req.hdr_tbl_info.start = ipa->mem_offset + mem->offset;
 		req.hdr_tbl_info.end = req.hdr_tbl_info.start + mem->size - 1;
 	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V4_ROUTE);
-	req.v4_route_tbl_info_valid = 1;
-	req.v4_route_tbl_info.start = ipa->mem_offset + mem->offset;
-	req.v4_route_tbl_info.end = modem_route_count - 1;
+	if (mem) {
+		req.v4_route_tbl_info_valid = 1;
+		req.v4_route_tbl_info.start = ipa->mem_offset + mem->offset;
+		req.v4_route_tbl_info.end = modem_route_count - 1;
+	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V6_ROUTE);
-	req.v6_route_tbl_info_valid = 1;
-	req.v6_route_tbl_info.start = ipa->mem_offset + mem->offset;
-	req.v6_route_tbl_info.end = modem_route_count - 1;
+	if (mem) {
+		req.v6_route_tbl_info_valid = 1;
+		req.v6_route_tbl_info.start = ipa->mem_offset + mem->offset;
+		req.v6_route_tbl_info.end = modem_route_count - 1;
+	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V4_FILTER);
-	req.v4_filter_tbl_start_valid = 1;
-	req.v4_filter_tbl_start = ipa->mem_offset + mem->offset;
+	if (mem) {
+		req.v4_filter_tbl_start_valid = 1;
+		req.v4_filter_tbl_start = ipa->mem_offset + mem->offset;
+	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V6_FILTER);
-	req.v6_filter_tbl_start_valid = 1;
-	req.v6_filter_tbl_start = ipa->mem_offset + mem->offset;
+	if (mem) {
+		req.v6_filter_tbl_start_valid = 1;
+		req.v6_filter_tbl_start = ipa->mem_offset + mem->offset;
+	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_MODEM);
-	if (mem->size) {
+	if (mem && mem->size) {
 		req.modem_mem_info_valid = 1;
 		req.modem_mem_info.start = ipa->mem_offset + mem->offset;
 		req.modem_mem_info.size = mem->size;
@@ -334,7 +342,7 @@ init_modem_driver_req(struct ipa_qmi *ipa_qmi)
 	/* skip_uc_load_valid and skip_uc_load are set above */
 
 	mem = ipa_mem_find(ipa, IPA_MEM_MODEM_PROC_CTX);
-	if (mem->size) {
+	if (mem && mem->size) {
 		req.hdr_proc_ctx_tbl_info_valid = 1;
 		req.hdr_proc_ctx_tbl_info.start =
 			ipa->mem_offset + mem->offset;
@@ -342,10 +350,15 @@ init_modem_driver_req(struct ipa_qmi *ipa_qmi)
 			req.hdr_proc_ctx_tbl_info.start + mem->size - 1;
 	}
 
-	/* Nothing to report for the compression table (zip_tbl_info) */
+	mem = ipa_mem_find(ipa, IPA_MEM_ZIP);
+	if (mem && mem->size) {
+		req.zip_tbl_info_valid = 1;
+		req.zip_tbl_info.start = ipa->mem_offset + mem->offset;
+		req.zip_tbl_info.end = ipa->mem_offset + mem->size - 1;
+	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V4_ROUTE_HASHED);
-	if (mem->size) {
+	if (mem && mem->size) {
 		req.v4_hash_route_tbl_info_valid = 1;
 		req.v4_hash_route_tbl_info.start =
 				ipa->mem_offset + mem->offset;
@@ -353,7 +366,7 @@ init_modem_driver_req(struct ipa_qmi *ipa_qmi)
 	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V6_ROUTE_HASHED);
-	if (mem->size) {
+	if (mem && mem->size) {
 		req.v6_hash_route_tbl_info_valid = 1;
 		req.v6_hash_route_tbl_info.start =
 			ipa->mem_offset + mem->offset;
@@ -361,13 +374,13 @@ init_modem_driver_req(struct ipa_qmi *ipa_qmi)
 	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V4_FILTER_HASHED);
-	if (mem->size) {
+	if (mem && mem->size) {
 		req.v4_hash_filter_tbl_start_valid = 1;
 		req.v4_hash_filter_tbl_start = ipa->mem_offset + mem->offset;
 	}
 
 	mem = ipa_mem_find(ipa, IPA_MEM_V6_FILTER_HASHED);
-	if (mem->size) {
+	if (mem && mem->size) {
 		req.v6_hash_filter_tbl_start_valid = 1;
 		req.v6_hash_filter_tbl_start = ipa->mem_offset + mem->offset;
 	}
@@ -518,6 +531,22 @@ err_server_handle_release:
 	memset(&ipa_qmi->server_handle, 0, sizeof(ipa_qmi->server_handle));
 
 	return ret;
+}
+
+/* With IPA v2.x the modem is not required to send a DRIVER_INIT_COMPLETE
+ * request to the AP.  We start operation as soon as the
+ * IPA_UC_RESPONSE_INIT_COMPLETED interrupt is triggered.
+ */
+void ipa_qmi_signal_uc_loaded(struct ipa *ipa)
+{
+	struct ipa_qmi *ipa_qmi = &ipa->qmi;
+
+	/* This is needed only on IPA v2.x */
+	if (ipa->version > IPA_VERSION_2_6L)
+		return;
+
+	ipa_qmi->uc_ready = true;
+	ipa_qmi_ready(ipa_qmi);
 }
 
 /* Tear down IPA QMI handles */

@@ -13,7 +13,7 @@
 
 #include <linux/soc/qcom/smem.h>
 
-#include "gsi_trans.h"
+#include "ipa_trans.h"
 #include "ipa.h"
 #include "ipa_cmd.h"
 #include "ipa_data.h"
@@ -45,13 +45,13 @@ const struct ipa_mem *ipa_mem_find(struct ipa *ipa, enum ipa_mem_id mem_id)
 
 /* Add an immediate command to a transaction that zeroes a memory region */
 static void
-ipa_mem_zero_region_add(struct gsi_trans *trans, enum ipa_mem_id mem_id)
+ipa_mem_zero_region_add(struct ipa_trans *trans, enum ipa_mem_id mem_id)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	const struct ipa_mem *mem = ipa_mem_find(ipa, mem_id);
 	dma_addr_t addr = ipa->zero_addr;
 
-	if (!mem->size)
+	if (!mem || !mem->size)
 		return;
 
 	ipa_cmd_dma_shared_mem_add(trans, mem->offset, mem->size, addr, true);
@@ -79,7 +79,7 @@ int ipa_mem_setup(struct ipa *ipa)
 {
 	dma_addr_t addr = ipa->zero_addr;
 	const struct ipa_mem *mem;
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	const struct reg *reg;
 	u32 offset;
 	u16 size;
@@ -88,11 +88,17 @@ int ipa_mem_setup(struct ipa *ipa)
 	/* Get a transaction to define the header memory region and to zero
 	 * the processing context and modem memory regions.
 	 */
-	trans = ipa_cmd_trans_alloc(ipa, 4);
+	trans = ipa_cmd_trans_alloc(ipa, 6);
 	if (!trans) {
 		dev_err(ipa->dev, "no transaction for memory setup\n");
 		return -EBUSY;
 	}
+
+	/* IPA v2.x keeps a header table in system (DRAM) memory as well;
+	 * tell the hardware where it is before initializing local headers.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L)
+		ipa_cmd_hdr_init_system_add(trans, ipa->system_hdr_addr);
 
 	/* Initialize IPA-local header memory.  The AP header region, if
 	 * present, is contiguous with and follows the modem header region,
@@ -109,9 +115,14 @@ int ipa_mem_setup(struct ipa *ipa)
 
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM_PROC_CTX);
 	ipa_mem_zero_region_add(trans, IPA_MEM_AP_PROC_CTX);
+	ipa_mem_zero_region_add(trans, IPA_MEM_ZIP);
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
+
+	/* On IPA version <=2.6L (except 2.5) there is no PROC_CTX. */
+	if (ipa->version != IPA_VERSION_2_5 && ipa->version <= IPA_VERSION_2_6L)
+		return 0;
 
 	/* Tell the hardware where the processing context area is located */
 	mem = ipa_mem_find(ipa, IPA_MEM_MODEM_PROC_CTX);
@@ -150,6 +161,11 @@ static bool ipa_mem_id_valid(struct ipa *ipa, enum ipa_mem_id mem_id)
 	case IPA_MEM_STATS_QUOTA_MODEM:
 	case IPA_MEM_STATS_QUOTA_AP:
 	case IPA_MEM_END_MARKER:	/* pseudo region */
+		break;
+
+	case IPA_MEM_ZIP:
+		if (version != IPA_VERSION_2_6L)
+			return false;
 		break;
 
 	case IPA_MEM_STATS_TETHERING:
@@ -191,19 +207,24 @@ static bool ipa_mem_id_required(struct ipa *ipa, enum ipa_mem_id mem_id)
 	switch (mem_id) {
 	case IPA_MEM_UC_SHARED:
 	case IPA_MEM_UC_INFO:
-	case IPA_MEM_V4_FILTER_HASHED:
 	case IPA_MEM_V4_FILTER:
-	case IPA_MEM_V6_FILTER_HASHED:
 	case IPA_MEM_V6_FILTER:
-	case IPA_MEM_V4_ROUTE_HASHED:
 	case IPA_MEM_V4_ROUTE:
-	case IPA_MEM_V6_ROUTE_HASHED:
 	case IPA_MEM_V6_ROUTE:
 	case IPA_MEM_MODEM_HEADER:
-	case IPA_MEM_MODEM_PROC_CTX:
-	case IPA_MEM_AP_PROC_CTX:
 	case IPA_MEM_MODEM:
 		return true;
+
+	case IPA_MEM_V4_FILTER_HASHED:
+	case IPA_MEM_V6_FILTER_HASHED:
+	case IPA_MEM_V4_ROUTE_HASHED:
+	case IPA_MEM_V6_ROUTE_HASHED:
+		return ipa_table_hash_support(ipa);
+
+	case IPA_MEM_MODEM_PROC_CTX:
+	case IPA_MEM_AP_PROC_CTX:
+		return ipa->version >= IPA_VERSION_3_0 ||
+		       ipa->version == IPA_VERSION_2_5;
 
 	case IPA_MEM_PDN_CONFIG:
 	case IPA_MEM_STATS_QUOTA_MODEM:
@@ -235,13 +256,17 @@ static bool ipa_mem_valid_one(struct ipa *ipa, const struct ipa_mem *mem)
 		return false;
 	}
 
-	/* Other than modem memory, sizes must be a multiple of 8 */
-	size_multiple = mem_id == IPA_MEM_MODEM ? 4 : 8;
+	/* Other than modem memory, sizes must be a multiple of 8 (or 4 on
+	 * IPA v2.x, whose table entries are 32 bits wide).
+	 */
+	size_multiple = mem_id == IPA_MEM_MODEM ||
+			ipa->version <= IPA_VERSION_2_6L ? 4 : 8;
 	if (mem->size % size_multiple)
 		dev_err(dev, "region %u size not a multiple of %u bytes\n",
 			mem_id, size_multiple);
-	else if (mem->offset % 8)
-		dev_err(dev, "region %u offset not 8-byte aligned\n", mem_id);
+	else if (mem->offset % size_multiple)
+		dev_err(dev, "region %u offset not %u-byte aligned\n",
+			mem_id, size_multiple);
 	else if (mem->offset < mem->canary_count * sizeof(__le32))
 		dev_err(dev, "region %u offset too small for %hu canaries\n",
 			mem_id, mem->canary_count);
@@ -333,11 +358,15 @@ int ipa_mem_config(struct ipa *ipa)
 	reg = ipa_reg(ipa, SHARED_MEM_SIZE);
 	val = ioread32(ipa->reg_virt + reg_offset(reg));
 
-	/* The fields in the register are in 8 byte units */
-	ipa->mem_offset = 8 * reg_decode(reg, MEM_BADDR, val);
-
-	/* Make sure the end is within the region's mapped space */
-	mem_size = 8 * reg_decode(reg, MEM_SIZE, val);
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		/* On IPA v2.x the fields are in units of bytes */
+		ipa->mem_offset = reg_decode(reg, MEM_BADDR, val);
+		mem_size = reg_decode(reg, MEM_SIZE, val);
+	} else {
+		/* The fields in the register are in 8 byte units */
+		ipa->mem_offset = 8 * reg_decode(reg, MEM_BADDR, val);
+		mem_size = 8 * reg_decode(reg, MEM_SIZE, val);
+	}
 
 	/* If the sizes don't match, issue a warning */
 	if (ipa->mem_offset + mem_size < ipa->mem_size) {
@@ -357,9 +386,31 @@ int ipa_mem_config(struct ipa *ipa)
 	virt = dma_alloc_coherent(dev, IPA_MEM_MAX, &addr, GFP_KERNEL);
 	if (!virt)
 		return -ENOMEM;
+
 	ipa->zero_addr = addr;
 	ipa->zero_virt = virt;
 	ipa->zero_size = IPA_MEM_MAX;
+
+	/* IPA v2.x also keeps a header table in system (DRAM) memory; the
+	 * IPA needs to know where it is.  Allocate it now so the address is
+	 * stable before it is programmed during setup.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		size_t size = IPA_SYSTEM_HDR_SIZE;
+
+		virt = dma_alloc_coherent(dev, size, &addr, GFP_KERNEL);
+		if (!virt) {
+			dma_free_coherent(dev, ipa->zero_size, ipa->zero_virt,
+					  ipa->zero_addr);
+			ipa->zero_size = 0;
+			return -ENOMEM;
+		}
+
+		memset(virt, 0, size);
+		ipa->system_hdr_addr = addr;
+		ipa->system_hdr_virt = virt;
+		ipa->system_hdr_size = size;
+	}
 
 	/* For each defined region, write "canary" values in the
 	 * space prior to the region's base address if indicated.
@@ -402,6 +453,14 @@ void ipa_mem_deconfig(struct ipa *ipa)
 	ipa->zero_size = 0;
 	ipa->zero_virt = NULL;
 	ipa->zero_addr = 0;
+
+	if (ipa->system_hdr_size) {
+		dma_free_coherent(dev, ipa->system_hdr_size,
+				  ipa->system_hdr_virt, ipa->system_hdr_addr);
+		ipa->system_hdr_size = 0;
+		ipa->system_hdr_virt = NULL;
+		ipa->system_hdr_addr = 0;
+	}
 }
 
 /**
@@ -416,7 +475,7 @@ void ipa_mem_deconfig(struct ipa *ipa)
  */
 int ipa_mem_zero_modem(struct ipa *ipa)
 {
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 
 	/* Get a transaction to zero the modem memory, modem header,
 	 * and modem processing context regions.
@@ -431,7 +490,7 @@ int ipa_mem_zero_modem(struct ipa *ipa)
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM_PROC_CTX);
 	ipa_mem_zero_region_add(trans, IPA_MEM_MODEM);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }
@@ -571,8 +630,12 @@ static int ipa_smem_init(struct ipa *ipa, size_t size)
 
 	domain = iommu_get_domain_for_dev(dev);
 	if (!domain) {
-		dev_err(dev, "no IOMMU domain found for SMEM\n");
-		return -EINVAL;
+		/* No IOMMU for this device: the SMEM is accessed using its
+		 * physical address directly, so no mapping is needed.
+		 */
+		ipa->smem_iova = qcom_smem_virt_to_phys(virt);
+		ipa->smem_size = size;
+		return 0;
 	}
 
 	/* Align the address down and the size up to a page boundary */
@@ -637,10 +700,41 @@ int ipa_mem_init(struct ipa *ipa, struct platform_device *pdev,
 	if (!ipa_table_mem_valid(ipa, true))
 		return -EINVAL;
 
-	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
+	ret = dma_set_mask_and_coherent(dev, IPA_IS_64BIT(ipa->version) ?
+					 DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
 	if (ret) {
 		dev_err(dev, "error %d setting DMA mask\n", ret);
 		return ret;
+	}
+
+	/* IPA v2.x keeps its system route/filter/header tables in DRAM at
+	 * a fixed, firmware-reserved address range.  The hardware walks
+	 * them during setup and at run time, so the range must be mapped
+	 * even though the driver does not own its contents.  Map a zeroed
+	 * window covering it.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+		struct page *page;
+
+		if (domain) {
+			size_t size = SZ_1M;
+			phys_addr_t phys;
+
+			page = alloc_pages(GFP_KERNEL | __GFP_ZERO |
+					   __GFP_DMA32, get_order(size));
+			if (!page)
+				return -ENOMEM;
+
+			phys = page_to_phys(page);
+			if (iommu_map(domain, IPA_V2_SYSTEM_WINDOW, phys, size,
+				      IOMMU_READ | IOMMU_WRITE, GFP_KERNEL)) {
+				__free_pages(page, get_order(size));
+				return -ENOMEM;
+			}
+
+			ipa->system_window_page = page;
+		}
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ipa-shared");
@@ -699,6 +793,16 @@ err_unmap:
 /* Inverse of ipa_mem_init() */
 void ipa_mem_exit(struct ipa *ipa)
 {
+	if (ipa->system_window_page) {
+		struct device *dev = ipa->dev;
+		struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+
+		if (domain)
+			iommu_unmap(domain, IPA_V2_SYSTEM_WINDOW, SZ_1M);
+		__free_pages(ipa->system_window_page, get_order(SZ_1M));
+		ipa->system_window_page = NULL;
+	}
+
 	ipa_smem_exit(ipa);
 	ipa_imem_exit(ipa);
 	memunmap(ipa->mem_virt);

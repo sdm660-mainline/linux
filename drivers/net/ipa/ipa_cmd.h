@@ -8,8 +8,8 @@
 
 #include <linux/types.h>
 
-struct gsi_channel;
-struct gsi_trans;
+struct ipa_channel;
+struct ipa_trans;
 struct ipa;
 struct ipa_mem;
 
@@ -21,6 +21,7 @@ struct ipa_mem;
  * @IPA_CMD_IP_V4_ROUTING_INIT:	Initialize IPv4 routing table
  * @IPA_CMD_IP_V6_ROUTING_INIT:	Initialize IPv6 routing table
  * @IPA_CMD_HDR_INIT_LOCAL:	Initialize IPA-local header memory
+ * @IPA_CMD_HDR_INIT_SYSTEM:	Initialize IPA system (DRAM) header memory
  * @IPA_CMD_REGISTER_WRITE:	Register write performed by IPA
  * @IPA_CMD_IP_PACKET_INIT:	Set up next packet's destination endpoint
  * @IPA_CMD_DMA_SHARED_MEM:	DMA command performed by IPA
@@ -36,6 +37,7 @@ enum ipa_cmd_opcode {
 	IPA_CMD_IP_V4_ROUTING_INIT	= 0x7,
 	IPA_CMD_IP_V6_ROUTING_INIT	= 0x8,
 	IPA_CMD_HDR_INIT_LOCAL		= 0x9,
+	IPA_CMD_HDR_INIT_SYSTEM		= 0xa,
 	IPA_CMD_REGISTER_WRITE		= 0xc,
 	IPA_CMD_IP_PACKET_INIT		= 0x10,
 	IPA_CMD_DMA_SHARED_MEM		= 0x13,
@@ -60,13 +62,13 @@ bool ipa_cmd_table_init_valid(struct ipa *ipa, const struct ipa_mem *mem,
  *
  * Return:	0 if successful, or a negative error code
  */
-int ipa_cmd_pool_init(struct gsi_channel *channel, u32 tre_count);
+int ipa_cmd_pool_init(struct ipa_channel *channel, u32 tre_count);
 
 /**
  * ipa_cmd_pool_exit() - Inverse of ipa_cmd_pool_init()
  * @channel:	AP->IPA command TX GSI channel pointer
  */
-void ipa_cmd_pool_exit(struct gsi_channel *channel);
+void ipa_cmd_pool_exit(struct ipa_channel *channel);
 
 /**
  * ipa_cmd_table_init_add() - Add table init command to a transaction
@@ -81,7 +83,7 @@ void ipa_cmd_pool_exit(struct gsi_channel *channel);
  *
  * If hash_size is 0, hash_offset and hash_addr are ignored.
  */
-void ipa_cmd_table_init_add(struct gsi_trans *trans, enum ipa_cmd_opcode opcode,
+void ipa_cmd_table_init_add(struct ipa_trans *trans, enum ipa_cmd_opcode opcode,
 			    u16 size, u32 offset, dma_addr_t addr,
 			    u16 hash_size, u32 hash_offset,
 			    dma_addr_t hash_addr);
@@ -95,8 +97,17 @@ void ipa_cmd_table_init_add(struct gsi_trans *trans, enum ipa_cmd_opcode opcode,
  *
  * Defines and fills the location in IPA memory to use for headers.
  */
-void ipa_cmd_hdr_init_local_add(struct gsi_trans *trans, u32 offset, u16 size,
+void ipa_cmd_hdr_init_local_add(struct ipa_trans *trans, u32 offset, u16 size,
 				dma_addr_t addr);
+
+/**
+ * ipa_cmd_hdr_init_system_add() - Add a system header init command
+ * @trans:	GSI transaction
+ * @addr:	DMA address of the system (DRAM) header table
+ *
+ * Tell the IPA where its system header table resides (IPA v2.x).
+ */
+void ipa_cmd_hdr_init_system_add(struct ipa_trans *trans, dma_addr_t addr);
 
 /**
  * ipa_cmd_register_write_add() - Add a register write command to a transaction
@@ -106,7 +117,7 @@ void ipa_cmd_hdr_init_local_add(struct gsi_trans *trans, u32 offset, u16 size,
  * @mask:	Mask of bits in register to update with bits from value
  * @clear_full: Pipeline clear option; true means full pipeline clear
  */
-void ipa_cmd_register_write_add(struct gsi_trans *trans, u32 offset, u32 value,
+void ipa_cmd_register_write_add(struct ipa_trans *trans, u32 offset, u32 value,
 				u32 mask, bool clear_full);
 
 /**
@@ -117,14 +128,14 @@ void ipa_cmd_register_write_add(struct gsi_trans *trans, u32 offset, u32 value,
  * @addr:	DMA address of buffer to be read into or written from
  * @toward_ipa:	true means write to IPA memory; false means read
  */
-void ipa_cmd_dma_shared_mem_add(struct gsi_trans *trans, u32 offset,
+void ipa_cmd_dma_shared_mem_add(struct ipa_trans *trans, u32 offset,
 				u16 size, dma_addr_t addr, bool toward_ipa);
 
 /**
  * ipa_cmd_pipeline_clear_add() - Add pipeline clear commands to a transaction
  * @trans:	GSI transaction
  */
-void ipa_cmd_pipeline_clear_add(struct gsi_trans *trans);
+void ipa_cmd_pipeline_clear_add(struct ipa_trans *trans);
 
 /**
  * ipa_cmd_pipeline_clear_count() - # commands required to clear pipeline
@@ -148,7 +159,7 @@ void ipa_cmd_pipeline_clear_wait(struct ipa *ipa);
  * Return:	A GSI transaction structure, or a null pointer if all
  *		available transactions are in use
  */
-struct gsi_trans *ipa_cmd_trans_alloc(struct ipa *ipa, u32 tre_count);
+struct ipa_trans *ipa_cmd_trans_alloc(struct ipa *ipa, u32 tre_count);
 
 /**
  * ipa_cmd_init() - Initialize IPA immediate commands
