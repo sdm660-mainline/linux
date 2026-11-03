@@ -38,8 +38,8 @@
 &panel {
 	compatible = "shenchao,fhdplus-video", "novatek,nt36672a";
 	vddio-supply = <&vreg_l11a_1p8>;
-	vddneg-supply = <&lcdb_fixed>;
-	vddpos-supply = <&lcdb_fixed>;
+	vddneg-supply = <&lcdb_ncp>;
+	vddpos-supply = <&lcdb_ldo>;
 };
 
 &tlmm {
