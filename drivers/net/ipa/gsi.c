@@ -1114,7 +1114,7 @@ void gsi_trans_tx_queued(struct ipa_trans *trans)
  * We report this information to the network stack, which uses it to manage
  * the rate at which data is sent to hardware.
  */
-static void gsi_trans_tx_completed(struct ipa_trans *trans)
+void gsi_trans_tx_completed(struct ipa_trans *trans)
 {
 	u32 channel_id = trans->channel_id;
 	struct ipa_dma *gsi = trans->dma_subsys;
@@ -2401,6 +2401,7 @@ int gsi_init(struct ipa_dma *gsi, struct platform_device *pdev,
 	gsi->channel_reset = gsi_channel_reset;
 	gsi->channel_suspend = gsi_channel_suspend;
 	gsi->channel_resume = gsi_channel_resume;
+	gsi->channel_update = gsi_channel_update;
 	gsi->trans_commit = gsi_trans_commit;
 
 	return 0;
