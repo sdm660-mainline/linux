@@ -13,6 +13,12 @@
 static const char *ipa_version_string(struct ipa *ipa)
 {
 	switch (ipa->version) {
+	case IPA_VERSION_2_0:
+		return "2.0";
+	case IPA_VERSION_2_5:
+		return "2.5";
+	case IPA_VERSION_2_6L:
+		return "2.6L";
 	case IPA_VERSION_3_0:
 		return "3.0";
 	case IPA_VERSION_3_1:
@@ -69,6 +75,19 @@ const struct attribute_group ipa_attribute_group = {
 
 static const char *ipa_offload_string(struct ipa *ipa)
 {
+	/* Report the offload mode the AP_MODEM endpoints are actually
+	 * configured for.  With checksum offload disabled the hardware uses
+	 * the plain (legacy) MAP header, and reporting MAPv4 here would make
+	 * the modem stack build a QMAPv4 rmnet link that does not match the
+	 * modem's data format.
+	 */
+	/* ipa->endpoint[] is indexed by hardware endpoint ID; AP_MODEM_RX
+	 * is hardware endpoint 5 on IPA v2.5/2.6L.
+	 */
+	if (ipa->version <= IPA_VERSION_2_6L &&
+	    !ipa->endpoint[5].config.checksum)
+		return "MAP";
+
 	return ipa->version < IPA_VERSION_4_5 ? "MAPv4" : "MAPv5";
 }
 
