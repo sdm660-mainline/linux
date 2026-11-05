@@ -21,6 +21,7 @@ struct ipa_mem;
  * @IPA_CMD_IP_V4_ROUTING_INIT:	Initialize IPv4 routing table
  * @IPA_CMD_IP_V6_ROUTING_INIT:	Initialize IPv6 routing table
  * @IPA_CMD_HDR_INIT_LOCAL:	Initialize IPA-local header memory
+ * @IPA_CMD_HDR_INIT_SYSTEM:	Initialize IPA system (DRAM) header memory
  * @IPA_CMD_REGISTER_WRITE:	Register write performed by IPA
  * @IPA_CMD_IP_PACKET_INIT:	Set up next packet's destination endpoint
  * @IPA_CMD_DMA_SHARED_MEM:	DMA command performed by IPA
@@ -36,6 +37,7 @@ enum ipa_cmd_opcode {
 	IPA_CMD_IP_V4_ROUTING_INIT	= 0x7,
 	IPA_CMD_IP_V6_ROUTING_INIT	= 0x8,
 	IPA_CMD_HDR_INIT_LOCAL		= 0x9,
+	IPA_CMD_HDR_INIT_SYSTEM		= 0xa,
 	IPA_CMD_REGISTER_WRITE		= 0xc,
 	IPA_CMD_IP_PACKET_INIT		= 0x10,
 	IPA_CMD_DMA_SHARED_MEM		= 0x13,
@@ -97,6 +99,15 @@ void ipa_cmd_table_init_add(struct ipa_trans *trans, enum ipa_cmd_opcode opcode,
  */
 void ipa_cmd_hdr_init_local_add(struct ipa_trans *trans, u32 offset, u16 size,
 				dma_addr_t addr);
+
+/**
+ * ipa_cmd_hdr_init_system_add() - Add a system header init command
+ * @trans:	GSI transaction
+ * @addr:	DMA address of the system (DRAM) header table
+ *
+ * Tell the IPA where its system header table resides (IPA v2.x).
+ */
+void ipa_cmd_hdr_init_system_add(struct ipa_trans *trans, dma_addr_t addr);
 
 /**
  * ipa_cmd_register_write_add() - Add a register write command to a transaction
