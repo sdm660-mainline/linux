@@ -69,6 +69,28 @@ properties:
       Indicates the active Execution Environment identifier (0-7) used in the
       secure world.
 
+  qcom,ipa-bam:
+    type: boolean
+    description:
+      Indicates that this BAM is the IPA's DMA transport.  The IPA BAM
+      needs the same global workaround configuration and thresholds the
+      downstream SPS driver uses.
+
+  qcom,event-threshold:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    maximum: 65535
+    description:
+      Event generation threshold programmed into each BAM pipe.  Used by
+      the IPA BAM (typically 0x10).
+
+  qcom,desc-threshold:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 1
+    maximum: 65535
+    description:
+      Descriptor count threshold programmed into the BAM.  Used by the
+      IPA BAM (typically 0x10).
+
   qcom,num-ees:
     $ref: /schemas/types.yaml#/definitions/uint32
     description:
