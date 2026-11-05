@@ -16,6 +16,22 @@ static bool ipa_reg_id_valid(struct ipa *ipa, enum ipa_reg_id reg_id)
 	enum ipa_version version = ipa->version;
 
 	switch (reg_id) {
+	case COMP_SW_RESET:
+	case V2_ENABLED_PIPES:
+		return version <= IPA_VERSION_2_6L;
+
+	case CLKON_CFG:
+	case QSB_MAX_WRITES:
+	case QSB_MAX_READS:
+	case SRC_RSRC_GRP_01_RSRC_TYPE:
+	case SRC_RSRC_GRP_23_RSRC_TYPE:
+	case DST_RSRC_GRP_01_RSRC_TYPE:
+	case DST_RSRC_GRP_23_RSRC_TYPE:
+	case ENDP_INIT_NAT:
+	case ENDP_INIT_RSRC_GRP:
+	case ENDP_INIT_SEQ:
+		return version >= IPA_VERSION_3_0;
+
 	case FILT_ROUT_HASH_EN:
 		return version == IPA_VERSION_4_2;
 
@@ -61,21 +77,13 @@ static bool ipa_reg_id_valid(struct ipa *ipa, enum ipa_reg_id reg_id)
 		return version >= IPA_VERSION_3_1;
 
 	case COMP_CFG:
-	case CLKON_CFG:
 	case ROUTE:
 	case SHARED_MEM_SIZE:
-	case QSB_MAX_WRITES:
-	case QSB_MAX_READS:
 	case STATE_AGGR_ACTIVE:
 	case LOCAL_PKT_PROC_CNTXT:
 	case AGGR_FORCE_CLOSE:
-	case SRC_RSRC_GRP_01_RSRC_TYPE:
-	case SRC_RSRC_GRP_23_RSRC_TYPE:
-	case DST_RSRC_GRP_01_RSRC_TYPE:
-	case DST_RSRC_GRP_23_RSRC_TYPE:
 	case ENDP_INIT_CTRL:
 	case ENDP_INIT_CFG:
-	case ENDP_INIT_NAT:
 	case ENDP_INIT_HDR:
 	case ENDP_INIT_HDR_EXT:
 	case ENDP_INIT_HDR_METADATA_MASK:
@@ -84,8 +92,6 @@ static bool ipa_reg_id_valid(struct ipa *ipa, enum ipa_reg_id reg_id)
 	case ENDP_INIT_HOL_BLOCK_EN:
 	case ENDP_INIT_HOL_BLOCK_TIMER:
 	case ENDP_INIT_DEAGGR:
-	case ENDP_INIT_RSRC_GRP:
-	case ENDP_INIT_SEQ:
 	case ENDP_STATUS:
 	case IPA_IRQ_STTS:
 	case IPA_IRQ_EN:
@@ -110,6 +116,9 @@ const struct reg *ipa_reg(struct ipa *ipa, enum ipa_reg_id reg_id)
 static const struct regs *ipa_regs(enum ipa_version version)
 {
 	switch (version) {
+	case IPA_VERSION_2_5:
+	case IPA_VERSION_2_6L:
+		return &ipa_regs_v2_5;
 	case IPA_VERSION_3_1:
 		return &ipa_regs_v3_1;
 	case IPA_VERSION_3_5_1:
