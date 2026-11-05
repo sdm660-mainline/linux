@@ -8,7 +8,14 @@
 
 #include <linux/types.h>
 
+#include "ipa_version.h"
+
 struct ipa;
+struct ipa_install_fltr_rule_req;
+
+/* The size of a filter or route table entry */
+#define IPA_TABLE_ENTRY_SIZE(version)	\
+	(IPA_IS_64BIT(version) ? sizeof(__le64) : sizeof(__le32))
 
 /**
  * ipa_filtered_valid() - Validate a filter table endpoint bitmap
@@ -37,6 +44,20 @@ void ipa_table_reset(struct ipa *ipa, bool modem);
  * @ipa:	IPA pointer
  */
 int ipa_table_hash_flush(struct ipa *ipa);
+
+/**
+ * ipa_table_install_filter_rules() - Install modem filter rules
+ * @ipa:	IPA pointer
+ * @req:	Decoded INSTALL_FILTER_RULE request
+ *
+ * Install the filter rules sent by an IPA v2.x modem on the modem's
+ * TX pipe, and make sure every routing table entry the rules refer to
+ * has a rule that forwards matching packets to the AP.
+ *
+ * Return:	0 on success, or a negative error code
+ */
+int ipa_table_install_filter_rules(struct ipa *ipa,
+				   const struct ipa_install_fltr_rule_req *req);
 
 /**
  * ipa_table_setup() - Set up filter and route tables
