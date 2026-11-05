@@ -18,6 +18,9 @@
 #define IPA_QMI_INDICATION_REGISTER	0x20	/* modem -> AP request */
 #define IPA_QMI_INIT_DRIVER		0x21	/* AP -> modem request */
 #define IPA_QMI_INIT_COMPLETE		0x22	/* AP -> modem indication */
+#define IPA_QMI_INSTALL_FILTER_RULE	0x23	/* modem -> AP request */
+#define IPA_QMI_FILTER_INSTALLED_NOTIF	0x24	/* modem -> AP request */
+#define IPA_QMI_CONFIG			0x27	/* modem -> AP request */
 #define IPA_QMI_DRIVER_INIT_COMPLETE	0x35	/* modem -> AP request */
 
 /* The maximum size required for message types.  These sizes include
@@ -36,6 +39,34 @@
 /* Maximum size of messages we expect the AP to receive (max of above) */
 #define IPA_QMI_SERVER_MAX_RCV_SZ		8
 #define IPA_QMI_CLIENT_MAX_RCV_SZ		25
+
+/* IPA v2.x modems send filter-rule and configuration requests to the AP
+ * over the IPA QMI service; these are much larger than the init messages.
+ * The filter-rule request is a fixed array of filter specs and is over
+ * 4 KB, so the receive buffer must be comfortably larger than that.
+ */
+#define IPA_QMI_V2_SERVER_MAX_RCV_SZ		16384
+
+/* INSTALL_FILTER_RULE requests the AP sends to the modem use the
+ * published QMI enum values, unlike the requests the modem sends to
+ * the AP (which use V4=0 and V6=1).
+ */
+#define IPA_QMI_REQ_IP_TYPE_V4			1
+#define IPA_QMI_REQ_IP_TYPE_V6			2
+#define IPA_QMI_REQ_FILTER_ACTION_ROUTE		3
+
+/* The stock AP rule set installs the WAN downlink default filters on the
+ * modem: the IPv4 multicast prefix 224.0.0.0/4 and the broadcast address,
+ * both routed through the WAN downlink routing table (ipa_dflt_wan_rt).
+ */
+#define IPA_QMI_WAN_DL_ROUTE_TABLE		8
+#define IPA_QMI_WAN_DL_FILTER_COUNT		2
+#define IPA_QMI_INSTALL_FILTER_RULE_REQ_SZ	1024
+
+/* The response to an INSTALL_FILTER_RULE request can carry a handle for
+ * every filter spec, so it is larger than the INIT_DRIVER response.
+ */
+#define IPA_QMI_V2_CLIENT_MAX_RCV_SZ		4096
 
 /* Request message for the IPA_QMI_INDICATION_REGISTER request */
 struct ipa_indication_register_req {
@@ -247,7 +278,130 @@ struct ipa_init_modem_driver_rsp {
 	u8				modem_driver_init_pending;
 };
 
-/* Message structure definitions defined in "ipa_qmi_msg.c" */
+/* === IPA v2.x filter rule installation ===
+ *
+ * IPA v2.x modems send an INSTALL_FILTER_RULE request containing the
+ * filter rules the modem wants the AP to install in the shared IPA
+ * hardware.  The rules are for packets arriving from the modem, and
+ * each one names the routing table entry used to forward a match.
+ */
+
+#define IPA_QMI_MAX_FILTERS		64
+
+/* IP type values used by the v2.x modem.  Note these differ from the
+ * published QMI service definition (which has INVALID=0, V4=1, V6=2);
+ * the modem sends 0 for IPv4 and 1 for IPv6.
+ */
+#define IPA_QMI_IP_TYPE_V4		0
+#define IPA_QMI_IP_TYPE_V6		1
+
+struct ipa_ipfltr_range_eq_16 {
+	u8 offset;
+	u16 range_low;
+	u16 range_high;
+};
+
+struct ipa_ipfltr_mask_eq_32 {
+	u8 offset;
+	u32 mask;
+	u32 value;
+};
+
+struct ipa_ipfltr_eq_16 {
+	u8 offset;
+	u16 value;
+};
+
+struct ipa_ipfltr_eq_32 {
+	u8 offset;
+	u32 value;
+};
+
+struct ipa_ipfltr_mask_eq_128 {
+	u8 offset;
+	u8 mask[16];
+	u8 value[16];
+};
+
+struct ipa_filter_rule {
+	u16 rule_eq_bitmap;
+	u8 tos_eq_present;
+	u8 tos_eq;
+	u8 protocol_eq_present;
+	u8 protocol_eq;
+	u8 num_ihl_offset_range_16;
+	struct ipa_ipfltr_range_eq_16 ihl_offset_range_16[2];
+	u8 num_offset_meq_32;
+	struct ipa_ipfltr_mask_eq_32 offset_meq_32[2];
+	u8 tc_eq_present;
+	u8 tc_eq;
+	u8 flow_eq_present;
+	u32 flow_eq;
+	u8 ihl_offset_eq_16_present;
+	struct ipa_ipfltr_eq_16 ihl_offset_eq_16;
+	u8 ihl_offset_eq_32_present;
+	struct ipa_ipfltr_eq_32 ihl_offset_eq_32;
+	u8 num_ihl_offset_meq_32;
+	struct ipa_ipfltr_mask_eq_32 ihl_offset_meq_32[2];
+	u8 num_offset_meq_128;
+	struct ipa_ipfltr_mask_eq_128 offset_meq_128[2];
+	u8 metadata_meq32_present;
+	struct ipa_ipfltr_mask_eq_32 metadata_meq32;
+	u8 ipv4_frag_eq_present;
+};
+
+struct ipa_filter_spec {
+	u32 filter_spec_identifier;
+	u32 ip_type;
+	struct ipa_filter_rule filter_rule;
+	u32 filter_action;
+	u8 is_routing_table_index_valid;
+	u32 route_table_index;
+	u8 is_mux_id_valid;
+	u32 mux_id;
+};
+
+/* Only the filter spec list is of interest; the modem does not send the
+ * other (optional) TLVs for the v2.x request.
+ */
+struct ipa_install_fltr_rule_req {
+	u8 filter_spec_list_valid;
+	u8 filter_spec_list_len;
+	struct ipa_filter_spec filter_spec_list[IPA_QMI_MAX_FILTERS];
+};
+
+struct ipa_filter_handle {
+	u32 filter_spec_identifier;
+	u32 filter_handle;
+};
+
+/* The response maps every spec identifier back to a rule handle */
+struct ipa_install_fltr_rule_rsp {
+	struct qmi_response_type_v01 rsp;
+	u8 filter_handle_list_valid;
+	u8 filter_handle_list_len;
+	struct ipa_filter_handle filter_handle_list[IPA_QMI_MAX_FILTERS];
+};
+
+/* FILTER_INSTALLED_NOTIF is sent by the AP after installing the rules */
+struct ipa_filter_handle_index {
+	u32 filter_handle;
+	u32 filter_index;
+};
+
+struct ipa_fltr_installed_notif_req {
+	u32 source_pipe_index;
+	u16 install_status;
+	u8 filter_index_list_len;
+	struct ipa_filter_handle_index filter_index_list[IPA_QMI_MAX_FILTERS];
+};
+
+extern const struct qmi_elem_info ipa_filter_rule_ei[];
+extern const struct qmi_elem_info ipa_filter_spec_ei[];
+extern const struct qmi_elem_info ipa_install_fltr_rule_req_ei[];
+extern const struct qmi_elem_info ipa_install_fltr_rule_rsp_ei[];
+extern const struct qmi_elem_info ipa_fltr_installed_notif_req_ei[];
+extern const struct qmi_elem_info ipa_fltr_installed_notif_rsp_ei[];
 extern const struct qmi_elem_info ipa_indication_register_req_ei[];
 extern const struct qmi_elem_info ipa_indication_register_rsp_ei[];
 extern const struct qmi_elem_info ipa_driver_init_complete_req_ei[];
