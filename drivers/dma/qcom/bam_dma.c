@@ -41,6 +41,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 
@@ -310,6 +311,16 @@ static const struct reg_offset_data bam_v2_0_reg_info[] = {
 				 BAM_AU_ACCUMED |	\
 				 BAM_CMD_ENABLE)
 
+/*
+ * The IPA BAM is configured the way the downstream SPS driver configures
+ * it: all workarounds except BAM_FULL_PIPE, no local clock gating, and no
+ * cache-miss error responses or cancelled-writeback messages.
+ */
+#define BAM_CNFG_BITS_IPA		0xfffff7ff
+#define CACHE_MISS_ERR_RESP_EN		BIT(19)
+#define LOCAL_CLK_GATING		(BIT(17) | BIT(18))
+#define BAM_MESS_ONLY_CANCEL_WB		BIT(20)
+
 /* PIPE CTRL */
 #define P_EN			BIT(1)
 #define P_DIRECTION		BIT(3)
@@ -422,6 +433,9 @@ struct bam_device {
 	u32 ee;
 	bool controlled_remotely;
 	bool powered_remotely;
+	bool ipa_bam;
+	u32 event_threshold;
+	u32 desc_threshold;
 	u32 active_channels;
 
 	const struct reg_offset_data *layout;
@@ -515,16 +529,22 @@ static void bam_reset(struct bam_device *bdev)
 	/* make sure previous stores are visible before enabling BAM */
 	wmb();
 
+	if (bdev->ipa_bam)
+		val &= ~(CACHE_MISS_ERR_RESP_EN | LOCAL_CLK_GATING |
+			 BAM_MESS_ONLY_CANCEL_WB);
+
 	/* enable bam */
 	val |= BAM_EN;
 	writel_relaxed(val, bam_addr(bdev, 0, BAM_CTRL));
 
-	/* set descriptor threshold, start with 4 bytes */
-	writel_relaxed(DEFAULT_CNT_THRSHLD,
-			bam_addr(bdev, 0, BAM_DESC_CNT_TRSHLD));
+	/* set the descriptor count threshold */
+	writel_relaxed(bdev->desc_threshold,
+		       bam_addr(bdev, 0, BAM_DESC_CNT_TRSHLD));
 
-	/* Enable default set of h/w workarounds, ie all except BAM_FULL_PIPE */
-	writel_relaxed(BAM_CNFG_BITS_DEFAULT, bam_addr(bdev, 0, BAM_CNFG_BITS));
+	/* Enable the workarounds; IPA needs the SPS configuration */
+	writel_relaxed(bdev->ipa_bam ? BAM_CNFG_BITS_IPA :
+			BAM_CNFG_BITS_DEFAULT,
+			bam_addr(bdev, 0, BAM_CNFG_BITS));
 
 	/* enable irqs for errors */
 	writel_relaxed(BAM_ERROR_EN | BAM_HRESP_ERR_EN,
@@ -585,6 +605,12 @@ static void bam_chan_init_hw(struct bam_chan *bchan,
 			bam_addr(bdev, bchan->id, BAM_P_DESC_FIFO_ADDR));
 	writel_relaxed(BAM_FIFO_SIZE,
 			bam_addr(bdev, bchan->id, BAM_P_FIFO_SIZES));
+
+	/* IPA uses the SPS event threshold on each system-mode pipe */
+	if (bdev->event_threshold)
+		writel_relaxed(bdev->event_threshold,
+			       bam_addr(bdev, bchan->id,
+					BAM_P_EVNT_GEN_TRSHLD));
 
 	/* enable the per pipe interrupts, enable EOT, ERR, and INT irqs */
 	writel_relaxed(P_DEFAULT_IRQS_EN,
@@ -751,8 +777,17 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
 	if (flags & DMA_PREP_FENCE)
 		async_desc->flags |= DESC_FLAG_NWD;
 
-	if (flags & DMA_PREP_INTERRUPT)
-		async_desc->flags |= DESC_FLAG_EOT;
+	if (flags & DMA_PREP_INTERRUPT) {
+		/*
+		 * SPS uses an interrupt descriptor (not an end-of-transfer
+		 * descriptor) for system-mode RX pipes.  TX and commands use
+		 * end-of-transfer.
+		 */
+		if (bdev->ipa_bam && direction == DMA_DEV_TO_MEM)
+			async_desc->flags |= DESC_FLAG_INT;
+		else
+			async_desc->flags |= DESC_FLAG_EOT;
+	}
 
 	async_desc->num_desc = num_alloc;
 	async_desc->curr_desc = async_desc->desc;
@@ -892,16 +927,96 @@ static int bam_resume(struct dma_chan *chan)
 }
 
 /**
- * process_channel_irqs - processes the channel interrupts
- * @bdev: bam controller
- *
- * This function processes the channel interrupts
- *
+ * bam_chan_process_done - retire descriptors the hardware has finished with
+ * @bchan: BAM channel to process
  */
+static void bam_chan_process_done(struct bam_chan *bchan)
+{
+	struct bam_device *bdev = bchan->bdev;
+	u32 pipe_stts, offset, avail;
+	struct bam_async_desc *async_desc, *tmp;
+	u32 i = bchan->id;
+
+	/* clear pipe irq */
+	pipe_stts = readl_relaxed(bam_addr(bdev, i, BAM_P_IRQ_STTS));
+
+	writel_relaxed(pipe_stts, bam_addr(bdev, i, BAM_P_IRQ_CLR));
+
+	guard(spinlock_irqsave)(&bchan->vc.lock);
+
+	offset = readl_relaxed(bam_addr(bdev, i, BAM_P_SW_OFSTS)) &
+			       P_SW_OFSTS_MASK;
+	offset /= sizeof(struct bam_desc_hw);
+
+	/* Number of bytes available to read */
+	avail = CIRC_CNT(offset, bchan->head, MAX_DESCRIPTORS + 1);
+
+	if (offset < bchan->head)
+		avail--;
+
+	list_for_each_entry_safe(async_desc, tmp,
+				 &bchan->desc_list, desc_node) {
+		/* Not enough data to read */
+		if (avail < async_desc->xfer_len)
+			break;
+
+		bam_update_metadata(bchan, async_desc);
+
+		/* manage FIFO */
+		bchan->head += async_desc->xfer_len;
+		bchan->head %= MAX_DESCRIPTORS;
+
+		async_desc->num_desc -= async_desc->xfer_len;
+		async_desc->curr_desc += async_desc->xfer_len;
+		avail -= async_desc->xfer_len;
+
+		/*
+		 * if complete, process cookie. Otherwise
+		 * push back to front of desc_issued so that
+		 * it gets restarted by the tasklet
+		 */
+		if (!async_desc->num_desc) {
+			vchan_cookie_complete(&async_desc->vd);
+		} else {
+			list_add(&async_desc->vd.node,
+				 &bchan->vc.desc_issued);
+		}
+		list_del(&async_desc->desc_node);
+	}
+}
+
+/**
+ * bam_dma_poll() - retire completed descriptors without an interrupt
+ * @chan: BAM DMA channel
+ *
+ * Some BAM instances never raise their completion interrupt (the IPA BAM
+ * on some Qualcomm SoCs is one).  Clients can call this periodically to
+ * process finished descriptors and complete their cookies.
+ */
+void bam_dma_poll(struct dma_chan *chan)
+{
+	struct bam_chan *bchan = to_bam_chan(chan);
+	struct bam_device *bdev = bchan->bdev;
+	int ret;
+
+	if (!bchan->initialized)
+		return;
+
+	/* Register access requires the BAM clock, held via runtime PM */
+	ret = pm_runtime_get_sync(bdev->dev);
+	if (ret < 0)
+		return;
+
+	bam_chan_process_done(bchan);
+
+	pm_runtime_mark_last_busy(bdev->dev);
+	pm_runtime_put_autosuspend(bdev->dev);
+}
+EXPORT_SYMBOL_GPL(bam_dma_poll);
+
 static u32 process_channel_irqs(struct bam_device *bdev)
 {
-	u32 i, srcs, pipe_stts, offset, avail;
-	struct bam_async_desc *async_desc, *tmp;
+	u32 i, srcs;
 
 	srcs = readl_relaxed(bam_addr(bdev, 0, BAM_IRQ_SRCS_EE));
 
@@ -910,57 +1025,8 @@ static u32 process_channel_irqs(struct bam_device *bdev)
 		return srcs;
 
 	for (i = 0; i < bdev->num_channels; i++) {
-		struct bam_chan *bchan = &bdev->channels[i];
-
-		if (!(srcs & BIT(i)))
-			continue;
-
-		/* clear pipe irq */
-		pipe_stts = readl_relaxed(bam_addr(bdev, i, BAM_P_IRQ_STTS));
-
-		writel_relaxed(pipe_stts, bam_addr(bdev, i, BAM_P_IRQ_CLR));
-
-		guard(spinlock_irqsave)(&bchan->vc.lock);
-
-		offset = readl_relaxed(bam_addr(bdev, i, BAM_P_SW_OFSTS)) &
-				       P_SW_OFSTS_MASK;
-		offset /= sizeof(struct bam_desc_hw);
-
-		/* Number of bytes available to read */
-		avail = CIRC_CNT(offset, bchan->head, MAX_DESCRIPTORS + 1);
-
-		if (offset < bchan->head)
-			avail--;
-
-		list_for_each_entry_safe(async_desc, tmp,
-					 &bchan->desc_list, desc_node) {
-			/* Not enough data to read */
-			if (avail < async_desc->xfer_len)
-				break;
-
-			bam_update_metadata(bchan, async_desc);
-
-			/* manage FIFO */
-			bchan->head += async_desc->xfer_len;
-			bchan->head %= MAX_DESCRIPTORS;
-
-			async_desc->num_desc -= async_desc->xfer_len;
-			async_desc->curr_desc += async_desc->xfer_len;
-			avail -= async_desc->xfer_len;
-
-			/*
-			 * if complete, process cookie. Otherwise
-			 * push back to front of desc_issued so that
-			 * it gets restarted by the tasklet
-			 */
-			if (!async_desc->num_desc) {
-				vchan_cookie_complete(&async_desc->vd);
-			} else {
-				list_add(&async_desc->vd.node,
-					 &bchan->vc.desc_issued);
-			}
-			list_del(&async_desc->desc_node);
-		}
+		if (srcs & BIT(i))
+			bam_chan_process_done(&bdev->channels[i]);
 	}
 
 	return srcs;
@@ -1067,7 +1133,12 @@ static void bam_apply_new_config(struct bam_chan *bchan,
 	struct bam_device *bdev = bchan->bdev;
 	u32 maxburst;
 
-	if (!bdev->controlled_remotely) {
+	/*
+	 * The descriptor-count threshold is a global BAM setting.  The IPA
+	 * BAM has a fixed value from its device tree configuration, so do
+	 * not let the per-channel slave maxburst overwrite it.
+	 */
+	if (!bdev->controlled_remotely && !bdev->ipa_bam) {
 		if (dir == DMA_DEV_TO_MEM)
 			maxburst = bchan->slave.src_maxburst;
 		else
@@ -1335,6 +1406,32 @@ static int bam_dma_probe(struct platform_device *pdev)
 		dev_err(bdev->dev, "Execution environment unspecified\n");
 		return ret;
 	}
+
+	bdev->ipa_bam = of_property_read_bool(pdev->dev.of_node,
+					      "qcom,ipa-bam");
+
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,event-threshold",
+				   &bdev->event_threshold);
+	if (ret)
+		bdev->event_threshold = 0;
+	if (bdev->event_threshold > 0xffff) {
+		dev_err(bdev->dev, "invalid event threshold\n");
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,desc-threshold",
+				   &bdev->desc_threshold);
+	if (ret || !bdev->desc_threshold)
+		bdev->desc_threshold = DEFAULT_CNT_THRSHLD;
+	if (bdev->desc_threshold > 0xffff) {
+		dev_err(bdev->dev, "invalid descriptor threshold\n");
+		return -EINVAL;
+	}
+
+	if (bdev->ipa_bam)
+		dev_info(bdev->dev,
+			 "IPA BAM: desc threshold %u, event threshold %u\n",
+			 bdev->desc_threshold, bdev->event_threshold);
 
 	bdev->controlled_remotely = of_property_read_bool(pdev->dev.of_node,
 						"qcom,controlled-remotely");
