@@ -45,6 +45,8 @@ properties:
     oneOf:
       - enum:
           - qcom,milos-ipa
+          - qcom,msm8953-ipa
+          - qcom,msm8996-ipa
           - qcom,msm8998-ipa
           - qcom,sc7180-ipa
           - qcom,sc7280-ipa
@@ -64,12 +66,16 @@ properties:
           - const: qcom,sm8550-ipa
 
   reg:
+    minItems: 2
+    maxItems: 3
     items:
       - description: IPA registers
       - description: IPA shared memory
-      - description: GSI registers
+      - description: GSI registers (not present on IPA v2.x)
 
   reg-names:
+    minItems: 2
+    maxItems: 3
     items:
       - const: ipa-reg
       - const: ipa-shared
@@ -86,16 +92,22 @@ properties:
     const: core
 
   interrupts:
+    minItems: 2
+    maxItems: 4
     items:
       - description: IPA interrupt (hardware IRQ)
-      - description: GSI interrupt (hardware IRQ)
+      - description: GSI or BAM DMA interrupt (hardware IRQ)
       - description: Modem clock query interrupt (smp2p interrupt)
       - description: Modem setup ready interrupt (smp2p interrupt)
 
   interrupt-names:
+    minItems: 2
+    maxItems: 4
     items:
       - const: ipa
-      - const: gsi
+      - enum:
+          - gsi
+          - dma
       - const: ipa-clock-query
       - const: ipa-setup-ready
 
@@ -196,9 +208,30 @@ required:
   - clocks
   - interrupts
   - interconnects
-  - qcom,smem-states
 
 allOf:
+  # IPA v2.x has no GSI and no SMP2P interrupts
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - qcom,msm8953-ipa
+              - qcom,msm8996-ipa
+    then:
+      properties:
+        reg:
+          maxItems: 2
+        interrupts:
+          maxItems: 2
+        interrupt-names:
+          items:
+            - const: ipa
+            - const: dma
+    else:
+      required:
+        - qcom,smem-states
+
   # If qcom,gsi-loader is present, modem-init must not be present
   - if:
       required:
