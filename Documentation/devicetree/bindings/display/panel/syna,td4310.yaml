@@ -15,7 +15,9 @@ allOf:
 properties:
   compatible:
     enum:
+      - shenchao,pt060jc-04n
       - syna,td4310
+      - tianma,tl060fvms47-00
 
   reg:
     maxItems: 1
