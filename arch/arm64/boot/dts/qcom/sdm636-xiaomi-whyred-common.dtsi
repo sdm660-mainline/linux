@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: 2025 Mathesh Velayudan <123v.mathesh@gmail.com>
 // SPDX-FileCopyrightText: 2025 Alexey Minnekhanov <alexeymin@postmarketos.org>
 
-/dts-v1/;
-
 #include "sdm636.dtsi"
 #include "pm660.dtsi"
 #include "pm660l.dtsi"
@@ -17,8 +15,6 @@
 /delete-node/ &zap_shader_region;
 
 / {
-	model = "Xiaomi Redmi Note 5 Pro";
-	compatible = "xiaomi,whyred", "qcom,sdm636";
 	chassis-type = "handset";
 
 	aliases {
@@ -106,6 +102,23 @@
 		};
 	};
 
+	/*
+	 * This is here until we have a driver for QPNP LCDB regulator.
+	 * It can emulate both positive LDO and negative NCP supplies for panel.
+	 */
+	lcdb_fixed: lcdb-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "lcdb";
+		/*
+		 * Actual range for LCDB is 4.0 - 6.0V, but
+		 * stock bootloader sets voltage to 5.4 V
+		 */
+		regulator-min-microvolt = <5400000>;
+		regulator-max-microvolt = <5400000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -164,7 +177,7 @@
 &blsp_i2c1 {
 	status = "okay";
 
-	/* Synaptics E753 */
+	/* Identifies itself as Synaptics E753 */
 	touchscreen@20 {
 		compatible = "syna,rmi4-i2c";
 		reg = <0x20>;
@@ -223,12 +236,14 @@
 	vdda-supply = <&vreg_l1a_1p225>;
 
 	panel: panel@0 {
-		compatible = "tianma,td4310-xiaomi-whyred";
 		reg = <0>;
 
 		backlight = <&pm660l_wled>;
 		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+
 		vddio-supply = <&vreg_l11a_1p8>;
+		vddneg-supply = <&lcdb_fixed>;
+		vddpos-supply = <&lcdb_fixed>;
 
 		pinctrl-0 = <&lcd_reset_active &mdss_te_active>;
 		pinctrl-1 = <&lcd_reset_sleep &mdss_te_sleep>;
