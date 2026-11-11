@@ -775,6 +775,7 @@ static const char *const ath10k_core_fw_feature_str[] = {
 	[ATH10K_FW_FEATURE_IRAM_RECOVERY] = "iram-recovery",
 	[ATH10K_FW_FEATURE_NO_QUIET_MODE] = "no-quiet-mode",
 	[ATH10K_FW_FEATURE_NO_VHT_TXBF] = "no-vht-txbf",
+	[ATH10K_FW_FEATURE_PASSIVE_SCAN_5GHZ] = "passive-scan-5ghz",
 };
 
 static unsigned int ath10k_core_get_fw_feature_str(char *buf,

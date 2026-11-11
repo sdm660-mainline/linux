@@ -849,6 +849,11 @@ enum ath10k_fw_features {
 	 */
 	ATH10K_FW_FEATURE_NO_VHT_TXBF = 24,
 
+	/* Firmware does not tune the radio during active scan on 5 GHz
+	 * channels, all 5 GHz channels must be scanned passively.
+	 */
+	ATH10K_FW_FEATURE_PASSIVE_SCAN_5GHZ = 25,
+
 	/* keep last */
 	ATH10K_FW_FEATURE_COUNT,
 };
