@@ -843,6 +843,12 @@ enum ath10k_fw_features {
 	 */
 	ATH10K_FW_FEATURE_NO_QUIET_MODE = 23,
 
+	/* Firmware advertises VHT beamforming but crashes when handling
+	 * VHT Group ID Management frames. Do not advertise any VHT
+	 * beamformer/beamformee capability.
+	 */
+	ATH10K_FW_FEATURE_NO_VHT_TXBF = 24,
+
 	/* keep last */
 	ATH10K_FW_FEATURE_COUNT,
 };
