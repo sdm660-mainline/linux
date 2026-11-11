@@ -1168,6 +1168,8 @@ config CHARGER_QCOM_SMB2
 	tristate "Qualcomm PMI8998 PMIC charger driver"
 	depends on MFD_SPMI_PMIC
 	depends on IIO
+	depends on REGULATOR
+	depends on USB_ROLE_SWITCH || !USB_ROLE_SWITCH
 	help
 	  Say Y here to enable the Qualcomm PMIC Charger driver. This
 	  adds support for the SMB2 switch mode battery charger found

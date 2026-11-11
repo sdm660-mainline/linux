@@ -20,7 +20,9 @@
 #include <linux/of.h>
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
+#include <linux/regulator/driver.h>
 #include <linux/types.h>
+#include <linux/usb/role.h>
 #include <linux/workqueue.h>
 
 /* clang-format off */
@@ -109,6 +111,14 @@
 #define ENABLE_OTG_IN_DEBUG_MODE_BIT			BIT(2)
 #define OTG_EN_SRC_CFG_BIT				BIT(1)
 #define CONCURRENT_MODE_CFG_BIT				BIT(0)
+
+#define CMD_OTG						0x140
+#define OTG_EN_BIT					BIT(0)
+
+#define OTG_CURRENT_LIMIT_CFG				0x152
+#define OTG_CURRENT_LIMIT_MASK				GENMASK(2, 0)
+/* Register value is (limit_uA - 250000) / 250000 */
+#define OTG_CURRENT_LIMIT_1500MA			0x5
 
 #define OTG_ENG_OTG_CFG					0x1C0
 #define ENG_BUCKBOOST_HALT1_8_MODE_BIT			BIT(0)
@@ -388,6 +398,8 @@ struct smb_init_register {
  * @usb_in_i_chan:	USB_IN current measurement channel
  * @usb_in_v_chan:	USB_IN voltage measurement channel
  * @chg_psy:		Charger power supply instance
+ * @role_sw:		USB role switch of the DWC3 controller, if any
+ * @role_update_work:	Debounced worker which applies the USB role
  */
 struct smb_chip {
 	struct device *dev;
@@ -405,6 +417,9 @@ struct smb_chip {
 	struct iio_channel *usb_in_v_chan;
 
 	struct power_supply *chg_psy;
+
+	struct usb_role_switch *role_sw;
+	struct delayed_work role_update_work;
 };
 
 static enum power_supply_property smb_properties[] = {
@@ -817,9 +832,13 @@ static irqreturn_t smb_handle_batt_overvoltage(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static void smb_update_usb_role(struct smb_chip *chip);
+
 static irqreturn_t smb_handle_usb_plugin(int irq, void *data)
 {
 	struct smb_chip *chip = data;
+
+	smb_update_usb_role(chip);
 
 	power_supply_changed(chip->chg_psy);
 
@@ -1010,6 +1029,131 @@ static void smb_restore_charge_enable(void *data)
 		dev_err(chip->dev, "Couldn't restore charging state: %d\n", rc);
 }
 
+static int smb_vbus_enable(struct regulator_dev *rdev)
+{
+	struct smb_chip *chip = rdev_get_drvdata(rdev);
+	int rc;
+
+	/*
+	 * Set the boost current limit before turning it on, matching the
+	 * downstream default for this board (qcom,otg-cl-ua = 1500000).
+	 */
+	rc = regmap_update_bits(chip->regmap,
+				chip->base + OTG_CURRENT_LIMIT_CFG,
+				OTG_CURRENT_LIMIT_MASK,
+				OTG_CURRENT_LIMIT_1500MA);
+	if (rc < 0)
+		return rc;
+
+	return regmap_write(chip->regmap, chip->base + CMD_OTG, OTG_EN_BIT);
+}
+
+static int smb_vbus_disable(struct regulator_dev *rdev)
+{
+	struct smb_chip *chip = rdev_get_drvdata(rdev);
+
+	return regmap_write(chip->regmap, chip->base + CMD_OTG, 0);
+}
+
+static int smb_vbus_is_enabled(struct regulator_dev *rdev)
+{
+	struct smb_chip *chip = rdev_get_drvdata(rdev);
+	unsigned int val;
+	int rc;
+
+	rc = regmap_read(chip->regmap, chip->base + CMD_OTG, &val);
+	if (rc < 0)
+		return rc;
+
+	return !!(val & OTG_EN_BIT);
+}
+
+static const struct regulator_ops smb_vbus_reg_ops = {
+	.enable = smb_vbus_enable,
+	.disable = smb_vbus_disable,
+	.is_enabled = smb_vbus_is_enabled,
+};
+
+static const struct regulator_desc smb_vbus_rdesc = {
+	.name = "otg-vbus",
+	.of_match = "otg-vbus",
+	.ops = &smb_vbus_reg_ops,
+	.owner = THIS_MODULE,
+	.type = REGULATOR_VOLTAGE,
+};
+
+static void smb_role_update_work(struct work_struct *work)
+{
+	struct smb_chip *chip = container_of(work, struct smb_chip,
+					     role_update_work.work);
+	unsigned int stat;
+	enum usb_role role;
+	int rc;
+
+	rc = regmap_read(chip->regmap, chip->base + TYPE_C_STATUS_3, &stat);
+	if (rc < 0) {
+		dev_err(chip->dev, "Couldn't read TYPE_C_STATUS_3: %d\n", rc);
+		return;
+	}
+
+	if (stat & (U_USB_GND_NOVBUS_BIT | U_USB_GND_BIT))
+		role = USB_ROLE_HOST;
+	else
+		role = USB_ROLE_DEVICE;
+
+	dev_dbg(chip->dev, "TYPE_C_STATUS_3 = 0x%02x, setting role %d\n",
+		stat, role);
+
+	/*
+	 * Nothing consumes the "otg-vbus" regulator as a vbus-supply here, so
+	 * drive the boost directly together with the role switch, like the
+	 * downstream smblib_uusb_otg_work() does.
+	 *
+	 * The current limit is programmed on every transition to host mode:
+	 * the power-on default is too low for a hub with a keyboard and a
+	 * mouse and makes the devices disconnect and reconnect repeatedly.
+	 */
+	if (role == USB_ROLE_HOST) {
+		rc = regmap_update_bits(chip->regmap,
+					chip->base + OTG_CURRENT_LIMIT_CFG,
+					OTG_CURRENT_LIMIT_MASK,
+					OTG_CURRENT_LIMIT_1500MA);
+		if (rc < 0)
+			dev_err(chip->dev,
+				"Couldn't set OTG current limit: %d\n", rc);
+	}
+
+	rc = regmap_write(chip->regmap, chip->base + CMD_OTG,
+			  role == USB_ROLE_HOST ? OTG_EN_BIT : 0);
+	if (rc < 0)
+		dev_err(chip->dev, "Couldn't %s VBUS boost: %d\n",
+			role == USB_ROLE_HOST ? "enable" : "disable", rc);
+
+	rc = usb_role_switch_set_role(chip->role_sw, role);
+	if (rc < 0)
+		dev_err(chip->dev, "Couldn't set USB role: %d\n", rc);
+}
+
+static void smb_update_usb_role(struct smb_chip *chip)
+{
+	if (!chip->role_sw)
+		return;
+
+	/*
+	 * The RID comparator can bounce right after the VBUS state changes
+	 * (e.g. when we enable the boost ourselves), so don't trust a read
+	 * taken straight from the IRQ. mod_delayed_work() re-arms the timer
+	 * if the IRQ fires again before it expires.
+	 */
+	mod_delayed_work(system_power_efficient_wq, &chip->role_update_work,
+			 msecs_to_jiffies(150));
+}
+
+static void smb_role_switch_put(void *data)
+{
+	usb_role_switch_put(data);
+}
+
 static int smb_init_irq(struct smb_chip *chip, int *irq, const char *name,
 			 irqreturn_t (*handler)(int irq, void *data))
 {
@@ -1036,6 +1180,8 @@ static int smb_probe(struct platform_device *pdev)
 {
 	struct power_supply_config supply_config = {};
 	struct power_supply_desc *desc;
+	struct regulator_config rconfig = {};
+	struct regulator_dev *rdev;
 	struct smb_chip *chip;
 	unsigned int charge_enable;
 	unsigned int float_voltage_sel;
@@ -1048,6 +1194,9 @@ static int smb_probe(struct platform_device *pdev)
 
 	chip->dev = &pdev->dev;
 	chip->name = pdev->name;
+
+	rconfig.dev = chip->dev;
+	rconfig.driver_data = chip;
 
 	chip->regmap = dev_get_regmap(pdev->dev.parent, NULL);
 	if (!chip->regmap)
@@ -1118,6 +1267,28 @@ static int smb_probe(struct platform_device *pdev)
 		return dev_err_probe(chip->dev, rc,
 				     "Failed to init status change work\n");
 
+	rc = devm_delayed_work_autocancel(chip->dev, &chip->role_update_work,
+					  smb_role_update_work);
+	if (rc)
+		return dev_err_probe(chip->dev, rc,
+				     "Failed to init role update work\n");
+
+	rdev = devm_regulator_register(chip->dev, &smb_vbus_rdesc, &rconfig);
+	if (IS_ERR(rdev))
+		return dev_err_probe(chip->dev, PTR_ERR(rdev),
+				     "Couldn't register otg-vbus regulator\n");
+
+	/* Optional: NULL when the DT has no "usb-role-switch" property */
+	chip->role_sw = usb_role_switch_get(chip->dev);
+	if (IS_ERR(chip->role_sw))
+		return dev_err_probe(chip->dev, PTR_ERR(chip->role_sw),
+				     "Couldn't get usb role switch\n");
+
+	rc = devm_add_action_or_reset(chip->dev, smb_role_switch_put,
+				      chip->role_sw);
+	if (rc)
+		return rc;
+
 	if (power_supply_battery_info_has_prop(chip->batt_info,
 					       POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX)) {
 		float_voltage_uv =
@@ -1155,6 +1326,21 @@ skip_float_voltage:
 			   smb_handle_usb_plugin);
 	if (rc < 0)
 		return rc;
+
+	/* Optional: not every device tree lists it */
+	irq = platform_get_irq_byname_optional(pdev, "type-c-change");
+	if (irq > 0) {
+		rc = devm_request_threaded_irq(chip->dev, irq, NULL,
+					       smb_handle_usb_plugin,
+					       IRQF_ONESHOT, "type-c-change",
+					       chip);
+		if (rc < 0)
+			return dev_err_probe(chip->dev, rc,
+					     "Couldn't request irq type-c-change\n");
+	} else if (irq != -ENXIO) {
+		return dev_err_probe(chip->dev, irq,
+				     "Couldn't get irq type-c-change\n");
+	}
 
 	rc = smb_init_irq(chip, &irq, "usbin-icl-change",
 			   smb_handle_usb_icl_change);
