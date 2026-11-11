@@ -838,6 +838,11 @@ enum ath10k_fw_features {
 	/* Firmware support IRAM recovery */
 	ATH10K_FW_FEATURE_IRAM_RECOVERY = 22,
 
+	/* Firmware advertises WMI_SERVICE_THERM_THROT but crashes when it
+	 * receives the pdev quiet mode command.
+	 */
+	ATH10K_FW_FEATURE_NO_QUIET_MODE = 23,
+
 	/* keep last */
 	ATH10K_FW_FEATURE_COUNT,
 };
