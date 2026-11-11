@@ -3450,6 +3450,11 @@ static int ath10k_update_channel_list(struct ath10k *ar)
 			passive = channel->flags & IEEE80211_CHAN_NO_IR;
 			ch->passive = passive;
 
+			if (channel->band == NL80211_BAND_5GHZ &&
+			    test_bit(ATH10K_FW_FEATURE_PASSIVE_SCAN_5GHZ,
+				     ar->running_fw->fw_file.fw_features))
+				ch->passive = true;
+
 			/* the firmware is ignoring the "radar" flag of the
 			 * channel and is scanning actively using Probe Requests
 			 * on "Radar detection"/DFS channels which are not
