@@ -20,7 +20,7 @@ properties:
 
   interrupts:
     minItems: 4
-    maxItems: 5
+    maxItems: 6
 
   interrupt-names:
     minItems: 4
@@ -30,6 +30,7 @@ properties:
       - const: wdog-bark
       - const: usbin-icl-change
       - const: chg-state-change
+      - const: type-c-change
 
   io-channels:
     items:
@@ -42,6 +43,18 @@ properties:
       - const: usbin_v
 
   monitored-battery: true
+
+  usb-role-switch:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description:
+      Phandle to the USB controller whose role is switched according to the
+      ID pin state.
+
+  otg-vbus:
+    type: object
+    $ref: /schemas/regulator/regulator.yaml#
+    unevaluatedProperties: false
+    description: Regulator controlling the VBUS boost used in host mode.
 
 required:
   - compatible
