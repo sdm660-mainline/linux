@@ -841,6 +841,11 @@ enum ath10k_fw_features {
 	/* Firmware crashes when asked for channel stats events during scan. */
 	ATH10K_FW_FEATURE_NO_CHAN_STAT_EVENT = 23,
 
+	/* Firmware advertises WMI_SERVICE_THERM_THROT but crashes when it
+	 * receives the pdev quiet mode command.
+	 */
+	ATH10K_FW_FEATURE_NO_QUIET_MODE = 24,
+
 	/* keep last */
 	ATH10K_FW_FEATURE_COUNT,
 };
