@@ -325,6 +325,30 @@
 	};
 };
 
+&pm660l_flash {
+	status = "okay";
+
+	led-1 {
+		function = LED_FUNCTION_FLASH;
+		color = <LED_COLOR_ID_WHITE>;
+		function-enumerator = <0>;
+		led-sources = <1>;
+		led-max-microamp = <100000>;
+		flash-max-microamp = <1500000>;
+		flash-max-timeout-us = <1280000>;
+	};
+
+	led-2 {
+		function = LED_FUNCTION_FLASH;
+		color = <LED_COLOR_ID_WHITE>;
+		function-enumerator = <1>;
+		led-sources = <2>;
+		led-max-microamp = <100000>;
+		flash-max-microamp = <1500000>;
+		flash-max-timeout-us = <1280000>;
+	};
+};
+
 &pm660l_wled {
 	qcom,switching-freq = <800>;
 	qcom,current-limit-microamp = <20000>;
