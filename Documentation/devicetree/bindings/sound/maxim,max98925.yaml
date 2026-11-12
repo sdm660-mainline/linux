@@ -15,6 +15,7 @@ properties:
       - maxim,max98925
       - maxim,max98926
       - maxim,max98927
+      - maxim,max98937
 
   reg:
     maxItems: 1
