@@ -253,10 +253,12 @@
 
 enum max98927_type {
 	MAX98927 = 1,
+	MAX98937,
 };
 
 struct max98927_priv {
 	struct regmap *regmap;
+	struct regmap *raw_regmap;
 	enum max98927_type type;
 	struct snd_soc_component *component;
 	struct max98927_pdata *pdata;
