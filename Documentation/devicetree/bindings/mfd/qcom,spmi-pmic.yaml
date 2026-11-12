@@ -185,6 +185,10 @@ patternProperties:
   "pon@[0-9a-f]+$":
     type: object
     $ref: /schemas/power/reset/qcom,pon.yaml#
+  
+  "^lcdb-regulator@[0-9a-f]+$":
+    type: object
+    $ref: /schemas/regulator/qcom-lcdb-regulator.yaml#
 
   "^rtc@[0-9a-f]+$":
     type: object
