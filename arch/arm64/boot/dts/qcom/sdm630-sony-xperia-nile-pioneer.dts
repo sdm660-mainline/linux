@@ -68,6 +68,8 @@
 		pinctrl-0 = <&panel_reset_gpio &panel_te_gpio>;
 		pinctrl-names = "default";
 
+		iovcc-supply = <&vreg_l11a_1p8>; /* VDDIO in shematics */
+
 		port {
 			panel_in: endpoint {
 				remote-endpoint = <&mdss_dsi0_out>;
