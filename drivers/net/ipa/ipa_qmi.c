@@ -10,6 +10,7 @@
 #include <linux/types.h>
 
 #include "ipa.h"
+#include "ipa_data_format.h"
 #include "ipa_mem.h"
 #include "ipa_modem.h"
 #include "ipa_qmi_msg.h"
@@ -145,8 +146,13 @@ static void ipa_qmi_ready(struct ipa_qmi *ipa_qmi)
 	/* We're ready.  Start up normal operation */
 	ipa = container_of(ipa_qmi, struct ipa, qmi);
 	ret = ipa_modem_start(ipa);
-	if (ret)
+	if (ret) {
 		dev_err(ipa->dev, "error %d starting modem\n", ret);
+		return;
+	}
+
+	/* Now that the modem's IPA is ready, negotiate its data format */
+	ipa_data_format_start(ipa);
 }
 
 /* All QMI clients from the modem node are gone (modem shut down or crashed). */
@@ -158,6 +164,9 @@ static void ipa_server_bye(struct qmi_handle *qmi, unsigned int node)
 
 	/* The modem client and server go away at the same time */
 	memset(&ipa_qmi->modem_sq, 0, sizeof(ipa_qmi->modem_sq));
+
+	/* The negotiated data format went away with the modem */
+	ipa_data_format_stop(container_of(ipa_qmi, struct ipa, qmi));
 
 	/* initial_boot doesn't change when modem reboots */
 	/* uc_ready doesn't change when modem reboots */
@@ -364,7 +373,11 @@ static void ipa_qmi_install_wan_filters(struct ipa *ipa)
 	if (!req)
 		return;
 
-	mux_id = 1;
+	/* The rmnet link's mux ID must match the one the userspace bearer
+	 * setup uses (ModemManager uses 0 by default; vendor-init-style
+	 * tools may use 1).
+	 */
+	mux_id = ipa->qmap_mux_id;
 
 	req->filter_spec_list_valid = 1;
 	req->filter_spec_list_len = IPA_QMI_WAN_DL_FILTER_COUNT;
@@ -418,6 +431,16 @@ static void ipa_qmi_install_wan_filters(struct ipa *ipa)
 
 out_free:
 	kfree(req);
+}
+
+/* Re-install the WAN downlink filters on the modem.  The stock AP does this
+ * when the WAN interface comes up (ipacm install_wan_filtering_rule), i.e.
+ * after the data call exists; installing only at modem boot can be undone
+ * by the modem's call setup.
+ */
+void ipa_qmi_wan_filters_install(struct ipa *ipa)
+{
+	ipa_qmi_install_wan_filters(ipa);
 }
 
 static void ipa_server_install_filter_rule(struct qmi_handle *qmi,
@@ -540,8 +563,8 @@ static const struct qmi_msg_handler ipa_server_msg_handlers[] = {
 	{
 		.type		= QMI_REQUEST,
 		.msg_id		= IPA_QMI_FILTER_INSTALLED_NOTIF,
-		.ei		= ipa_ignore_ei,
-		.decoded_size	= 1,
+		.ei		= ipa_fltr_installed_notif_req_ei,
+		.decoded_size	= sizeof(struct ipa_fltr_installed_notif_req),
 		.fn		= ipa_server_filter_installed,
 	},
 	{
@@ -838,6 +861,15 @@ int ipa_qmi_setup(struct ipa *ipa)
 	if (ret)
 		goto err_client_handle_release;
 
+	/* Data-format negotiation is optional; the modem path still works
+	 * without it, just with the modem's default framing.
+	 */
+	ret = ipa_data_format_setup(ipa);
+	if (ret)
+		dev_warn(ipa->dev,
+			 "unable to set up data-format negotiation: %d\n",
+			 ret);
+
 	return 0;
 
 err_client_handle_release:
@@ -873,9 +905,14 @@ void ipa_qmi_teardown(struct ipa *ipa)
 {
 	cancel_work_sync(&ipa->qmi.init_driver_work);
 
-	qmi_handle_release(&ipa->qmi.client_handle);
-	memset(&ipa->qmi.client_handle, 0, sizeof(ipa->qmi.client_handle));
-
+	/* Stop the server handle first: its "bye" callback can reach the
+	 * data-format state, which is freed below.
+	 */
 	qmi_handle_release(&ipa->qmi.server_handle);
 	memset(&ipa->qmi.server_handle, 0, sizeof(ipa->qmi.server_handle));
+
+	ipa_data_format_teardown(ipa);
+
+	qmi_handle_release(&ipa->qmi.client_handle);
+	memset(&ipa->qmi.client_handle, 0, sizeof(ipa->qmi.client_handle));
 }

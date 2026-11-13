@@ -84,6 +84,13 @@ enum ipa_status_mask {
 	IPA_STATUS_MASK_BYTE_LIMIT		= BIT(15),
 };
 
+/* Cookie stored in the status tag_f_2 field by the IPA tag process
+ * (IPA_IP_PACKET_TAG_STATUS command).  The tag process is used to
+ * flush/synchronize the IPA pipeline, and its status packets carry
+ * this cookie in the 48-bit tag.
+ */
+#define IPA_COOKIE				0x57831603
+
 /* Special IPA filter/router rule field value indicating "rule miss" */
 #define IPA_STATUS_RULE_MISS	0x3ff	/* 10-bit filter/router rule fields */
 
@@ -960,7 +967,15 @@ static void ipa_endpoint_init_mode(struct ipa_endpoint *endpoint)
 		val = reg_encode(reg, ENDP_MODE, IPA_DMA);
 		val |= reg_encode(reg, DEST_PIPE_INDEX, dma_endpoint_id);
 	} else {
+		/* In BASIC mode DEST_PIPE_INDEX is the fallback destination
+		 * used when no filter or routing rule matches.  Stock routes
+		 * these to the AP LAN consumer (endpoint 2); see ipa2-lite's
+		 * REG_IPA_EP_MODE and downstream ipa2_cfg_ep_mode().
+		 */
+		u32 lan_rx_id = ipa->name_map[IPA_ENDPOINT_AP_LAN_RX]->endpoint_id;
+
 		val = reg_encode(reg, ENDP_MODE, IPA_BASIC);
+		val |= reg_encode(reg, DEST_PIPE_INDEX, lan_rx_id);
 	}
 	/* All other bits unspecified (and 0) */
 
@@ -1562,9 +1577,27 @@ ipa_endpoint_status_tag_valid(struct ipa_endpoint *endpoint, const void *data)
 	if (endpoint_id == command_endpoint->endpoint_id) {
 		complete(&ipa->completion);
 	} else if (ipa->version <= IPA_VERSION_2_6L) {
-		dev_err_ratelimited(ipa->dev,
-				    "unexpected tagged packet from endpoint %u\n",
-				    endpoint_id);
+		u32 tag_low32;
+		u32 tag_high16;
+
+		tag_low32 = ipa_status_extract(ipa, data, STATUS_TAG_LOW32);
+		tag_high16 = ipa_status_extract(ipa, data, STATUS_TAG_HIGH16);
+
+		/* The IPA tag process (IPA_IP_PACKET_TAG_STATUS) stores
+		 * IPA_COOKIE in tag_f_2, the high 32 bits of the 48-bit
+		 * tag.  Such a status is a pipeline flush/synchronization
+		 * marker, not an unexpected packet: consume it without
+		 * treating it as an error.
+		 */
+		if (tag_high16 == (IPA_COOKIE >> 16) &&
+		    (tag_low32 >> 16) == (IPA_COOKIE & 0xffff))
+			dev_dbg(ipa->dev,
+				"IPA tag process status from endpoint %u\n",
+				endpoint_id);
+		else
+			dev_err_ratelimited(ipa->dev,
+					    "unexpected tagged packet from endpoint %u\n",
+					    endpoint_id);
 	} else {
 		dev_err(ipa->dev, "unexpected tagged packet from endpoint %u\n",
 			endpoint_id);
@@ -1587,11 +1620,18 @@ ipa_endpoint_status_drop(struct ipa_endpoint *endpoint, const void *data)
 
 	/* Deaggregation exceptions we drop; all other types we consume */
 	exception = ipa_status_extract(ipa, data, STATUS_EXCEPTION);
+	rule = ipa_status_extract(ipa, data, STATUS_ROUTER_RULE_INDEX);
+	dev_info_ratelimited(ipa->dev,
+			     "IPA-STDBG ep%u exception %u src %u dst %u rule 0x%02x\n",
+			     endpoint->endpoint_id, exception,
+			     ipa_status_extract(ipa, data, STATUS_SRC_ENDPOINT),
+			     ipa_status_extract(ipa, data, STATUS_DST_ENDPOINT),
+			     rule);
+
 	if (exception)
 		return exception == IPA_STATUS_EXCEPTION_DEAGGR;
 
 	/* Drop the packet if it fails to match a routing rule; otherwise no */
-	rule = ipa_status_extract(ipa, data, STATUS_ROUTER_RULE_INDEX);
 	if (rule == (ipa->version <= IPA_VERSION_2_6L ? 0xff :
 		     IPA_STATUS_RULE_MISS))
 		return true;
@@ -1627,6 +1667,18 @@ static void ipa_endpoint_status_parse(struct ipa_endpoint *endpoint,
 
 		/* Skip over status packets that lack packet data */
 		length = ipa_status_extract(ipa, data, STATUS_LENGTH);
+		{
+			const __le32 *w = data;
+
+			dev_info_ratelimited(dev,
+				"IPA-STATRAW ep%u w0 0x%08x w1 0x%08x exc %u src %u dst %u len %u\n",
+				endpoint->endpoint_id, le32_to_cpu(w[0]),
+				le32_to_cpu(w[1]),
+				ipa_status_extract(ipa, data, STATUS_EXCEPTION),
+				ipa_status_extract(ipa, data, STATUS_SRC_ENDPOINT),
+				ipa_status_extract(ipa, data, STATUS_DST_ENDPOINT),
+				length);
+		}
 		if (!length || ipa_endpoint_status_skip(endpoint, data)) {
 			data += IPA_STATUS_SIZE;
 			resid -= IPA_STATUS_SIZE;
@@ -2243,13 +2295,18 @@ int ipa_endpoint_init(struct ipa *ipa, u32 count,
 {
 	enum ipa_endpoint_name name;
 	u32 filtered;
+	u32 max;
 
 	BUILD_BUG_ON(!IPA_REPLENISH_BATCH);
 
-	/* Number of endpoints is one more than the maximum ID */
-	ipa->endpoint_count = ipa_endpoint_max(ipa, count, data) + 1;
-	if (!ipa->endpoint_count)
+	/* Number of endpoints is one more than the maximum ID.  A zero
+	 * maximum means the configuration was rejected; fail loudly rather
+	 * than silently running with endpoint_count == 1.
+	 */
+	max = ipa_endpoint_max(ipa, count, data);
+	if (!max)
 		return -EINVAL;
+	ipa->endpoint_count = max + 1;
 
 	/* Initialize endpoint state bitmaps */
 	ipa->defined = bitmap_zalloc(ipa->endpoint_count, GFP_KERNEL);

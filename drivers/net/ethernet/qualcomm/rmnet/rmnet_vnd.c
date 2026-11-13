@@ -7,6 +7,7 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/if_arp.h>
+#include <linux/rtnetlink.h>
 #include <net/pkt_sched.h>
 #include "rmnet_config.h"
 #include "rmnet_handlers.h"
@@ -350,6 +351,40 @@ int rmnet_vnd_dellink(u8 id, struct rmnet_port *port,
 	port->nr_rmnet_devs--;
 	return 0;
 }
+
+/* Update the MAP data format of an existing rmnet mux.
+ *
+ * This lets the real device's driver (the IPA driver on IPA v2.x) enable
+ * or disable MAP checksum offload on the muxes once it has negotiated the
+ * modem's framing.  It must be called with the RTNL lock held, and only
+ * affects a mux whose real_dev is the device the caller is responsible
+ * for.
+ */
+int rmnet_vnd_update_data_format(struct net_device *mux_dev,
+				 struct net_device *real_dev,
+				 u32 set, u32 clear)
+{
+	struct rmnet_priv *priv;
+	struct rmnet_port *port;
+
+	ASSERT_RTNL();
+
+	if (mux_dev->rtnl_link_ops != &rmnet_link_ops)
+		return -EINVAL;
+
+	priv = netdev_priv(mux_dev);
+	if (priv->real_dev != real_dev)
+		return -ENODEV;
+
+	port = rmnet_get_port_rtnl(real_dev);
+	if (!port)
+		return -ENODEV;
+
+	port->data_format = (port->data_format & ~clear) | set;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(rmnet_vnd_update_data_format);
 
 int rmnet_vnd_do_flow_control(struct net_device *rmnet_dev, int enable)
 {

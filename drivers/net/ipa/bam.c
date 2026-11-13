@@ -396,6 +396,10 @@ static void bam_trans_callback(void *arg)
 {
 	struct ipa_trans *trans = arg;
 
+	dev_info_ratelimited(trans->dma_subsys->dev,
+			     "BAM-DBG: channel %u transfer complete\n",
+			     trans->channel_id);
+
 	ipa_trans_complete(trans);
 }
 

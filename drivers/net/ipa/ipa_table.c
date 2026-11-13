@@ -795,8 +795,15 @@ static void ipa_ap_route_setup(struct ipa *ipa)
 	if (!count)
 		return;
 
-	for (i = 0; i < count; i++)
-		((__le32 *)ipa->route_table_virt)[first + i] =
+	/* v2.x hashes every packet over the whole route table, not just the
+	 * AP's share, so a hash into the modem's range (entries 0..first-1)
+	 * must also resolve to a valid rule.  Fill the entire table with the
+	 * match-all rule; the modem later overwrites its own entries in the
+	 * shared SRAM with its per-flow rules, leaving any entries it does
+	 * not touch pointing at the AP match-all -> Q6_LAN_CONS.
+	 */
+	for (i = 0; i < ipa->route_count; i++)
+		((__le32 *)ipa->route_table_virt)[i] =
 			cpu_to_le32((u32)ipa->ap_route_rule_addr);
 
 	trans = ipa_cmd_trans_alloc(ipa, 2);
@@ -1023,9 +1030,11 @@ static int ipa_hdr_proc_ctx_setup(struct ipa *ipa, struct ipa_trans *trans)
 	ipa->hdr_table_size = PAGE_SIZE;
 	memset(ipa->hdr_table_virt, 0, ipa->hdr_table_size);
 
-	/* QMAP header template: flags, mux_id, pkt_len (filled by IPA) */
+	/* QMAP header template: flags, mux_id, pkt_len (filled by IPA).
+	 * The mux ID must match the rmnet link's mux ID.
+	 */
 	hdr = ipa->hdr_table_virt;
-	hdr[1] = 1;	/* QMAP mux id */
+	hdr[1] = ipa->qmap_mux_id;	/* QMAP mux id */
 
 	ipa->proc_ctx_virt = dma_alloc_coherent(ipa->dev, PAGE_SIZE,
 						&ipa->proc_ctx_addr,
@@ -1134,7 +1143,13 @@ int ipa_table_install_filter_rules(struct ipa *ipa,
 
 		spec = &req->filter_spec_list[i];
 
-		if (any_mux && (!spec->is_mux_id_valid || spec->mux_id != 1))
+		/* ModemManager's bearer mux is 0 (qmapmux0.0), but the
+		 * modem's uplink filter specs have also been seen with the
+		 * on-wire mux 1.  Accept either rather than dropping the
+		 * uplink rule set entirely.
+		 */
+		if (any_mux && (!spec->is_mux_id_valid ||
+				(spec->mux_id != 0 && spec->mux_id != 1)))
 			continue;
 		if (!spec->is_routing_table_index_valid ||
 		    spec->route_table_index >= ipa->modem_route_count) {
@@ -1207,7 +1222,11 @@ int ipa_table_install_filter_rules(struct ipa *ipa,
 		if (!pipe5_base)
 			goto err_free;
 		memset(pipe5_base, 0, IPA_V2_ROUTE_RULE_SIZE);
-		ptr = ipa_rt_rule_write_match_all(pipe5_base, 5, true);
+		/* Stock uses a plain header-table entry for the WAN route
+		 * (proc_ctx = 0, hdr_offset into the system header table),
+		 * not a header processing context; follow it.
+		 */
+		ptr = ipa_rt_rule_write_match_all(pipe5_base, 5, false);
 		put_unaligned_le32(0, ptr);
 		ipa->pipe_5_route_rule_virt = pipe5_base;
 		ipa->pipe_5_route_rule_addr = pipe5_addr;
@@ -1225,7 +1244,8 @@ int ipa_table_install_filter_rules(struct ipa *ipa,
 		for (j = 0; j < nspecs; j++) {
 			spec = &req->filter_spec_list[j];
 			if (any_mux &&
-			    (!spec->is_mux_id_valid || spec->mux_id != 1))
+			    (!spec->is_mux_id_valid ||
+			     (spec->mux_id != 0 && spec->mux_id != 1)))
 				continue;
 			if (!spec->is_routing_table_index_valid ||
 			    spec->route_table_index >= ipa->modem_route_count)
@@ -1465,7 +1485,9 @@ int ipa_table_init(struct ipa *ipa)
 		return -ENOMEM;
 	}
 
-	/* Route rule: match-all, destination modem LAN RX pipe.
+	/* Route rule: match-all, destination modem LAN RX pipe (Q6_LAN_CONS,
+	 * endpoint 8).  The modem's own UL route rules (route table entries
+	 * 1/2) also target Q6_LAN_CONS, so the AP default must match.
 	 *
 	 * The hardware does not treat an equation-less rule as a match-all,
 	 * so use one meq32 equation with a zero mask; the offset selects
@@ -1528,6 +1550,20 @@ int ipa_table_init(struct ipa *ipa)
 	((__le32 *)filter_virt)[0] = cpu_to_le32(val);
 	for (i = 1; i < 1 + ipa->filter_count; i++)
 		((__le32 *)filter_virt)[i] = cpu_to_le32((u32)addr);
+
+	/* Install the AP match-all filter rule on the AP->modem TX endpoint
+	 * so unmatched uplink traffic routes through the AP's share of the
+	 * route table (ENDP_INIT_ROUTE) instead of the zero rule.  This is
+	 * the effective default when the modem's per-mux METADATA_COMPARE
+	 * rules are not installed (QMI 0x23 is ACKed without programming).
+	 */
+	if (ipa->name_map[IPA_ENDPOINT_AP_MODEM_TX]) {
+		u32 ul_slot = ipa_filter_slot(ipa,
+			ipa->name_map[IPA_ENDPOINT_AP_MODEM_TX]->endpoint_id);
+
+		((__le32 *)filter_virt)[ul_slot] =
+			cpu_to_le32((u32)filter_rule_addr);
+	}
 
 	ipa->filter_table_addr = filter_addr;
 	ipa->filter_table_virt = filter_virt;
