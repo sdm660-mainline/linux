@@ -181,15 +181,24 @@ static void ipa_uc_response_hdlr(struct ipa *ipa)
 	 */
 	switch (response) {
 	case IPA_UC_RESPONSE_INIT_COMPLETED:
-		if (ipa->uc_powered) {
-			ipa->uc_loaded = true;
-			ipa_power_retention(ipa, true);
+		if (ipa->uc_loaded)
+			break;
+		/* The modem can boot (and load the microcontroller) before
+		 * this driver probes, in which case no SSR "before powerup"
+		 * event has set uc_powered.  The uC-ready signal is what
+		 * completes the IPA QMI handshake on v2.x, so accept it
+		 * regardless, and only drop the power reference if we
+		 * actually took one.
+		 */
+		if (!ipa->uc_powered)
+			dev_dbg(dev, "uC ready before modem powerup event\n");
+		else
 			(void)pm_runtime_put_autosuspend(dev);
-			ipa->uc_powered = false;
-			ipa_qmi_signal_uc_loaded(ipa);
-		} else {
-			dev_warn(dev, "unexpected init_completed response\n");
-		}
+		ipa->uc_powered = false;
+		ipa->uc_loaded = true;
+		ipa_power_retention(ipa, true);
+		dev_dbg(dev, "microcontroller ready; signalling QMI\n");
+		ipa_qmi_signal_uc_loaded(ipa);
 		break;
 	default:
 		dev_warn(dev, "unsupported microcontroller response %u\n",
@@ -214,6 +223,25 @@ void ipa_uc_config(struct ipa *ipa)
 	ipa->uc_loaded = false;
 	ipa_interrupt_enable(ipa, IPA_IRQ_UC_0);
 	ipa_interrupt_enable(ipa, IPA_IRQ_UC_1);
+}
+
+/* Pick up a uC INIT_COMPLETED response that arrived before this driver
+ * enabled its interrupt (for example, the modem booted long before ipa.ko
+ * was loaded).  The response stays in the shared area until the AP writes
+ * a new command, so it can be recovered here.
+ */
+void ipa_uc_check_ready(struct ipa *ipa)
+{
+	if (ipa->uc_loaded)
+		return;
+
+	if (UC_FIELD(ipa, response) != IPA_UC_RESPONSE_INIT_COMPLETED)
+		return;
+
+	dev_dbg(ipa->dev, "uC INIT_COMPLETED found in shared area\n");
+	ipa->uc_loaded = true;
+	ipa_power_retention(ipa, true);
+	ipa_qmi_signal_uc_loaded(ipa);
 }
 
 /* Inverse of ipa_uc_config() */

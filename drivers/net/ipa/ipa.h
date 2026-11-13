@@ -17,6 +17,7 @@
 
 struct net_device;
 
+struct ipa_data_format;
 struct ipa_interrupt;
 struct ipa_power;
 struct ipa_smp2p;
@@ -68,6 +69,8 @@ struct ipa_smp2p;
  * @setup_complete:	Flag indicating whether setup stage has completed
  * @modem_state:	State of modem (stopped, running)
  * @modem_netdev:	Network device structure used for modem
+ * @data_format:	Modem data-port mapping state
+ * @qmap_mux_id:	QMAP mux ID used for the modem data path
  * @qmi:		QMI information
  */
 struct ipa {
@@ -167,6 +170,8 @@ struct ipa {
 
 	atomic_t modem_state;		/* enum ipa_modem_state */
 	struct net_device *modem_netdev;
+	struct ipa_data_format *data_format;
+	u32 qmap_mux_id;
 	struct ipa_qmi qmi;
 };
 

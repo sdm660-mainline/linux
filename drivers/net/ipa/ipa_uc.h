@@ -42,6 +42,17 @@ void ipa_uc_deconfig(struct ipa *ipa);
 void ipa_uc_power(struct ipa *ipa);
 
 /**
+ * ipa_uc_check_ready() - Recover a missed uC INIT_COMPLETED response
+ * @ipa:	IPA pointer
+ *
+ * If the modem (and its IPA microcontroller) started before this driver
+ * registered its interrupt handler, the INIT_COMPLETED response from the
+ * microcontroller can be missed.  The response remains readable in the
+ * microcontroller shared area, so look for it there.
+ */
+void ipa_uc_check_ready(struct ipa *ipa);
+
+/**
  * ipa_uc_panic_notifier()
  * @ipa:	IPA pointer
  *

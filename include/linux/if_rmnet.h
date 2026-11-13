@@ -71,4 +71,11 @@ struct rmnet_map_v5_csum_header {
 #define MAPV5_CSUMINFO_VALID_FLAG	BIT(7)
 
 #define RMNET_MAP_HEADER_TYPE_CSUM_OFFLOAD 2
+
+struct net_device;
+
+int rmnet_vnd_update_data_format(struct net_device *mux_dev,
+				 struct net_device *real_dev,
+				 u32 set, u32 clear);
+
 #endif /* !(_LINUX_IF_RMNET_H_) */

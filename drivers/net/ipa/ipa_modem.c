@@ -71,6 +71,12 @@ static int ipa_open(struct net_device *netdev)
 
 	netif_start_queue(netdev);
 
+	/* The stock AP installs the WAN downlink filters when the interface
+	 * comes up; do the same so a modem call-setup filter reset cannot
+	 * leave the modem without them.
+	 */
+	ipa_qmi_wan_filters_install(ipa);
+
 	(void)pm_runtime_put_autosuspend(dev);
 
 	return 0;
@@ -128,12 +134,18 @@ ipa_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	struct device *dev;
 	int ret;
 
-	if (!skb_len)
+	if (!skb_len) {
+		dev_info_ratelimited(ipa->dev, "IPA-TXDBG drop zero-length skb\n");
 		goto err_drop_skb;
+	}
 
 	endpoint = ipa->name_map[IPA_ENDPOINT_AP_MODEM_TX];
-	if (endpoint->config.qmap && skb->protocol != htons(ETH_P_MAP))
+	if (endpoint->config.qmap && skb->protocol != htons(ETH_P_MAP)) {
+		dev_info_ratelimited(ipa->dev,
+				     "IPA-TXDBG drop non-MAP proto 0x%04x len %u\n",
+				     ntohs(skb->protocol), skb->len);
 		goto err_drop_skb;
+	}
 
 	/* The hardware must be powered for us to transmit, so if we're not
 	 * ready we want the network stack to stop queueing until power is
@@ -159,6 +171,9 @@ ipa_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	if (ret < 1) {
 		/* If a resume won't happen, just drop the packet */
 		if (ret < 0 && ret != -EINPROGRESS) {
+			dev_info_ratelimited(ipa->dev,
+					     "IPA-TXDBG drop pm_runtime ret %d len %u\n",
+					     ret, skb_len);
 			netif_wake_queue(netdev);
 			pm_runtime_put_noidle(dev);
 			goto err_drop_skb;
@@ -178,8 +193,18 @@ ipa_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	if (ret) {
 		if (ret != -E2BIG)
 			return NETDEV_TX_BUSY;
+		dev_info_ratelimited(ipa->dev,
+				     "IPA-TXDBG drop E2BIG len %u\n", skb_len);
 		goto err_drop_skb;
 	}
+
+	dev_info_ratelimited(ipa->dev, "IPA-TXDBG sent proto 0x%04x len %u\n",
+			     ntohs(skb->protocol), skb_len);
+	if (skb_len >= 8)
+		dev_info_ratelimited(ipa->dev,
+			"IPA-TXDBG hdr %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			skb->data[0], skb->data[1], skb->data[2], skb->data[3],
+			skb->data[4], skb->data[5], skb->data[6], skb->data[7]);
 
 	stats->tx_packets++;
 	stats->tx_bytes += skb_len;

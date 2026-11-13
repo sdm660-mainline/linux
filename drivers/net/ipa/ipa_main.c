@@ -80,6 +80,14 @@
 /* Divider for 19.2 MHz crystal oscillator clock to get common timer clock */
 #define IPA_XO_CLOCK_DIVIDER	192	/* 1 is subtracted where used */
 
+/* QMAP mux ID used for the modem data path; 0 matches ModemManager's
+ * default rmnet link, vendor-init-style tools may use 1.
+ */
+static uint qmap_mux_id;
+module_param(qmap_mux_id, uint, 0644);
+MODULE_PARM_DESC(qmap_mux_id,
+		 "QMAP mux ID used for the modem data path (default: 0)");
+
 /**
  * enum ipa_firmware_loader: How GSI firmware gets loaded
  *
@@ -151,6 +159,11 @@ int ipa_setup(struct ipa *ipa)
 	ret = ipa_qmi_setup(ipa);
 	if (ret)
 		goto err_default_route_clear;
+
+	/* The uC may have signalled INIT_COMPLETED before we enabled the
+	 * interrupt; recover that so the QMI handshake can complete.
+	 */
+	ipa_uc_check_ready(ipa);
 
 	ipa->setup_complete = true;
 
@@ -870,6 +883,7 @@ static int ipa_probe(struct platform_device *pdev)
 	ipa->interrupt = interrupt;
 	ipa->power = power;
 	ipa->version = data->version;
+	ipa->qmap_mux_id = qmap_mux_id;
 	ipa->modem_route_count = data->modem_route_count;
 	init_completion(&ipa->completion);
 
