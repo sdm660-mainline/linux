@@ -761,3 +761,111 @@
 
 	status = "okay";
 };
+
+/*
+ * Cameras: rear OV13855 on csiphy0/csid0, 4-lane MIPI.  Power, GPIO and
+ * clock values were taken from the vendor (MIUI) device tree.
+ */
+/ {
+	cam_avdd_2v8: cam-avdd-2v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_avdd_2v8";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		enable-active-high;
+		gpio = <&tlmm 51 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&vph_pwr>;
+	};
+
+	cam_rear_dvdd_1v2: cam-rear-dvdd-1v2 {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_rear_dvdd_1v2";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		enable-active-high;
+		/* DVDD enable is on PM660L, not PM660 (vendor DT: "pm660l-gpio") */
+		gpio = <&pm660l_gpios 4 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&vreg_l13a_1p8>;
+	};
+};
+
+&camss {
+	status = "okay";
+
+	ports {
+		port@0 {
+			csiphy0_ep: endpoint {
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&ov13855_ep>;
+			};
+		};
+	};
+};
+
+&cci {
+	status = "okay";
+};
+
+&cci_i2c0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	ov13855: camera@36 {
+		compatible = "ovti,ov13855";
+		reg = <0x36>;
+
+		/* reset is active HIGH on this board (vendor DT) */
+		reset-gpios = <&tlmm 46 GPIO_ACTIVE_HIGH>;
+		/* third entry of the vendor camera gpio table: CAM_STANDBY on GPIO44 */
+		standby-gpios = <&tlmm 44 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&cam_mclk0_default &cam_reset_default>;
+		pinctrl-1 = <&cam_mclk0_sleep>;
+
+		clocks = <&mmcc CAMSS_MCLK0_CLK>, <&mmcc CAMSS_MCLK1_CLK>,
+			 <&mmcc CAMSS_MCLK2_CLK>, <&mmcc CAMSS_MCLK3_CLK>;
+		clock-names = "xvclk", "xvclk1", "xvclk2", "xvclk3";
+		assigned-clocks = <&mmcc CAMSS_MCLK0_CLK>, <&mmcc CAMSS_MCLK1_CLK>,
+				  <&mmcc CAMSS_MCLK2_CLK>, <&mmcc CAMSS_MCLK3_CLK>;
+		assigned-clock-rates = <24000000>, <24000000>, <24000000>, <24000000>;
+
+		dovdd-supply = <&vreg_l11a_1p8>;
+		avdd-supply = <&cam_avdd_2v8>;
+		dvdd-supply = <&cam_rear_dvdd_1v2>;
+
+		port {
+			ov13855_ep: endpoint {
+				link-frequencies = /bits/ 64 <540000000>;
+				data-lanes = <1 2 3 4>;
+				remote-endpoint = <&csiphy0_ep>;
+			};
+		};
+	};
+};
+
+/* Camera pin mux: MCLK on GPIO32 must be switched to the cam_mclk function,
+ * otherwise the sensor never receives its 24 MHz reference clock.
+ */
+&tlmm {
+	cam_mclk0_default: cam-mclk0-default {
+		pins = "gpio32";
+		function = "cam_mclk";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_mclk0_sleep: cam-mclk0-sleep {
+		pins = "gpio32";
+		function = "cam_mclk";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_reset_default: cam-reset-default {
+		pins = "gpio46", "gpio44";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+};
