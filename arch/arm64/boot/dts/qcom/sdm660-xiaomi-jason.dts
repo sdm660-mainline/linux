@@ -75,14 +75,37 @@
 		voltage-max-design-microvolt = <4400000>;
 	};
 
-	vph_pwr: vph-pwr-regulator {
+	/*
+	 * If this is disabled, e.g by being unused, panel turns off,
+	 * so mark it always-on; alternatively maybe don't describe it at all.
+	 * Would be nice if this one was controlled by panel, but panel
+	 * driver already controls 3 regulators... This one is board specific.
+	 */
+	disp_vdd_vreg: disp-vdd-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "vph_pwr";
-		regulator-min-microvolt = <3700000>;
-		regulator-max-microvolt = <3700000>;
-
+		regulator-name = "disp_vdd_vreg";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		startup-delay-us = <4000>;
+		enable-active-high;
 		regulator-always-on;
 		regulator-boot-on;
+		gpio = <&tlmm 62 GPIO_ACTIVE_HIGH>;
+	};
+
+	/*
+	 * This is also required for touch/panel to function, but it
+	 * is properly controlled by touchscreen
+	 */
+	disp_vddts_vreg: disp-vddts-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "disp_vddts_vreg";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		startup-delay-us = <4000>;
+		enable-active-high;
+		regulator-boot-on;
+		gpio = <&tlmm 73 GPIO_ACTIVE_HIGH>;
 	};
 
 	/*
@@ -102,15 +125,14 @@
 		regulator-boot-on;
 	};
 
-	disp_vddts_vreg: disp-vddts-regulator {
+	vph_pwr: vph-pwr-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "disp_vddts_vreg";
-		regulator-min-microvolt = <2800000>;
-		regulator-max-microvolt = <2800000>;
-		startup-delay-us = <4000>;
-		enable-active-high;
+		regulator-name = "vph_pwr";
+		regulator-min-microvolt = <3700000>;
+		regulator-max-microvolt = <3700000>;
+
+		regulator-always-on;
 		regulator-boot-on;
-		gpio = <&tlmm 73 GPIO_ACTIVE_HIGH>;
 	};
 
 	gpio-keys {
@@ -170,7 +192,8 @@
 &blsp_i2c4 {
 	status = "okay";
 
-	/* Synaptics S3330 / S3331 / TD4322 */
+	/* possible variants: Synaptics S3330 / S3331 / TD4322 */
+	/* on my phone: Synaptics S3330 */
 	touchscreen@20 {
 		compatible = "syna,rmi4-i2c";
 		reg = <0x20>;
@@ -179,6 +202,8 @@
 		#size-cells = <0>;
 		interrupts-extended = <&tlmm 67 IRQ_TYPE_LEVEL_LOW>;
 
+		panel = <&panel>;
+
 		pinctrl-0 = <&ts_active>;
 		pinctrl-1 = <&ts_int_sleep &ts_reset_sleep>;
 		pinctrl-names = "default", "sleep";
@@ -186,9 +211,8 @@
 		vio-supply = <&vreg_l11a_1p8>;
 		vdd-supply = <&disp_vddts_vreg>;
 
-		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>;
 		syna,reset-delay-ms = <200>;
-		syna,startup-delay-ms = <600>;
+		syna,startup-delay-ms = <5>;
 
 		rmi4-f01@1 {
 			reg = <0x01>;
@@ -221,19 +245,15 @@
 
 	status = "okay";
 
-	panel@0 {
+	panel: panel@0 {
 		compatible = "jdi,fhd-r63452";
 		reg = <0>;
-		reset-gpios = <&tlmm 53 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_LOW>; /* TP_RESET_N */
 		backlight = <&pm660l_wled>;
 
-		power-supply = <&vreg_l11a_1p8>; /* vddio */
-		/*
-		 * Driver/bindings do not support extra supplies.
-		 * when it does, add these:
-		 * vddpos-supply = <&lcdb_fixed>;
-		 * vddneg-supply = <&lcdb_fixed>;
-		 */
+		avdd-supply = <&lcdb_fixed>; /* positive / LDO */
+		avee-supply = <&lcdb_fixed>; /* negative / NCP */
+		vddio-supply = <&vreg_l11a_1p8>;
 
 		port {
 			panel_in: endpoint {
