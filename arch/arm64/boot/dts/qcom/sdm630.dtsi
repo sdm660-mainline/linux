@@ -2903,6 +2903,10 @@
 
 			qcom,perfcl-corner-uv =
 				<724000 724000 724000 724000 724000 724000 724000 724000 724000 724000 724000 788000 788000 788000 788000 868000 868000 868000 868000 988000 988000 988000 988000 988000 988000 1140000 1140000>;  /* 27 corners */
+
+			/* uV; same value as the stock SDM660 tree, not separately checked for SDM630 */
+			qcom,apm-threshold-voltage = <872000>;
+
 			/* The stock SDM630 tree defines no MEM-ACC trim and no ACD for this
 			 * clock controller, so neither is described here. */
 		};

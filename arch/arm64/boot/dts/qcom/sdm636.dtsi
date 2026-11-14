@@ -346,13 +346,10 @@
 			<0x00000000 0x00000000 0x00000000>,
 			<0x00000000 0x00000000 0x00000001>;
 
-		/* qcom,apm-threshold-voltage = <832000>; (uV) exists in the
-		 * downstream tree but is NOT wired into the driver yet - it
-		 * feeds clk_osm_resolve_crossover_corners(), which needs a
-		 * real CPR/rpmh regulator corner table we deliberately don't
-		 * port. Driver currently approximates
-		 * apm_threshold_vc/apm_crossover_vc as the LUT's top corner
-		 * instead - see clk_osm_probe_cluster() comment. */
+		/* uV; value from the interposer file the LUT rows were taken from
+		 * (the stock SDM660 tree uses 872000).
+		 */
+		qcom,apm-threshold-voltage = <832000>;
 
 		/* ACD is fully optional (see clk-cpu-osm-sdm660.c comment) -
 		 * NOT present in this DT fragment: no "pwrcl-acd"/"perfcl-acd"

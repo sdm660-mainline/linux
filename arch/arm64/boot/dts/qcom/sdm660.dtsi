@@ -839,10 +839,8 @@
 		 * be reused for this SoC without a downstream source for them.
 		 */
 
-		/* qcom,apm-threshold-voltage = <872000>; (uV) in the stock tree,
-		 * not wired into the driver - see the SDM636 fragment for how the
-		 * crossover corner is approximated instead.
-		 */
+		/* uV, as in the stock SDM660 tree */
+		qcom,apm-threshold-voltage = <872000>;
 
 		/* ACD is optional. The stock SDM660 tree does enable it, with one
 		 * register window and identical values for both clusters:
