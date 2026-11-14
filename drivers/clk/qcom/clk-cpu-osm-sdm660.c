@@ -72,8 +72,8 @@
 #define APM_MX_MODE_VAL			0
 #define APM_APC_MODE_VAL		0x3
 
-#define PWRCL_EFUSE_SHIFT		0
-#define PWRCL_EFUSE_MASK		0	/* pwrcl: single speed-bin on whyred/660 */
+#define PWRCL_EFUSE_SHIFT		29
+#define PWRCL_EFUSE_MASK		0x7
 #define PERFCL_EFUSE_SHIFT		29
 #define PERFCL_EFUSE_MASK		0x7
 
@@ -196,6 +196,7 @@ struct clk_osm {
 
 	u32 apcs_mem_acc_cfg[3];
 	u32 apcs_mem_acc_val[9];	/* MAX_MEM_ACC_LEVELS * MAX_MEM_ACC_VAL_PER_LEVEL */
+	bool has_mem_acc;		/* DT describes the MEM-ACC trim */
 
 	u32 l_val_base;
 	u32 apcs_pll_user_ctl;
@@ -210,8 +211,6 @@ struct clk_osm {
 	u32 acd_extint0_cfg;
 	u32 acd_extint1_cfg;
 	u32 acd_autoxfer_ctl;
-
-	int cur_index;
 };
 
 #define to_clk_osm(_hw) container_of(_hw, struct clk_osm, hw)
@@ -394,8 +393,7 @@ static void clk_osm_setup_hw_table(struct clk_osm *c)
 
 		if (i < c->num_entries) {
 			struct osm_entry *e = &c->osm_table[i];
-			u32 uv = (e->virtual_corner < c->num_vc) ?
-				 c->vc_to_uv[e->virtual_corner] : 0;
+			u32 uv = c->vc_to_uv[e->virtual_corner];
 
 			/* bits[21:16] = virtual corner, bits[11:0] = open
 			 * loop voltage in mV (downstream: BVAL(21,16,vc) |
@@ -475,7 +473,7 @@ static void clk_osm_program_mem_acc_regs(struct clk_osm *c)
 	unsigned int i, j = 0;
 	u32 curr_level;
 
-	if (!c->num_entries)
+	if (!c->has_mem_acc || !c->num_entries)
 		return;
 
 	curr_level = c->osm_table[0].spare_data;
@@ -621,7 +619,6 @@ static int clk_osm_set_rate(struct clk_hw *hw, unsigned long rate,
 
 	osm_write(c, index, DCVS_PERF_STATE_DESIRED_REG);
 	osm_mb(c);
-	c->cur_index = index;
 
 	return 0;
 }
@@ -630,11 +627,12 @@ static unsigned long clk_osm_recalc_rate(struct clk_hw *hw,
 					  unsigned long parent_rate)
 {
 	struct clk_osm *c = to_clk_osm(hw);
+	u32 index = osm_read(c, DCVS_PERF_STATE_DESIRED_REG);
 
-	if (c->cur_index < 0 || c->cur_index >= c->num_entries)
+	if (index >= c->num_entries)
 		return 0;
 
-	return c->osm_table[c->cur_index].frequency;
+	return c->osm_table[index].frequency;
 }
 
 static int clk_osm_determine_rate(struct clk_hw *hw,
@@ -739,6 +737,14 @@ static int clk_osm_parse_lut(struct platform_device *pdev, struct clk_osm *c,
 		struct osm_entry *e = &c->osm_table[i];
 		u32 vc_1based = buf[i * 5 + 4];
 
+		/* num_vc comes from the corner-uv table, parsed first. */
+		if (vc_1based < 1 || vc_1based > c->num_vc) {
+			dev_err(&pdev->dev, "%s row %d: virtual corner %u not in 1..%u\n",
+				propname, i, vc_1based, c->num_vc);
+			kfree(buf);
+			return -EINVAL;
+		}
+
 		e->frequency	  = buf[i * 5 + 0];
 		e->freq_data	  = buf[i * 5 + 1];
 		e->override_data = buf[i * 5 + 2];
@@ -746,7 +752,7 @@ static int clk_osm_parse_lut(struct platform_device *pdev, struct clk_osm *c,
 		/* virtual corners are 1-based in the DT array, same as
 		 * downstream's clk_osm_get_lut().
 		 */
-		e->virtual_corner = vc_1based ? vc_1based - 1 : 0;
+		e->virtual_corner = vc_1based - 1;
 	}
 	c->num_entries = rows;
 
@@ -766,11 +772,14 @@ static int clk_osm_read_speedbin(struct platform_device *pdev,
 	if (!mask)
 		return 0;
 
-	/* Map without request_mem_region(): the efuse window lies inside the
-	 * qfprom node's range, which qcom,qfprom must still be able to claim. */
+	/* No efuse window described for this cluster: single speed bin. */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, efuse_name);
 	if (!res)
-		return -EINVAL;
+		return 0;
+
+	/* Map without request_mem_region(): the efuse window lies inside the
+	 * qfprom node's range, which qcom,qfprom must still be able to claim.
+	 */
 
 	base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
 	if (!base)
@@ -836,6 +845,52 @@ static void clk_osm_resolve_apm_corners(struct clk_osm *c, u32 apm_uv)
 	c->apm_threshold_pre_vc = MAX_VIRTUAL_CORNER - 1;
 }
 
+static int clk_osm_read_u32_array(struct device *dev, const char *name,
+				  u32 *out, size_t n)
+{
+	int ret = of_property_read_u32_array(dev->of_node, name, out, n);
+
+	if (ret)
+		return dev_err_probe(dev, ret, "missing or malformed %s\n", name);
+
+	return 0;
+}
+
+static int clk_osm_read_u32_index(struct device *dev, const char *name,
+				  unsigned int idx, u32 *out)
+{
+	int ret = of_property_read_u32_index(dev->of_node, name, idx, out);
+
+	if (ret)
+		return dev_err_probe(dev, ret, "missing or malformed %s[%u]\n",
+				     name, idx);
+
+	return 0;
+}
+
+static int clk_osm_read_acd_params(struct device *dev, struct clk_osm *c,
+				   unsigned int idx)
+{
+	int ret;
+
+	ret = clk_osm_read_u32_index(dev, "qcom,acdtd-val", idx, &c->acd_td);
+	if (!ret)
+		ret = clk_osm_read_u32_index(dev, "qcom,acdcr-val", idx, &c->acd_cr);
+	if (!ret)
+		ret = clk_osm_read_u32_index(dev, "qcom,acdsscr-val", idx, &c->acd_sscr);
+	if (!ret)
+		ret = clk_osm_read_u32_index(dev, "qcom,acdextint0-val", idx,
+					  &c->acd_extint0_cfg);
+	if (!ret)
+		ret = clk_osm_read_u32_index(dev, "qcom,acdextint1-val", idx,
+					  &c->acd_extint1_cfg);
+	if (!ret)
+		ret = clk_osm_read_u32_index(dev, "qcom,acdautoxfer-val", idx,
+					  &c->acd_autoxfer_ctl);
+
+	return ret;
+}
+
 static int clk_osm_probe_cluster(struct platform_device *pdev,
 				  struct clk_osm *c, void __iomem *osm_base,
 				  const char *name, unsigned int cell_idx,
@@ -847,13 +902,11 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 {
 	char propname[40];
 	u32 speedbin = 0;
-	u32 mem_acc_cfg[3];
 	struct clk_init_data init = {};
 	struct resource *res;
 	int ret;
 
 	c->dev = &pdev->dev;
-	c->cur_index = -1;
 	c->cluster_num = cell_idx;
 	/* Both clusters live in one "osm" MMIO region, but each has its own
 	 * OSM_CORE_TABLE_SIZE window: pwrcl at +0, perfcl one window further
@@ -873,6 +926,16 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	c->apcs_cmd_rcgr = apcs_cmd_rcgr;
 	c->apcs_itm_present = apcs_itm_present;
 
+	/* Open-loop uV per virtual corner from the CPR corner ceilings in DT.
+	 * Must run before clk_osm_parse_lut(), which checks the LUT's virtual
+	 * corners against it, and before clk_osm_setup_hw_table().
+	 */
+	ret = clk_osm_parse_corner_uv(pdev, c, cell_idx ?
+				      "qcom,perfcl-corner-uv" :
+				      "qcom,pwrcl-corner-uv");
+	if (ret)
+		return ret;
+
 	ret = clk_osm_read_speedbin(pdev, efuse_name, efuse_shift, efuse_mask,
 				     &speedbin);
 	if (ret == -EPROBE_DEFER)
@@ -884,48 +947,46 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	}
 
 	snprintf(propname, sizeof(propname), "qcom,%s-speedbin%u-v0", name, speedbin);
-	ret = clk_osm_parse_lut(pdev, c, propname);
-	if (ret) {
+	if (!of_property_present(pdev->dev.of_node, propname)) {
 		/* fall back to bin 0 if the selected bin isn't present */
-		dev_warn(&pdev->dev, "%s not found, retrying speedbin0\n", propname);
+		dev_warn(&pdev->dev, "%s not found, using speedbin0\n", propname);
+		speedbin = 0;
 		snprintf(propname, sizeof(propname), "qcom,%s-speedbin0-v0", name);
-		ret = clk_osm_parse_lut(pdev, c, propname);
-		if (ret)
-			return ret;
 	}
+	ret = clk_osm_parse_lut(pdev, c, propname);
+	if (ret)
+		return ret;
 
 	dev_info(&pdev->dev, "%s: %u LUT rows loaded, speedbin=%u\n",
 		 name, c->num_entries, speedbin);
 
-	/* Open-loop uV per virtual corner from the CPR corner ceilings in DT.
-	 * Must run before clk_osm_setup_hw_table(). */
-	ret = clk_osm_parse_corner_uv(pdev, c, cell_idx ?
-				      "qcom,perfcl-corner-uv" :
-				      "qcom,pwrcl-corner-uv");
+	ret = clk_osm_read_u32_index(&pdev->dev, "qcom,apm-mode-ctl", cell_idx,
+				     &c->apm_mode_ctl);
 	if (ret)
 		return ret;
-
-	of_property_read_u32_index(pdev->dev.of_node, "qcom,apm-mode-ctl", cell_idx, &c->apm_mode_ctl);
-	of_property_read_u32_index(pdev->dev.of_node, "qcom,apm-ctrl-status", cell_idx, &c->apm_ctrl_status);
+	ret = clk_osm_read_u32_index(&pdev->dev, "qcom,apm-ctrl-status", cell_idx,
+				     &c->apm_ctrl_status);
+	if (ret)
+		return ret;
 
 	/* APM threshold corner: first corner whose open-loop uV reaches 872000.
 	 * The corner-uv values are CPR ceilings, not real open-loop voltages;
 	 * on SDM636 every ceiling is above the threshold, so this resolves to
-	 * corner 0. Placeholder until real open-loop values are known. */
+	 * corner 0. Placeholder until real open-loop values are known.
+	 */
 	clk_osm_resolve_apm_corners(c, 872000);
 	c->apm_crossover_vc = c->apm_threshold_vc;
 
-	ret = of_property_read_u32_array(pdev->dev.of_node,
-					  cell_idx ? "qcom,perfcl-apcs-mem-acc-cfg"
-						   : "qcom,pwrcl-apcs-mem-acc-cfg",
-					  mem_acc_cfg, 3);
-	if (!ret)
-		memcpy(c->apcs_mem_acc_cfg, mem_acc_cfg, sizeof(mem_acc_cfg));
-
-	of_property_read_u32_array(pdev->dev.of_node,
-				    cell_idx ? "qcom,perfcl-apcs-mem-acc-val"
-					     : "qcom,pwrcl-apcs-mem-acc-val",
-				    c->apcs_mem_acc_val, MAX_MEM_ACC_VALUES);
+	/* MEM-ACC trim is optional: it is programmed only if the DT has it. */
+	c->has_mem_acc =
+		!of_property_read_u32_array(pdev->dev.of_node,
+					    cell_idx ? "qcom,perfcl-apcs-mem-acc-cfg"
+						 : "qcom,pwrcl-apcs-mem-acc-cfg",
+					    c->apcs_mem_acc_cfg, 3) &&
+		!of_property_read_u32_array(pdev->dev.of_node,
+					    cell_idx ? "qcom,perfcl-apcs-mem-acc-val"
+						 : "qcom,pwrcl-apcs-mem-acc-val",
+					    c->apcs_mem_acc_val, MAX_MEM_ACC_VALUES);
 
 	/* ACD - fully optional: probe the region only if DT declares it */
 	c->acd_base = NULL;
@@ -937,18 +998,9 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 			c->acd_base = NULL;
 	}
 	if (c->acd_base) {
-		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdtd-val",
-					    cell_idx, &c->acd_td);
-		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdcr-val",
-					    cell_idx, &c->acd_cr);
-		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdsscr-val",
-					    cell_idx, &c->acd_sscr);
-		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdextint0-val",
-					    cell_idx, &c->acd_extint0_cfg);
-		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdextint1-val",
-					    cell_idx, &c->acd_extint1_cfg);
-		of_property_read_u32_index(pdev->dev.of_node, "qcom,acdautoxfer-val",
-					    cell_idx, &c->acd_autoxfer_ctl);
+		ret = clk_osm_read_acd_params(&pdev->dev, c, cell_idx);
+		if (ret)
+			return ret;
 	}
 
 	init.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "cpu-osm-%s", name);
@@ -966,20 +1018,10 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	 * done by the caller after both clusters reach this point -
 	 * see clk_osm_probe()).
 	 *
-	 * All of this - INCLUDING the initial enable+index write right
-	 * below - now runs BEFORE devm_clk_hw_register(). Doing it after
-	 * registration was the actual bug behind cpufreq-dt's ENODEV/
-	 * "->get() failed": the clk core caches its rate exactly once, at
-	 * registration time, by calling recalc_rate() itself - it does
-	 * NOT re-invoke recalc_rate() on every clk_get_rate() call. A
-	 * direct call to our own set_rate() *after* registration writes
-	 * the hardware correctly but never touches that cache, so
-	 * clk_get_rate() (which cpufreq-dt's init path calls before ever
-	 * setting a rate itself) kept reading the stale value cached at
-	 * registration - 0, since cur_index was still -1 back then.
-	 * Setting cur_index and enabling the hardware before registration
-	 * means recalc_rate() reports the real frequency on that first,
-	 * only call the core ever makes on its own.
+	 * All of this - including the initial enable and index write below -
+	 * runs BEFORE devm_clk_hw_register(): the clk core calls recalc_rate()
+	 * once at registration and caches the result, so the hardware must
+	 * already be in its final state for the cached rate to be right.
 	 */
 	clk_osm_setup_hw_table(c);
 	clk_osm_do_additional_setup(c);
@@ -1044,11 +1086,21 @@ static int clk_osm_probe(struct platform_device *pdev)
 	/* <pwrcl_val perfcl_val> 2-cell DT arrays, same layout as downstream's
 	 * qcom,l-val-base etc.
 	 */
-	of_property_read_u32_array(pdev->dev.of_node, "qcom,l-val-base", l_val_base, 2);
-	of_property_read_u32_array(pdev->dev.of_node, "qcom,apcs-pll-user-ctl", apcs_pll_user_ctl, 2);
-	of_property_read_u32_array(pdev->dev.of_node, "qcom,apcs-cfg-rcgr", apcs_cfg_rcgr, 2);
-	of_property_read_u32_array(pdev->dev.of_node, "qcom,apcs-cmd-rcgr", apcs_cmd_rcgr, 2);
-	of_property_read_u32_array(pdev->dev.of_node, "qcom,apcs-itm-present", apcs_itm_present, 2);
+	ret = clk_osm_read_u32_array(&pdev->dev, "qcom,l-val-base", l_val_base, 2);
+	if (ret)
+		return ret;
+	ret = clk_osm_read_u32_array(&pdev->dev, "qcom,apcs-pll-user-ctl", apcs_pll_user_ctl, 2);
+	if (ret)
+		return ret;
+	ret = clk_osm_read_u32_array(&pdev->dev, "qcom,apcs-cfg-rcgr", apcs_cfg_rcgr, 2);
+	if (ret)
+		return ret;
+	ret = clk_osm_read_u32_array(&pdev->dev, "qcom,apcs-cmd-rcgr", apcs_cmd_rcgr, 2);
+	if (ret)
+		return ret;
+	ret = clk_osm_read_u32_array(&pdev->dev, "qcom,apcs-itm-present", apcs_itm_present, 2);
+	if (ret)
+		return ret;
 
 	ret = clk_osm_probe_cluster(pdev, &cc->pwrcl, osm_base, "pwrcl", 0,
 				     "pwrcl_efuse", PWRCL_EFUSE_SHIFT, PWRCL_EFUSE_MASK,
