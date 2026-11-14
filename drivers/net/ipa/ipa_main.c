@@ -115,7 +115,7 @@ int ipa_setup(struct ipa *ipa)
 	struct device *dev = ipa->dev;
 	int ret;
 
-	ret = gsi_setup(&ipa->gsi);
+	ret = ipa_dma_setup(&ipa->dma_subsys);
 	if (ret)
 		return ret;
 
@@ -165,7 +165,7 @@ err_command_disable:
 	ipa_endpoint_disable_one(command_endpoint);
 err_endpoint_teardown:
 	ipa_endpoint_teardown(ipa);
-	gsi_teardown(&ipa->gsi);
+	ipa_dma_teardown(&ipa->dma_subsys);
 
 	return ret;
 }
@@ -189,7 +189,7 @@ static void ipa_teardown(struct ipa *ipa)
 	command_endpoint = ipa->name_map[IPA_ENDPOINT_AP_COMMAND_TX];
 	ipa_endpoint_disable_one(command_endpoint);
 	ipa_endpoint_teardown(ipa);
-	gsi_teardown(&ipa->gsi);
+	ipa_dma_teardown(&ipa->dma_subsys);
 }
 
 static void
@@ -494,6 +494,22 @@ static void ipa_hardware_dcd_deconfig(struct ipa *ipa)
  */
 static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 {
+	const struct reg *reg;
+
+	/* IPA v2.x requires a software reset and the core clock enabled */
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		reg = ipa_reg(ipa, COMP_SW_RESET);
+		iowrite32(1, ipa->reg_virt + reg_offset(reg));
+		iowrite32(0, ipa->reg_virt + reg_offset(reg));
+
+		reg = ipa_reg(ipa, COMP_CFG);
+		iowrite32(1, ipa->reg_virt + reg_offset(reg));
+
+		ipa_hardware_config_bcr(ipa, data);
+
+		return;
+	}
+
 	ipa_hardware_config_bcr(ipa, data);
 	ipa_hardware_config_tx(ipa);
 	ipa_hardware_config_clkon(ipa);
@@ -513,7 +529,8 @@ static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 static void ipa_hardware_deconfig(struct ipa *ipa)
 {
 	/* Mostly we just leave things as we set them. */
-	ipa_hardware_dcd_deconfig(ipa);
+	if (ipa->version > IPA_VERSION_2_6L)
+		ipa_hardware_dcd_deconfig(ipa);
 }
 
 /**
@@ -637,6 +654,14 @@ out_release_firmware:
 }
 
 static const struct of_device_id ipa_match[] = {
+	{
+		.compatible	= "qcom,msm8996-ipa",
+		.data		= &ipa_data_v2_5,
+	},
+	{
+		.compatible	= "qcom,msm8953-ipa",
+		.data		= &ipa_data_v2_6L,
+	},
 	{
 		.compatible	= "qcom,msm8998-ipa",
 		.data		= &ipa_data_v3_1,
@@ -860,15 +885,19 @@ static int ipa_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_mem_exit;
 
-	ret = gsi_init(&ipa->gsi, pdev, ipa->version, data->endpoint_count,
-		       data->endpoint_data);
+	if (IPA_HAS_GSI(ipa->version))
+		ret = gsi_init(&ipa->dma_subsys, pdev, ipa->version,
+			       data->endpoint_count, data->endpoint_data);
+	else
+		ret = bam_init(&ipa->dma_subsys, pdev, ipa->version,
+			       data->endpoint_count, data->endpoint_data);
 	if (ret)
 		goto err_mem_exit;
 
 	/* Result is a non-zero mask of endpoints that support filtering */
 	ret = ipa_endpoint_init(ipa, data->endpoint_count, data->endpoint_data);
 	if (ret)
-		goto err_gsi_exit;
+		goto err_dma_exit;
 
 	ret = ipa_table_init(ipa);
 	if (ret)
@@ -896,8 +925,11 @@ static int ipa_probe(struct platform_device *pdev)
 		goto done;
 
 	if (loader == IPA_LOADER_SELF) {
-		/* The AP is loading GSI firmware; do so now */
-		ret = ipa_firmware_load(dev);
+		/* The AP is loading GSI firmware; do so now.  IPA v2.x
+		 * (BAM) has no GSI firmware to load.
+		 */
+		if (ipa->version > IPA_VERSION_2_6L)
+			ret = ipa_firmware_load(dev);
 		if (ret)
 			goto err_deconfig;
 	} /* Otherwise loader == IPA_LOADER_SKIP */
@@ -920,8 +952,8 @@ err_table_exit:
 	ipa_table_exit(ipa);
 err_endpoint_exit:
 	ipa_endpoint_exit(ipa);
-err_gsi_exit:
-	gsi_exit(&ipa->gsi);
+err_dma_exit:
+	ipa_dma_exit(&ipa->dma_subsys);
 err_mem_exit:
 	ipa_mem_exit(ipa);
 err_reg_exit:
@@ -987,7 +1019,7 @@ out_power_put:
 	ipa_smp2p_exit(ipa);
 	ipa_table_exit(ipa);
 	ipa_endpoint_exit(ipa);
-	gsi_exit(&ipa->gsi);
+	ipa_dma_exit(&ipa->dma_subsys);
 	ipa_mem_exit(ipa);
 	ipa_reg_exit(ipa);
 	kfree(ipa);

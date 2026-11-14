@@ -9,7 +9,7 @@
 #include <linux/notifier.h>
 #include <linux/types.h>
 
-#include "gsi.h"
+#include "ipa_dma.h"
 #include "ipa_endpoint.h"
 #include "ipa_mem.h"
 #include "ipa_qmi.h"
@@ -71,7 +71,7 @@ struct ipa_smp2p;
  * @qmi:		QMI information
  */
 struct ipa {
-	struct gsi gsi;
+	struct ipa_dma dma_subsys;
 	enum ipa_version version;
 	struct device *dev;
 	struct completion completion;
@@ -81,7 +81,7 @@ struct ipa {
 	struct ipa_power *power;
 
 	dma_addr_t table_addr;
-	__le64 *table_virt;
+	void *table_virt;
 	u32 route_count;
 	u32 modem_route_count;
 	u32 filter_count;
@@ -109,6 +109,14 @@ struct ipa {
 	dma_addr_t zero_addr;
 	void *zero_virt;
 	size_t zero_size;
+
+	/* System (DRAM) header table used by IPA v2.x */
+	dma_addr_t system_hdr_addr;
+	void *system_hdr_virt;
+	size_t system_hdr_size;
+
+	/* Zeroed window mapped at the v2.x system table range */
+	struct page *system_window_page;
 
 	/* Bitmaps indicating endpoint state */
 	u32 endpoint_count;
