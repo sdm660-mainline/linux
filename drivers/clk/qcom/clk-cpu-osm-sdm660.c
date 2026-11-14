@@ -181,6 +181,7 @@ struct clk_osm {
 	void __iomem *base;		/* this cluster's OSM window */
 	phys_addr_t base_phys;		/* ... and its physical address */
 	unsigned int cluster_num;	/* 0 = pwrcl, 1 = perfcl */
+	const char *name;
 
 	struct osm_entry osm_table[OSM_TABLE_SIZE];
 	unsigned int num_entries;
@@ -891,7 +892,7 @@ static int clk_osm_read_acd_params(struct device *dev, struct clk_osm *c,
 	return ret;
 }
 
-static int clk_osm_probe_cluster(struct platform_device *pdev,
+static int clk_osm_setup_cluster(struct platform_device *pdev,
 				  struct clk_osm *c, void __iomem *osm_base,
 				  const char *name, unsigned int cell_idx,
 				  const char *efuse_name, u32 efuse_shift,
@@ -903,12 +904,12 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	char propname[40];
 	u32 speedbin = 0;
 	u32 apm_uv;
-	struct clk_init_data init = {};
 	struct resource *res;
 	int ret;
 
 	c->dev = &pdev->dev;
 	c->cluster_num = cell_idx;
+	c->name = name;
 	/* Both clusters live in one "osm" MMIO region, but each has its own
 	 * OSM_CORE_TABLE_SIZE window: pwrcl at +0, perfcl one window further
 	 * (downstream: perfcl base = pwrcl base + cluster_num *
@@ -1012,28 +1013,35 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 			return ret;
 	}
 
-	init.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "cpu-osm-%s", name);
+	/* Bring-up follows downstream cpu_clock_osm_driver_probe(): for both
+	 * clusters LUT -> hw table push -> do_additional_setup (PLL/GFMUX, APM
+	 * register addresses); then the ITM handoff and the sequencer microcode
+	 * (see clk_osm_probe()); only then, per cluster, MEM-ACC -> APM crossover
+	 * -> ACD -> enable (see clk_osm_register_cluster()). cc/llm policy tuning
+	 * and setup_fsms are not ported.
+	 */
+	clk_osm_setup_hw_table(c);
+	clk_osm_do_additional_setup(c);
+
+	return 0;
+}
+
+/*
+ * Second half of the bring-up, run once the ITM handoff and the sequencer
+ * microcode are in place for both clusters.
+ */
+static int clk_osm_register_cluster(struct platform_device *pdev,
+				    struct clk_osm *c)
+{
+	struct clk_init_data init = {};
+	int ret;
+
+	init.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "cpu-osm-%s", c->name);
 	if (!init.name)
 		return -ENOMEM;
 	init.ops = &clk_osm_ops;
 	c->hw.init = &init;
 
-	/* Bring-up order matches downstream cpu_clock_osm_driver_probe():
-	 * LUT -> hw table push -> (cc/llm policy tuning, not ported) ->
-	 * setup_fsms (not ported, optional) -> do_additional_setup
-	 * (PLL/GFMUX programming - needed here, TZ doesn't do it) ->
-	 * mem_acc -> apm_vc_setup -> acd_init (last, per-cluster) ->
-	 * (itm handoff + sequencer load happen once for both clusters,
-	 * done by the caller after both clusters reach this point -
-	 * see clk_osm_probe()).
-	 *
-	 * All of this - including the initial enable and index write below -
-	 * runs BEFORE devm_clk_hw_register(): the clk core calls recalc_rate()
-	 * once at registration and caches the result, so the hardware must
-	 * already be in its final state for the cached rate to be right.
-	 */
-	clk_osm_setup_hw_table(c);
-	clk_osm_do_additional_setup(c);
 	clk_osm_program_mem_acc_regs(c);
 	clk_osm_apm_vc_setup(c);
 
@@ -1041,8 +1049,11 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	if (ret)
 		dev_warn(&pdev->dev,
 			 "%s: ACD init failed (%d) - continuing without it\n",
-			 name, ret);
+			 c->name, ret);
 
+	/* The hardware has to be in its final state before registration: the clk
+	 * core calls recalc_rate() once at registration and caches the result.
+	 */
 	if (c->num_entries) {
 		clk_osm_enable(&c->hw);
 		ret = clk_osm_set_rate(&c->hw, c->osm_table[0].frequency, 0);
@@ -1050,17 +1061,13 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 			dev_warn(&pdev->dev,
 				 "%s: could not set initial rate (%d) - "
 				 "cpufreq-dt registration will likely fail\n",
-				 name, ret);
+				 c->name, ret);
 		else
 			dev_info(&pdev->dev, "%s: enabled, initial rate %u Hz\n",
-				 name, c->osm_table[0].frequency);
+				 c->name, c->osm_table[0].frequency);
 	}
 
-	ret = devm_clk_hw_register(&pdev->dev, &c->hw);
-	if (ret)
-		return ret;
-
-	return 0;
+	return devm_clk_hw_register(&pdev->dev, &c->hw);
 }
 
 /* One shared "osm" MMIO region drives both clusters (see DT file),
@@ -1120,7 +1127,7 @@ static int clk_osm_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = clk_osm_probe_cluster(pdev, &cc->pwrcl, osm_base, "pwrcl", 0,
+	ret = clk_osm_setup_cluster(pdev, &cc->pwrcl, osm_base, "pwrcl", 0,
 				     "pwrcl_efuse", PWRCL_EFUSE_SHIFT, PWRCL_EFUSE_MASK,
 				     l_val_base[0], apcs_pll_user_ctl[0],
 				     apcs_cfg_rcgr[0], apcs_cmd_rcgr[0],
@@ -1128,7 +1135,7 @@ static int clk_osm_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = clk_osm_probe_cluster(pdev, &cc->perfcl, osm_base, "perfcl", 1,
+	ret = clk_osm_setup_cluster(pdev, &cc->perfcl, osm_base, "perfcl", 1,
 				     "perfcl_efuse", PERFCL_EFUSE_SHIFT, PERFCL_EFUSE_MASK,
 				     l_val_base[1], apcs_pll_user_ctl[1],
 				     apcs_cfg_rcgr[1], apcs_cmd_rcgr[1],
@@ -1136,14 +1143,22 @@ static int clk_osm_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	/* Both clusters have had do_additional_setup() applied at this
-	 * point (inside clk_osm_probe_cluster) - now do the two steps
-	 * downstream does across BOTH clusters together, in this order:
-	 * ITM handoff, then sequencer microcode load for each.
+	/* Both clusters have had do_additional_setup() applied. Downstream then
+	 * does two steps across BOTH clusters together - ITM handoff, then the
+	 * sequencer microcode load for each - before MEM-ACC/APM setup and
+	 * before OSM is enabled.
 	 */
 	clk_osm_setup_itm_to_osm_handoff(&cc->pwrcl, &cc->perfcl);
 	clk_osm_setup_sequencer(&cc->pwrcl);
 	clk_osm_setup_sequencer(&cc->perfcl);
+
+	ret = clk_osm_register_cluster(pdev, &cc->pwrcl);
+	if (ret)
+		return ret;
+
+	ret = clk_osm_register_cluster(pdev, &cc->perfcl);
+	if (ret)
+		return ret;
 
 	cc->onecell.num = 2;
 	cc->onecell.hws[0] = &cc->pwrcl.hw;
