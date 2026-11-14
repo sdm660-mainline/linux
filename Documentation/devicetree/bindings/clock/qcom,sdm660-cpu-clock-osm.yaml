@@ -52,6 +52,19 @@ properties:
   '#clock-cells':
     const: 1
 
+  qcom,osm-no-tz:
+    type: boolean
+    description:
+      TrustZone does not initialise OSM on this board, so the kernel sets up
+      the PLLs, the APM and the OSM sequencer itself. The driver currently
+      implements only this mode and refuses to probe without the property.
+
+  qcom,apm-threshold-voltage:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      APM threshold voltage in microvolts. The first virtual corner whose
+      open-loop voltage reaches it is used as the APM threshold corner.
+
   qcom,l-val-base:
     $ref: /schemas/types.yaml#/definitions/uint32-array
     description: Per-cluster PLL L-value register addresses, <pwrcl perfcl>.
@@ -192,6 +205,7 @@ required:
   - reg
   - reg-names
   - '#clock-cells'
+  - qcom,apm-threshold-voltage
 
 additionalProperties: false
 
@@ -214,6 +228,9 @@ examples:
         interrupt-names = "pwrcl-irq", "perfcl-irq";
 
         #clock-cells = <1>;
+
+        qcom,osm-no-tz;
+        qcom,apm-threshold-voltage = <832000>;
 
         qcom,l-val-base = <0x17916004 0x17816004>;
         qcom,apcs-pll-user-ctl = <0x1791600c 0x1781600c>;
