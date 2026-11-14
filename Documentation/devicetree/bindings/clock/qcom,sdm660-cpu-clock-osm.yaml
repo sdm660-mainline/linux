@@ -29,6 +29,7 @@ properties:
   reg-names:
     minItems: 5
     maxItems: 9
+    uniqueItems: true
     items:
       enum:
         - osm
@@ -37,17 +38,8 @@ properties:
         - apcs_common
         - pwrcl_efuse
         - perfcl_efuse
-        - debug
         - pwrcl-acd
         - perfcl-acd
-
-  interrupts:
-    maxItems: 2
-
-  interrupt-names:
-    items:
-      - const: pwrcl-irq
-      - const: perfcl-irq
 
   '#clock-cells':
     const: 1
@@ -173,7 +165,7 @@ properties:
     maxItems: 32
 
 patternProperties:
-  '^qcom,(pwrcl|perfcl)-speedbin[0-9]+-v[0-9]+$':
+  '^qcom,(pwrcl|perfcl)-speedbin[0-9]+-v0$':
     $ref: /schemas/types.yaml#/definitions/uint32-matrix
     description:
       OSM LUT for one cluster and speed bin. Each row is
@@ -211,8 +203,6 @@ additionalProperties: false
 
 examples:
   - |
-    #include <dt-bindings/interrupt-controller/arm-gic.h>
-
     clock-controller@179c0000 {
         compatible = "qcom,sdm660-cpu-clock-osm";
         reg = <0x179c0000 0x4000>,
@@ -222,10 +212,6 @@ examples:
               <0x00784130 0x8>;
         reg-names = "osm", "pwrcl_pll", "perfcl_pll",
                     "apcs_common", "perfcl_efuse";
-
-        interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-                     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
-        interrupt-names = "pwrcl-irq", "perfcl-irq";
 
         #clock-cells = <1>;
 
