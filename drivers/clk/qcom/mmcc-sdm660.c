@@ -2504,6 +2504,8 @@ static struct clk_branch video_axi_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(struct clk_init_data){
 			.name = "video_axi_clk",
+			.parent_hws = (const struct clk_hw *[]){ &axi_clk_src.clkr.hw },
+			.num_parents = 1,
 			.ops = &clk_branch2_ops,
 		},
 	},
@@ -2519,6 +2521,8 @@ static struct clk_branch throttle_video_axi_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(struct clk_init_data){
 			.name = "throttle_video_axi_clk",
+			.parent_hws = (const struct clk_hw *[]){ &axi_clk_src.clkr.hw },
+			.num_parents = 1,
 			.ops = &clk_branch2_ops,
 		},
 	},

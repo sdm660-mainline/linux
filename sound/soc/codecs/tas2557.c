@@ -196,7 +196,8 @@ static const unsigned int tas2557_startup_data[] = {
 	TAS2557_GPIO6_PIN_REG,            0x01,	/* GPIO6 = ASI2 WCLK input */
 	TAS2557_GPIO8_PIN_REG,            0x02,	/* GPIO8 = ASI2 DIN */
 	TAS2557_GPIO5_PIN_REG,            0x01,	/* GPIO5 = ASI2 BCLK input */
-	TAS2557_ASI2_DAC_FORMAT_REG,      0x18,	/* ASI2: 32-bit I2S */
+	TAS2557_ASI1_DAC_FORMAT_REG,      0x00,	/* ASI1: 16-bit I2S */
+	TAS2557_ASI2_DAC_FORMAT_REG,      0x00,	/* ASI2: 16-bit I2S */
 	TAS2557_ASI2_BDIV_CLK_SEL_REG,   0x01,
 	TAS2557_ASI2_BDIV_CLK_RATIO_REG, 0x01,
 	TAS2557_ASI2_BDIV_CLK_RATIO_REG, 0x81,	/* power up BDIV */
@@ -1759,11 +1760,11 @@ static int tas2557_hw_params(struct snd_pcm_substream *substream,
 	 * format, so no WORDLENGTH bits are written here.  Only the
 	 * channel data-slot offset (in BCLK cycles) depends on the
 	 * stream: channel 0 sits at offset 1 (the validated hardware
-	 * configuration); later channels follow, width*2 apart.
+	 * configuration); later channels follow one slot width apart.
 	 */
 	width = tas2557->tdm_slot_width > 0 ? tas2557->tdm_slot_width :
 					      params_physical_width(params);
-	offset = (tas2557->channel == 0) ? 1 : 1 + width * 2;
+	offset = (tas2557->channel == 0) ? 1 : 1 + width;
 	tas2557->asi_offset = offset;
 
 	/* Playback runs over ASI2; ASI1 is programmed too (per TI driver) */
@@ -2377,10 +2378,10 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 
 	/*
 	 * Seed the cached ASI data-slot offset before any hw_params() or
-	 * set_tdm_slot() call arrives; 32 is the fixed ASI word length
+	 * set_tdm_slot() call arrives; 16 is the fixed ASI word length
 	 * used by tas2557_startup_data.
 	 */
-	tas2557->asi_offset = (tas2557->channel == 0) ? 1 : 1 + 32 * 2;
+	tas2557->asi_offset = (tas2557->channel == 0) ? 1 : 1 + 16;
 
 	ret = devm_regulator_bulk_get_enable(dev, ARRAY_SIZE(tas2557_supplies),
 					     tas2557_supplies);
