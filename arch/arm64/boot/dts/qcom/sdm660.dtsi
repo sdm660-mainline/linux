@@ -657,10 +657,6 @@
 
 		/delete-property/ qcom,perfcl-speedbin2-v0;
 
-		interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
-		interrupt-names = "pwrcl-irq", "perfcl-irq";
-
 		#clock-cells = <1>;	/* 0 = pwrcl, 1 = perfcl */
 
 		/* <pwrcl perfcl> - additional_setup() inputs, taken from the

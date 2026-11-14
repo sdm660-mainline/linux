@@ -6,8 +6,6 @@
  */
 
 #include "sdm660.dtsi"
-#include <dt-bindings/interrupt-controller/arm-gic.h>
-#include <dt-bindings/interrupt-controller/irq.h>
 
 /delete-node/ &remoteproc_cdsp;
 /delete-node/ &cdsp_smmu;
@@ -236,20 +234,14 @@
 		      <0x17916000 0x1000>,	/* pwrcl_pll */
 		      <0x17816000 0x1000>,	/* perfcl_pll */
 		      <0x179d1000 0x1000>,	/* apcs_common */
-		      <0x00784130 0x8>,	/* perfcl_efuse (QFPROM) */
-		      <0x1791101c 0x8>;	/* debug */
+		      <0x00784130 0x8>;	/* perfcl_efuse (QFPROM) */
 		reg-names = "osm", "pwrcl_pll", "perfcl_pll",
-			    "apcs_common", "perfcl_efuse", "debug";
+			    "apcs_common", "perfcl_efuse";
 
 		/delete-property/ qcom,pwrcl-speedbin1-v0;
 		/delete-property/ qcom,pwrcl-speedbin3-v0;
 		/delete-property/ qcom,perfcl-speedbin1-v0;
 		/delete-property/ qcom,perfcl-speedbin3-v0;
-
-
-		interrupts = <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>;
-		interrupt-names = "pwrcl-irq", "perfcl-irq";
 
 		#clock-cells = <1>;	/* 0 = pwrcl, 1 = perfcl */
 
