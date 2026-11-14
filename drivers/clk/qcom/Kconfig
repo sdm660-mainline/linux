@@ -1785,7 +1785,6 @@ config SM_VIDEOCC_8450
 config SDM_CPU_OSM_660
 	tristate "SDM660/636 CPU OSM clock controller"
 	depends on ARM64 || COMPILE_TEST
-	select QCOM_SCM
 	help
 	  Support CPU frequency scaling on SDM660/636 (Kryo 260) via the
 	  OSM (Operating State Manager) hardware block.

@@ -10,21 +10,18 @@
  * against https://linux-msm.github.io/mainline-status/ - MSM8998 row,
  * "CPUfreq (DVFS)" column = "N" as of the date this was written).
  *
- * STATUS: Functional, but untested on SDM660/SDM630.
- * Tested only on xiaomi, whyred. qcom-sdm636
+ * STATUS: tested only on SDM636 (Xiaomi Redmi Note 5 Pro, "whyred").
+ * SDM660 and SDM630 share the register layout but are untested.
  *
- * Scope deliberately excludes, for a first bring-up:
- *   - ACD (Adaptive Clock Distribution / droop mitigation)
+ * Not implemented:
  *   - LLM (Limits Management - external thermal/battery voting engine)
- *   - the full "no-TZ" sequencer microcode load path (clk_osm_do_
- *     additional_setup() downstream) - this programs the OSM's internal
- *     FSM via a 256-word microcode blob (seq_instr[]/seq_br_instr[])
- *     and is only exercised on boards built with "qcom,osm-no-tz" in DT.
- *     Retail Xiaomi firmware initializes OSM's PLL/GFMUX/microcode in
- *     TrustZone before Linux boots, so this path is expected to be
- *     unnecessary for whyred - but that is an assumption, not something
- *     we've confirmed by reading back OSM_BASE+VERSION_REG/ENABLE_REG
- *     state at early boot.
+ *   - the TrustZone-assisted OSM init path (downstream "secure_init"
+ *     false). The PLL/GFMUX/APM setup and the FSM microcode load below
+ *     are done by the kernel, as downstream does for boards with
+ *     "qcom,osm-no-tz".
+ *
+ * ACD (Adaptive Clock Distribution) is optional: it is set up only when
+ * the node describes the per-cluster "*-acd" register window.
  *
  *     Copyright (c) 2026, kulesha Evgeniy <voovdop@gmail.com>
  */
@@ -34,15 +31,12 @@
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
-#include <linux/nvmem-consumer.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_opp.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
-
-#include <linux/firmware/qcom/qcom_scm.h>
 
 #define OSM_TABLE_SIZE			40
 #define MAX_VIRTUAL_CORNER		(OSM_TABLE_SIZE - 1)
@@ -444,14 +438,9 @@ static void clk_osm_program_apm_regs(struct clk_osm *c)
 
 /* ---------------------------------------------------------------------
  * APM voltage-crossover corner programming - clk_osm_apm_vc_setup(),
- * secure_init==true branch (i.e. board where TZ has NOT already brought
- * up OSM - confirmed to be whyred's case by reading ENABLE_REG/FREQ_REG
- * back as zero on real hardware, 2026-08-23). This branch is plain
- * MMIO in the downstream source, no SCM involved - unlike an earlier
- * draft of this file, which wrongly assumed the opposite (TZ-present)
- * branch and used qcom_scm_io_writel() here. Left the SCM path further
- * down as a fallback in case that assumption ever needs revisiting on
- * a different board/firmware.
+ * downstream's secure_init branch: TZ has not set OSM up (ENABLE_REG and
+ * FREQ_REG read back as zero at boot on whyred), so Linux programs it.
+ * Plain MMIO, no SCM.
  * ---------------------------------------------------------------------
  */
 static void clk_osm_apm_vc_setup(struct clk_osm *c)
@@ -471,32 +460,6 @@ static void clk_osm_apm_vc_setup(struct clk_osm *c)
 	osm_write(c, 0x3b | (c->apm_threshold_vc << 6), SEQ_REG(73));
 	osm_write(c, 0x39 | (c->apm_threshold_vc << 6), SEQ_REG(76));
 	osm_mb(c);
-}
-
-/* Fallback for a board that turns out to need the TZ-present path after
- * all (secure_init==false downstream) - NOT currently called, kept for
- * reference/completeness. Needs the physical base address, unlike the
- * function above.
- */
-static int __maybe_unused clk_osm_apm_vc_setup_scm(struct clk_osm *c, phys_addr_t base_phys)
-{
-	int ret;
-
-	ret = qcom_scm_io_writel(base_phys + SEQ_REG(72), c->apm_crossover_vc);
-	if (ret)
-		return ret;
-	ret = qcom_scm_io_writel(base_phys + SEQ_REG(15), c->apm_threshold_vc);
-	if (ret)
-		return ret;
-	ret = qcom_scm_io_writel(base_phys + SEQ_REG(1), c->apm_threshold_vc);
-	if (ret)
-		return ret;
-	ret = qcom_scm_io_writel(base_phys + SEQ_REG(73),
-				  0x3b | (c->apm_threshold_vc << 6));
-	if (ret)
-		return ret;
-
-	return 0;
 }
 
 /* ---------------------------------------------------------------------
@@ -727,7 +690,7 @@ static const struct clk_ops clk_osm_ops = {
  * DT parsing. Property names deliberately match the downstream
  * qcom,{pwrcl,perfcl}-speedbin<N>-v<M> array shape so whyred's existing
  * board DT data (already extracted from msm8998-interposer-sdm660.dtsi)
- * can be reused without re-encoding. See sdm660-whyred-cpu-osm.dtsi.
+ * can be reused without re-encoding.
  *
  * Each row is 5 cells, order taken from downstream's own field enum
  * (FREQ, FREQ_DATA, PLL_OVERRIDES, SPARE_DATA, VIRTUAL_CORNER - in that
@@ -873,14 +836,10 @@ static void clk_osm_resolve_apm_corners(struct clk_osm *c, u32 apm_uv)
 	c->apm_threshold_pre_vc = MAX_VIRTUAL_CORNER - 1;
 }
 
-
-/*
- * Probe :)
- */
 static int clk_osm_probe_cluster(struct platform_device *pdev,
 				  struct clk_osm *c, void __iomem *osm_base,
 				  const char *name, unsigned int cell_idx,
-				  const char *nvmem_name, u32 efuse_shift,
+				  const char *efuse_name, u32 efuse_shift,
 				  u32 efuse_mask,
 				  u32 l_val_base, u32 apcs_pll_user_ctl,
 				  u32 apcs_cfg_rcgr, u32 apcs_cmd_rcgr,
@@ -914,12 +873,12 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	c->apcs_cmd_rcgr = apcs_cmd_rcgr;
 	c->apcs_itm_present = apcs_itm_present;
 
-	ret = clk_osm_read_speedbin(pdev, nvmem_name, efuse_shift, efuse_mask,
+	ret = clk_osm_read_speedbin(pdev, efuse_name, efuse_shift, efuse_mask,
 				     &speedbin);
 	if (ret == -EPROBE_DEFER)
 		return ret;
 	if (ret) {
-		dev_warn(&pdev->dev, "%s: no speedbin nvmem cell, using bin 0 (%d)\n",
+		dev_warn(&pdev->dev, "%s: no speedbin efuse window, using bin 0 (%d)\n",
 			 name, ret);
 		speedbin = 0;
 	}
@@ -946,8 +905,7 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	if (ret)
 		return ret;
 
-	snprintf(propname, sizeof(propname), "qcom,apm-mode-ctl");
-	of_property_read_u32_index(pdev->dev.of_node, propname, cell_idx, &c->apm_mode_ctl);
+	of_property_read_u32_index(pdev->dev.of_node, "qcom,apm-mode-ctl", cell_idx, &c->apm_mode_ctl);
 	of_property_read_u32_index(pdev->dev.of_node, "qcom,apm-ctrl-status", cell_idx, &c->apm_ctrl_status);
 
 	/* APM threshold corner: first corner whose open-loop uV reaches 872000.
@@ -993,7 +951,9 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 					    cell_idx, &c->acd_autoxfer_ctl);
 	}
 
-	init.name = name;
+	init.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "cpu-osm-%s", name);
+	if (!init.name)
+		return -ENOMEM;
 	init.ops = &clk_osm_ops;
 	c->hw.init = &init;
 
@@ -1081,9 +1041,8 @@ static int clk_osm_probe(struct platform_device *pdev)
 	if (IS_ERR(osm_base))
 		return PTR_ERR(osm_base);
 
-	/* All four of these are <pwrcl_val perfcl_val> 2-cell DT arrays,
-	 * matching downstream's qcom,l-val-base etc layout - see
-	 * sdm660-whyred-cpu-osm.dtsi.
+	/* <pwrcl_val perfcl_val> 2-cell DT arrays, same layout as downstream's
+	 * qcom,l-val-base etc.
 	 */
 	of_property_read_u32_array(pdev->dev.of_node, "qcom,l-val-base", l_val_base, 2);
 	of_property_read_u32_array(pdev->dev.of_node, "qcom,apcs-pll-user-ctl", apcs_pll_user_ctl, 2);
@@ -1115,12 +1074,6 @@ static int clk_osm_probe(struct platform_device *pdev)
 	clk_osm_setup_itm_to_osm_handoff(&cc->pwrcl, &cc->perfcl);
 	clk_osm_setup_sequencer(&cc->pwrcl);
 	clk_osm_setup_sequencer(&cc->perfcl);
-
-	/* Only now, with PLL/GFMUX/microcode actually loaded, is it
-	 * meaningful to enable the clocks. clk_osm_enable() (ENABLE_REG=1)
-	 * runs lazily via the clk framework on first clk_prepare_enable()
-	 * from a consumer (e.g. a cpufreq driver) - not forced here.
-	 */
 
 	cc->onecell.num = 2;
 	cc->onecell.hws[0] = &cc->pwrcl.hw;
