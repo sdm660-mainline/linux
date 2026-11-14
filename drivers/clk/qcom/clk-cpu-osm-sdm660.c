@@ -902,6 +902,7 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 {
 	char propname[40];
 	u32 speedbin = 0;
+	u32 apm_uv;
 	struct clk_init_data init = {};
 	struct resource *res;
 	int ret;
@@ -969,12 +970,20 @@ static int clk_osm_probe_cluster(struct platform_device *pdev,
 	if (ret)
 		return ret;
 
-	/* APM threshold corner: first corner whose open-loop uV reaches 872000.
-	 * The corner-uv values are CPR ceilings, not real open-loop voltages;
-	 * on SDM636 every ceiling is above the threshold, so this resolves to
-	 * corner 0. Placeholder until real open-loop values are known.
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,apm-threshold-voltage",
+				  &apm_uv);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret,
+				     "missing qcom,apm-threshold-voltage\n");
+
+	/* APM threshold corner: first corner whose open-loop uV reaches the
+	 * threshold. The corner-uv values are CPR ceilings, not real open-loop
+	 * voltages, so on SDM636 every corner is above the threshold and this
+	 * resolves to corner 0.
+	 * TODO: downstream derives the crossover corner from the regulator
+	 * corner count, not from the threshold; the two are not the same.
 	 */
-	clk_osm_resolve_apm_corners(c, 872000);
+	clk_osm_resolve_apm_corners(c, apm_uv);
 	c->apm_crossover_vc = c->apm_threshold_vc;
 
 	/* MEM-ACC trim is optional: it is programmed only if the DT has it. */
@@ -1073,6 +1082,15 @@ static int clk_osm_probe(struct platform_device *pdev)
 	u32 apcs_cfg_rcgr[2] = {}, apcs_cmd_rcgr[2] = {};
 	u32 apcs_itm_present[2] = {};
 	int ret;
+
+	/* Only downstream's "no TZ" init path is implemented: Linux programs the
+	 * PLL/GFMUX, APM and the FSM microcode itself. Where TrustZone has already
+	 * done that, doing it again would overwrite firmware-programmed state, so
+	 * a board has to opt in.
+	 */
+	if (!of_property_read_bool(pdev->dev.of_node, "qcom,osm-no-tz"))
+		return dev_err_probe(&pdev->dev, -EOPNOTSUPP,
+				     "only the no-TZ init path is implemented, qcom,osm-no-tz is required\n");
 
 	cc = devm_kzalloc(&pdev->dev,
 			   struct_size(cc, onecell.hws, 2), GFP_KERNEL);
