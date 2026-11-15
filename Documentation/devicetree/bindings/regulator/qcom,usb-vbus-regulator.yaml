@@ -25,6 +25,7 @@ properties:
       - items:
           - enum:
               - qcom,pm4125-vbus-reg
+              - qcom,pm660-vbus-reg
               - qcom,pm6150-vbus-reg
               - qcom,pm7250b-vbus-reg
               - qcom,pmi632-vbus-reg
