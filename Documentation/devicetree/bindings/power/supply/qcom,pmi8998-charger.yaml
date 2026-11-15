@@ -50,11 +50,8 @@ properties:
       Phandle to the USB controller whose role is switched according to the
       ID pin state.
 
-  otg-vbus:
-    type: object
-    $ref: /schemas/regulator/regulator.yaml#
-    unevaluatedProperties: false
-    description: Regulator controlling the VBUS boost used in host mode.
+  vbus-supply:
+    description: VBUS booster regulator, enabled when acting as a USB host.
 
 required:
   - compatible
