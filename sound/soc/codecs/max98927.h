@@ -251,8 +251,13 @@
 /* MAX98927_R00FF_GLOBAL_SHDN */
 #define MAX98927_GLOBAL_EN_MASK (0x1 << 0)
 
+enum max98927_type {
+	MAX98927 = 1,
+};
+
 struct max98927_priv {
 	struct regmap *regmap;
+	enum max98927_type type;
 	struct snd_soc_component *component;
 	struct max98927_pdata *pdata;
 	struct gpio_desc *reset_gpio; 

@@ -809,6 +809,11 @@ static int max98927_i2c_probe(struct i2c_client *i2c)
 	}
 	i2c_set_clientdata(i2c, max98927);
 
+	max98927->type = (uintptr_t)i2c_get_match_data(i2c);
+	if (!max98927->type)
+		return dev_err_probe(&i2c->dev, -EINVAL,
+				     "Unknown device type\n");
+
 	/* update interleave mode info */
 	if (of_property_read_bool(i2c->dev.of_node, "maxim,interleave-mode")) {
 		max98927->interleave_mode = true;
@@ -873,7 +878,7 @@ static void max98927_i2c_remove(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id max98927_i2c_id[] = {
-	{ .name = "max98927" },
+	{ .name = "max98927", .driver_data = MAX98927 },
 	{ }
 };
 
@@ -881,7 +886,7 @@ MODULE_DEVICE_TABLE(i2c, max98927_i2c_id);
 
 #if defined(CONFIG_OF)
 static const struct of_device_id max98927_of_match[] = {
-	{ .compatible = "maxim,max98927", },
+	{ .compatible = "maxim,max98927", .data = (void *)MAX98927 },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, max98927_of_match);
@@ -889,7 +894,7 @@ MODULE_DEVICE_TABLE(of, max98927_of_match);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id max98927_acpi_match[] = {
-	{ "MX98927", 0 },
+	{ "MX98927", MAX98927 },
 	{},
 };
 MODULE_DEVICE_TABLE(acpi, max98927_acpi_match);
