@@ -278,12 +278,9 @@
 &pm660_charger {
 	monitored-battery = <&battery>;
 	usb-role-switch = <&usb3_dwc3>;
+	vbus-supply = <&pm660_vbus>;
 
 	status = "okay";
-
-	usb_otg_vbus: otg-vbus {
-		regulator-name = "usb_otg_vbus";
-	};
 };
 
 &pm660_fg {
@@ -303,6 +300,10 @@
 };
 
 &pm660_rradc {
+	status = "okay";
+};
+
+&pm660_vbus {
 	status = "okay";
 };
 
