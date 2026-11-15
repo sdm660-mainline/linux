@@ -7,6 +7,7 @@
  */
 
 #include <linux/acpi.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
@@ -938,6 +939,8 @@ static int max98927_i2c_probe(struct i2c_client *i2c)
 	}
 
 	if (max98927->reset_gpio) {
+		/* Hold the part in reset for 1 ms, as the vendor driver does */
+		usleep_range(1000, 2000);
 		gpiod_set_value_cansleep(max98927->reset_gpio, 0);
 		/* Wait for i2c port to be ready */
 		usleep_range(5000, 6000);
