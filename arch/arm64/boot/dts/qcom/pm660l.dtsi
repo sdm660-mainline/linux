@@ -87,6 +87,34 @@
 			status = "disabled";
 		};
 
+		pm660l_lcdb: lcdb-regulator@ec00 {
+			compatible = "qcom,pm660l-lcdb";
+			reg = <0xec00>;
+			/* Unlike LAB/IBB, there is only single IRQ for both regulators */
+			interrupts = <0x3 0xec 0x1 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "sc-irq";
+
+			status = "disabled";
+
+			/*
+			 * The range 4..6V is correct, but too wide. Each board
+			 * is expected to tighten this range to single voltage,
+			 * usually phone LCD panels expect 5.4V or 5.5V.
+			 */
+
+			lcdb_ldo: ldo {
+				regulator-name = "lcdb_ldo";
+				regulator-min-microvolt = <4000000>;
+				regulator-max-microvolt = <6000000>;
+			};
+
+			lcdb_ncp: ncp {
+				regulator-name = "lcdb_ncp";
+				regulator-min-microvolt = <4000000>;
+				regulator-max-microvolt = <6000000>;
+			};
+		};
+
 		pm660l_codec: audio-codec@f000 {
 			compatible = "qcom,pm8916-wcd-analog-codec";
 			reg = <0xf000>;
