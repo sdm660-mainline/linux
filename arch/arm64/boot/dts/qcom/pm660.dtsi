@@ -82,16 +82,28 @@
 				     <0x0 0x12 0x2 IRQ_TYPE_EDGE_BOTH>,
 				     <0x0 0x16 0x1 IRQ_TYPE_EDGE_RISING>,
 				     <0x0 0x13 0x6 IRQ_TYPE_EDGE_RISING>,
-				     <0x0 0x10 0x1 IRQ_TYPE_EDGE_RISING>;
+				     <0x0 0x10 0x1 IRQ_TYPE_EDGE_RISING>,
+				     <0x0 0x13 0x7 IRQ_TYPE_EDGE_RISING>;
 			interrupt-names = "usb-plugin",
 					  "bat-ov",
 					  "wdog-bark",
 					  "usbin-icl-change",
-					  "chg-state-change";
+					  "chg-state-change",
+					  "type-c-change";
 
 			io-channels = <&pm660_rradc 3>,
 				      <&pm660_rradc 4>;
 			io-channel-names = "usbin_i", "usbin_v";
+
+			status = "disabled";
+		};
+
+		pm660_vbus: usb-vbus-regulator@1100 {
+			compatible = "qcom,pm660-vbus-reg", "qcom,pm8150b-vbus-reg";
+			reg = <0x1100>;
+
+			regulator-min-microamp = <500000>;
+			regulator-max-microamp = <1500000>;
 
 			status = "disabled";
 		};

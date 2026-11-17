@@ -278,6 +278,8 @@
 
 &pm660_charger {
 	monitored-battery = <&battery>;
+	usb-role-switch = <&usb3_dwc3>;
+	vbus-supply = <&pm660_vbus>;
 
 	status = "okay";
 };
@@ -299,6 +301,10 @@
 };
 
 &pm660_rradc {
+	status = "okay";
+};
+
+&pm660_vbus {
 	status = "okay";
 };
 
@@ -746,7 +752,9 @@
 	maximum-speed = "high-speed";
 	phys = <&qusb2phy0>;
 	phy-names = "usb2-phy";
-	dr_mode = "peripheral";
+	dr_mode = "otg";
+	usb-role-switch;
+	role-switch-default-mode = "peripheral";
 };
 
 &venus {
