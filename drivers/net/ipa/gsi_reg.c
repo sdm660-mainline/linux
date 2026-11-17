@@ -5,12 +5,12 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 
-#include "gsi.h"
+#include "ipa_dma.h"
 #include "gsi_reg.h"
 #include "reg.h"
 
 /* Is this register ID valid for the current GSI version? */
-static bool gsi_reg_id_valid(struct gsi *gsi, enum gsi_reg_id reg_id)
+static bool gsi_reg_id_valid(struct ipa_dma *gsi, enum gsi_reg_id reg_id)
 {
 	switch (reg_id) {
 	case INTER_EE_SRC_CH_IRQ_MSK:
@@ -79,7 +79,7 @@ static bool gsi_reg_id_valid(struct gsi *gsi, enum gsi_reg_id reg_id)
 	}
 }
 
-const struct reg *gsi_reg(struct gsi *gsi, enum gsi_reg_id reg_id)
+const struct reg *gsi_reg(struct ipa_dma *gsi, enum gsi_reg_id reg_id)
 {
 	if (WARN(!gsi_reg_id_valid(gsi, reg_id), "invalid reg %u\n", reg_id))
 		return NULL;
@@ -87,7 +87,7 @@ const struct reg *gsi_reg(struct gsi *gsi, enum gsi_reg_id reg_id)
 	return reg(gsi->regs, reg_id);
 }
 
-static const struct regs *gsi_regs(struct gsi *gsi)
+static const struct regs *gsi_regs(struct ipa_dma *gsi)
 {
 	switch (gsi->version) {
 	case IPA_VERSION_3_1:
@@ -120,7 +120,7 @@ static const struct regs *gsi_regs(struct gsi *gsi)
 }
 
 /* Sets gsi->virt and I/O maps the "gsi" memory range for registers */
-int gsi_reg_init(struct gsi *gsi, struct platform_device *pdev)
+int gsi_reg_init(struct ipa_dma *gsi, struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct resource *res;
@@ -155,7 +155,7 @@ int gsi_reg_init(struct gsi *gsi, struct platform_device *pdev)
 }
 
 /* Inverse of gsi_reg_init() */
-void gsi_reg_exit(struct gsi *gsi)
+void gsi_reg_exit(struct ipa_dma *gsi)
 {
 	iounmap(gsi->virt);
 	gsi->virt = NULL;

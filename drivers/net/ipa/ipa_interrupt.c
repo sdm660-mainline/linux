@@ -61,8 +61,8 @@ static void ipa_interrupt_suspend_clear_all(struct ipa_interrupt *interrupt)
 		reg = ipa_reg(ipa, IRQ_SUSPEND_INFO);
 		val = ioread32(ipa->reg_virt + reg_n_offset(reg, unit));
 
-		/* SUSPEND interrupt status isn't cleared on IPA version 3.0 */
-		if (!val || ipa->version == IPA_VERSION_3_0)
+		/* SUSPEND interrupt status isn't cleared on IPA version <=3.0 */
+		if (!val || ipa->version <= IPA_VERSION_3_0)
 			continue;
 
 		reg = ipa_reg(ipa, IRQ_SUSPEND_CLR);
@@ -201,8 +201,8 @@ static void ipa_interrupt_suspend_control(struct ipa_interrupt *interrupt,
 
 	WARN_ON(!test_bit(endpoint_id, ipa->available));
 
-	/* IPA version 3.0 does not support TX_SUSPEND interrupt control */
-	if (ipa->version == IPA_VERSION_3_0)
+	/* IPA version <=3.0 does not support TX_SUSPEND interrupt control */
+	if (ipa->version <= IPA_VERSION_3_0)
 		return;
 
 	weight = bitmap_weight(interrupt->suspend_enabled, ipa->endpoint_count);

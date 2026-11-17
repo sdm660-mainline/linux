@@ -45,14 +45,22 @@ struct ipa_mem_data;
 /* The maximum allowed size for any memory region */
 #define IPA_MEM_MAX	(2 * PAGE_SIZE)
 
+/* Size of the IPA v2.x system (DRAM) header table */
+#define IPA_SYSTEM_HDR_SIZE	2048
+
+/* Base of the firmware-reserved IPA v2.x system table window in DRAM */
+#define IPA_V2_SYSTEM_WINDOW	0xfd900000
+
 /* IPA-resident memory region ids */
 enum ipa_mem_id {
 	IPA_MEM_UC_SHARED,		/* 0 canaries */
 	IPA_MEM_UC_INFO,		/* 0 canaries */
 	IPA_MEM_V4_FILTER_HASHED,	/* 2 canaries */
 	IPA_MEM_V4_FILTER,		/* 2 canaries */
+	IPA_MEM_V4_FILTER_AP,		/* 2 canaries (IPA v2.0) */
 	IPA_MEM_V6_FILTER_HASHED,	/* 2 canaries */
 	IPA_MEM_V6_FILTER,		/* 2 canaries */
+	IPA_MEM_V6_FILTER_AP,		/* 0 canaries (IPA v2.0) */
 	IPA_MEM_V4_ROUTE_HASHED,	/* 2 canaries */
 	IPA_MEM_V4_ROUTE,		/* 2 canaries */
 	IPA_MEM_V6_ROUTE_HASHED,	/* 2 canaries */
@@ -61,6 +69,7 @@ enum ipa_mem_id {
 	IPA_MEM_AP_HEADER,		/* 0 canaries, optional */
 	IPA_MEM_MODEM_PROC_CTX,		/* 2 canaries */
 	IPA_MEM_AP_PROC_CTX,		/* 0 canaries */
+	IPA_MEM_ZIP,			/* 1 canary (IPA v2.6L) */
 	IPA_MEM_MODEM,			/* 0/2 canaries */
 	IPA_MEM_UC_EVENT_RING,		/* 1 canary, optional */
 	IPA_MEM_PDN_CONFIG,		/* 0/2 canaries (IPA v4.0+) */

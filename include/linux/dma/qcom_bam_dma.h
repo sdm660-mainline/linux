@@ -9,6 +9,14 @@
 #include <asm/byteorder.h>
 
 /*
+ * This data type is used as client metadata buffer in bam driver.
+ */
+struct bam_dma_metadata {
+	/* Actual number of bytes transferred by hardware */
+	size_t xfer_len_bytes;
+};
+
+/*
  * This data type corresponds to the native Command Element
  * supported by BAM DMA Engine.
  *
