@@ -7,6 +7,7 @@
  */
 
 #include <linux/acpi.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
@@ -795,6 +796,91 @@ static void max98927_slot_config(struct i2c_client *i2c,
 		max98927->i_l_slot = 1;
 }
 
+/*
+ * MAX98937 is a close relative with the same register contents at different
+ * addresses: three status word registers are inserted at 0x20, the DRE
+ * control register is gone and the global enable, soft reset and revision
+ * registers moved to 0x0500, 0x0501 and 0x0600. The driver keeps using
+ * MAX98927 addresses and they are translated here.
+ */
+#define MAX98937_NO_REG		0xffff
+#define MAX98937_REV_ID_REG	0x0600
+
+static unsigned int max98937_xlate(unsigned int reg)
+{
+	switch (reg) {
+	case 0x0001 ... 0x001f:
+		return reg;
+	case 0x0020 ... 0x0028:
+		return reg + 3;
+	case 0x002b ... 0x002c:
+		return reg + 1;
+	case 0x002e ... 0x0038:
+		return reg;
+	case 0x003a ... 0x004e:
+		return reg - 1;
+	case 0x0051 ... 0x0055:
+		return reg;
+	case 0x005a ... 0x0061:
+		return reg - 4;
+	case 0x0072 ... 0x0081:
+		return reg - 0x14;
+	case 0x0082 ... 0x0087:
+		return reg - 0xf;
+	case MAX98927_R00FF_GLOBAL_SHDN:
+		return 0x0500;
+	case MAX98927_R0100_SOFT_RESET:
+		return 0x0501;
+	case MAX98927_R01FF_REV_ID:
+		return MAX98937_REV_ID_REG;
+	default:
+		return MAX98937_NO_REG;
+	}
+}
+
+static int max98937_reg_read(void *context, unsigned int reg, unsigned int *val)
+{
+	struct max98927_priv *max98927 = context;
+	unsigned int xreg = max98937_xlate(reg);
+
+	if (xreg == MAX98937_NO_REG) {
+		*val = 0;
+		return 0;
+	}
+
+	return regmap_read(max98927->raw_regmap, xreg, val);
+}
+
+static int max98937_reg_write(void *context, unsigned int reg, unsigned int val)
+{
+	struct max98927_priv *max98927 = context;
+	unsigned int xreg = max98937_xlate(reg);
+
+	if (xreg == MAX98937_NO_REG)
+		return 0;
+
+	return regmap_write(max98927->raw_regmap, xreg, val);
+}
+
+static const struct regmap_config max98937_raw_regmap = {
+	.reg_bits         = 16,
+	.val_bits         = 8,
+	.max_register     = MAX98937_REV_ID_REG,
+	.cache_type       = REGCACHE_NONE,
+};
+
+/* No register defaults: the reset values are read from the chip. */
+static const struct regmap_config max98937_regmap = {
+	.reg_bits         = 16,
+	.val_bits         = 8,
+	.max_register     = MAX98927_R01FF_REV_ID,
+	.readable_reg	  = max98927_readable_register,
+	.volatile_reg	  = max98927_volatile_reg,
+	.reg_read	  = max98937_reg_read,
+	.reg_write	  = max98937_reg_write,
+	.cache_type       = REGCACHE_RBTREE,
+};
+
 static int max98927_i2c_probe(struct i2c_client *i2c)
 {
 
@@ -809,6 +895,11 @@ static int max98927_i2c_probe(struct i2c_client *i2c)
 	}
 	i2c_set_clientdata(i2c, max98927);
 
+	max98927->type = (uintptr_t)i2c_get_match_data(i2c);
+	if (!max98927->type)
+		return dev_err_probe(&i2c->dev, -EINVAL,
+				     "Unknown device type\n");
+
 	/* update interleave mode info */
 	if (of_property_read_bool(i2c->dev.of_node, "maxim,interleave-mode")) {
 		max98927->interleave_mode = true;
@@ -820,8 +911,19 @@ static int max98927_i2c_probe(struct i2c_client *i2c)
 	}
 
 	/* regmap initialization */
-	max98927->regmap
-		= devm_regmap_init_i2c(i2c, &max98927_regmap);
+	if (max98927->type == MAX98937) {
+		max98927->raw_regmap =
+			devm_regmap_init_i2c(i2c, &max98937_raw_regmap);
+		if (IS_ERR(max98927->raw_regmap))
+			return dev_err_probe(&i2c->dev,
+					     PTR_ERR(max98927->raw_regmap),
+					     "Failed to allocate raw regmap\n");
+		max98927->regmap = devm_regmap_init(&i2c->dev, NULL, max98927,
+						    &max98937_regmap);
+	} else {
+		max98927->regmap
+			= devm_regmap_init_i2c(i2c, &max98927_regmap);
+	}
 	if (IS_ERR(max98927->regmap)) {
 		ret = PTR_ERR(max98927->regmap);
 		dev_err(&i2c->dev,
@@ -837,6 +939,8 @@ static int max98927_i2c_probe(struct i2c_client *i2c)
 	}
 
 	if (max98927->reset_gpio) {
+		/* Hold the part in reset for 1 ms, as the vendor driver does */
+		usleep_range(1000, 2000);
 		gpiod_set_value_cansleep(max98927->reset_gpio, 0);
 		/* Wait for i2c port to be ready */
 		usleep_range(5000, 6000);
@@ -849,7 +953,8 @@ static int max98927_i2c_probe(struct i2c_client *i2c)
 			"Failed to read: 0x%02X\n", MAX98927_R01FF_REV_ID);
 		return ret;
 	}
-	dev_info(&i2c->dev, "MAX98927 revisionID: 0x%02X\n", reg);
+	dev_info(&i2c->dev, "%s revisionID: 0x%02X\n",
+		 max98927->type == MAX98937 ? "MAX98937" : "MAX98927", reg);
 
 	/* voltage/current slot configuration */
 	max98927_slot_config(i2c, max98927);
@@ -873,7 +978,8 @@ static void max98927_i2c_remove(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id max98927_i2c_id[] = {
-	{ .name = "max98927" },
+	{ .name = "max98927", .driver_data = MAX98927 },
+	{ .name = "max98937", .driver_data = MAX98937 },
 	{ }
 };
 
@@ -881,7 +987,8 @@ MODULE_DEVICE_TABLE(i2c, max98927_i2c_id);
 
 #if defined(CONFIG_OF)
 static const struct of_device_id max98927_of_match[] = {
-	{ .compatible = "maxim,max98927", },
+	{ .compatible = "maxim,max98927", .data = (void *)MAX98927 },
+	{ .compatible = "maxim,max98937", .data = (void *)MAX98937 },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, max98927_of_match);
@@ -889,7 +996,7 @@ MODULE_DEVICE_TABLE(of, max98927_of_match);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id max98927_acpi_match[] = {
-	{ "MX98927", 0 },
+	{ "MX98927", MAX98927 },
 	{},
 };
 MODULE_DEVICE_TABLE(acpi, max98927_acpi_match);
