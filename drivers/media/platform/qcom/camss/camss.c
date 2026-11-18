@@ -830,7 +830,7 @@ static const struct camss_subdev_resources csiphy_res_660[] = {
 				{ 0 },
 				{ 0 },
 				{ 100000000, 200000000, 269333333 },
-				{ 0 } },
+				{ 269333333 } },
 		.reg = { "csiphy0", "csiphy0_clk_mux" },
 		.interrupt = { "csiphy0" },
 		.csiphy = {
@@ -849,7 +849,7 @@ static const struct camss_subdev_resources csiphy_res_660[] = {
 				{ 0 },
 				{ 0 },
 				{ 100000000, 200000000, 269333333 },
-				{ 0 } },
+				{ 269333333 } },
 		.reg = { "csiphy1", "csiphy1_clk_mux" },
 		.interrupt = { "csiphy1" },
 		.csiphy = {
@@ -868,7 +868,7 @@ static const struct camss_subdev_resources csiphy_res_660[] = {
 				{ 0 },
 				{ 0 },
 				{ 100000000, 200000000, 269333333 },
-				{ 0 } },
+				{ 269333333 } },
 		.reg = { "csiphy2", "csiphy2_clk_mux" },
 		.interrupt = { "csiphy2" },
 		.csiphy = {

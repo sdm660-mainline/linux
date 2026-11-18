@@ -180,9 +180,10 @@ static int csiphy_set_clock_rates(struct csiphy_device *csiphy)
 				return -EINVAL;
 			}
 
-			csiphy->timer_clk_rate = round_rate;
+			if (strstr(clock->name, "timer"))
+				csiphy->timer_clk_rate = round_rate;
 
-			ret = clk_set_rate(clock->clk, csiphy->timer_clk_rate);
+			ret = clk_set_rate(clock->clk, round_rate);
 			if (ret < 0) {
 				dev_err(dev, "clk set rate failed: %d\n", ret);
 				return ret;
