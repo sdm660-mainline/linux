@@ -228,6 +228,10 @@ properties:
     description:
       Definition of the regulator used as analog power supply.
 
+  vdd_sec-supply:
+    description:
+      Definition of the regulator used as the CSID secondary power supply.
+
 required:
   - clock-names
   - clocks
