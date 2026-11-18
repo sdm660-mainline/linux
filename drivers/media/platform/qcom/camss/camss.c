@@ -4707,10 +4707,23 @@ void camss_pm_domain_off(struct camss *camss, int id)
 		pm_runtime_put_sync(vfe->genpd);
 }
 
+/*
+ * SDM660 has four CSIDs but only two VFEs. CSID2 and CSID3 are statically
+ * wired to VFE0 and VFE1 in the hardware, so map them to an existing VFE.
+ */
+static int vfe_parent_id(struct camss *camss, int id)
+{
+	if (camss->res->version == CAMSS_660 && id >= camss->res->vfe_num)
+		return id % camss->res->vfe_num;
+
+	return id;
+}
+
 static int vfe_parent_dev_ops_get(struct camss *camss, int id)
 {
 	int ret = -EINVAL;
 
+	id = vfe_parent_id(camss, id);
 	if (id < camss->res->vfe_num) {
 		struct vfe_device *vfe = &camss->vfe[id];
 
@@ -4722,6 +4735,7 @@ static int vfe_parent_dev_ops_get(struct camss *camss, int id)
 
 static int vfe_parent_dev_ops_put(struct camss *camss, int id)
 {
+	id = vfe_parent_id(camss, id);
 	if (id < camss->res->vfe_num) {
 		struct vfe_device *vfe = &camss->vfe[id];
 
@@ -4734,6 +4748,7 @@ static int vfe_parent_dev_ops_put(struct camss *camss, int id)
 static void __iomem
 *vfe_parent_dev_ops_get_base_address(struct camss *camss, int id)
 {
+	id = vfe_parent_id(camss, id);
 	if (id < camss->res->vfe_num) {
 		struct vfe_device *vfe = &camss->vfe[id];
 
