@@ -45,6 +45,7 @@
 struct ipa_power {
 	struct device *dev;
 	struct clk *core;
+	u32 core_rate;
 	struct qmp *qmp;
 	u32 interconnect_count;
 	struct icc_bulk_data interconnect[] __counted_by(interconnect_count);
@@ -106,6 +107,21 @@ static int ipa_power_enable(struct ipa *ipa)
 		dev_err(power->dev, "error %d enabling core clock\n", ret);
 		icc_bulk_disable(power->interconnect_count,
 				 power->interconnect);
+		return ret;
+	}
+
+	/*
+	 * RPM-backed clock providers (qcom,clk-smd-rpm) silently ignore
+	 * clk_set_rate() while the clock is disabled, so the rate requested
+	 * in ipa_power_init() has not been applied yet.  Re-apply it now
+	 * that the clock is running.
+	 */
+	if (clk_get_rate(power->core) != power->core_rate) {
+		int err = clk_set_rate(power->core, power->core_rate);
+
+		if (err)
+			dev_warn(power->dev,
+				 "error %d setting core clock rate\n", err);
 	}
 
 	return ret;
@@ -260,6 +276,7 @@ ipa_power_init(struct device *dev, const struct ipa_power_data *data)
 	}
 	power->dev = dev;
 	power->core = clk;
+	power->core_rate = data->core_clock_rate;
 	power->interconnect_count = data->interconnect_count;
 
 	ret = ipa_interconnect_init(power, data->interconnect_data);
