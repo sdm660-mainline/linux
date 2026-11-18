@@ -159,6 +159,86 @@
 		regulator-always-on;
 		regulator-boot-on;
 	};
+
+	/* Analog 2.8 V, gated by TLMM 51, shared by S5K2L7 and OV13855. */
+	cam_avdd_2p8: regulator-cam-avdd-2p8 {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_avdd_2p8";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 51 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_bob>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_avdd_default>;
+	};
+
+	/* Rear DVDD, gated by PM660L gpio4. */
+	cam_rear_dvdd: regulator-cam-rear-dvdd {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_rear_dvdd";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		gpio = <&pm660l_gpios 4 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_s5a_1p35>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_rear_dvdd_default>;
+	};
+
+	cam_front_dvdd: regulator-cam-front-dvdd {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_front_dvdd";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		gpio = <&pm660l_gpios 3 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_s5a_1p35>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_front_dvdd_default>;
+	};
+
+	/* AF actuator supply, gated by TLMM 50 (CAM_VAF). */
+	cam_vaf_2p8: regulator-cam-vaf-2p8 {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_vaf_2p8";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 50 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_bob>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_vaf_default>;
+	};
+
+	/* S5K5E8 analog supply, gated by TLMM 46 (CAM_AVDD). */
+	cam_avdd_s5k5e8: regulator-cam-avdd-s5k5e8 {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_avdd_s5k5e8";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 46 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_bob>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_avdd_s5k5e8_default>;
+	};
+
+	/*
+	 * S5K5E8 digital supply: TLMM 45 (CAM_VDIG) is chained after the
+	 * shared rear 1.2 V rail.
+	 */
+	cam_dvdd_s5k5e8: regulator-cam-dvdd-s5k5e8 {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_dvdd_s5k5e8";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		gpio = <&tlmm 45 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&cam_rear_dvdd>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_dvdd_s5k5e8_default>;
+	};
 };
 
 &adreno_gpu {
@@ -309,6 +389,22 @@
 		bias-pull-up;
 		input-enable;
 		qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
+	};
+
+	cam_rear_dvdd_default: cam-rear-dvdd-default-state {
+		pins = "gpio4";
+		function = "normal";
+		power-source = <0>;
+		bias-disable;
+		output-low;
+	};
+
+	cam_front_dvdd_default: cam-front-dvdd-default-state {
+		pins = "gpio3";
+		function = "normal";
+		power-source = <0>;
+		bias-disable;
+		output-low;
 	};
 };
 
@@ -734,6 +830,80 @@
 		drive-strength = <2>;
 		bias-disable;
 	};
+
+	cam_avdd_default: cam-avdd-default-state {
+		pins = "gpio51";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-low;
+	};
+
+	cam_vaf_default: cam-vaf-default-state {
+		pins = "gpio50";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-low;
+	};
+
+	cam_avdd_s5k5e8_default: cam-avdd-s5k5e8-default-state {
+		pins = "gpio46";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-low;
+	};
+
+	cam_dvdd_s5k5e8_default: cam-dvdd-s5k5e8-default-state {
+		pins = "gpio45";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-low;
+	};
+
+	cam_mclk3_default: cam-mclk3-default-state {
+		pins = "gpio35";
+		function = "cam_mclk";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_s5k5e8_reset_default: cam-s5k5e8-reset-default-state {
+		pins = "gpio52";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_mclk0_default: cam-mclk0-default-state {
+		pins = "gpio32";
+		function = "cam_mclk";
+		drive-strength = <4>;
+		bias-disable;
+	};
+
+	cam_mclk1_default: cam-mclk1-default-state {
+		pins = "gpio33";
+		function = "cam_mclk";
+		drive-strength = <6>;
+		bias-disable;
+	};
+
+	cam_rear_reset_default: cam-rear-reset-default-state {
+		pins = "gpio48";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_front_reset_default: cam-front-reset-default-state {
+		pins = "gpio47";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
 };
 
 &usb3 {
@@ -763,4 +933,140 @@
 	vdd-3.3-ch1-supply = <&vreg_l19a_3p3>;
 
 	status = "okay";
+};
+
+/* S5K2L7, OV13855, and S5K5E8 are used in the CN (MEE7S) revision; I'm not sure about Global. */
+&camss {
+	/* PM660 L1: 1.2 V MIPI CSI analog. */
+	vdda-supply = <&vreg_l1a_1p225>;
+	/* PM660L L1: 0.925 V CSID secondary supply. */
+	vdd_sec-supply = <&vreg_l1b_0p925>;
+	status = "okay";
+
+	ports {
+		port@0 {
+			reg = <0>;
+			csiphy0_ep: endpoint {
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&s5k2l7_ep>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			csiphy1_ep: endpoint {
+				data-lanes = <0 1>;
+				remote-endpoint = <&s5k5e8_ep>;
+			};
+		};
+
+		port@2 {
+			reg = <2>;
+			csiphy2_ep: endpoint {
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&ov13855_ep>;
+			};
+		};
+	};
+};
+
+&cci {
+	status = "okay";
+};
+
+&cci_i2c1 {
+	/*
+	 * AK7374
+	 */
+	cam_rear_af: actuator@c {
+		compatible = "asahi-kasei,ak7374";
+		reg = <0x0c>;
+		vdd-supply = <&cam_vaf_2p8>;
+		vio-supply = <&vreg_l11a_1p8>;
+	};
+
+	/* Samsung S5K2L7, MCLK0. */
+	camera@10 {
+		compatible = "samsung,s5k2l7";
+		reg = <0x10>;
+
+		clocks = <&mmcc CAMSS_MCLK0_CLK>;
+		reset-gpios = <&tlmm 48 GPIO_ACTIVE_LOW>;
+
+		dovdd-supply = <&vreg_l11a_1p8>;
+		dvdd-supply = <&cam_rear_dvdd>;
+		avdd-supply = <&cam_avdd_2p8>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_mclk0_default &cam_rear_reset_default>;
+
+		rotation = <90>;
+		orientation = <1>;
+		lens-focus = <&cam_rear_af>;
+
+		port {
+			s5k2l7_ep: endpoint {
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <666000000>;
+				remote-endpoint = <&csiphy0_ep>;
+			};
+		};
+	};
+
+	/* OmniVision OV13855, MCLK1. */
+	camera@36 {
+		compatible = "ovti,ov13855";
+		reg = <0x36>;
+
+		clocks = <&mmcc CAMSS_MCLK1_CLK>;
+		reset-gpios = <&tlmm 47 GPIO_ACTIVE_LOW>;
+
+		dovdd-supply = <&vreg_l11a_1p8>;
+		dvdd-supply = <&cam_front_dvdd>;
+		avdd-supply = <&cam_avdd_2p8>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_mclk1_default &cam_front_reset_default>;
+
+		rotation = <270>;
+		orientation = <0>;
+
+		port {
+			ov13855_ep: endpoint {
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <540000000 270000000>;
+				remote-endpoint = <&csiphy2_ep>;
+			};
+		};
+	};
+};
+
+&cci_i2c0 {
+	/* Samsung S5K5E8, MCLK3 */
+	camera@2d {
+		compatible = "samsung,s5k5e8";
+		reg = <0x2d>;
+
+		clocks = <&mmcc CAMSS_MCLK3_CLK>;
+		reset-gpios = <&tlmm 52 GPIO_ACTIVE_LOW>;
+
+		dovdd-supply = <&vreg_l11a_1p8>;
+		dvdd-supply = <&cam_dvdd_s5k5e8>;
+		avdd-supply = <&cam_avdd_s5k5e8>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_mclk3_default &cam_s5k5e8_reset_default>;
+
+		rotation = <90>;
+		orientation = <1>;
+
+		port {
+			s5k5e8_ep: endpoint {
+				/* sensor-side lane numbers: 1 = clock, 2 = DL1 */
+				data-lanes = <1 2>;
+				link-frequencies = /bits/ 64 <418000000 300000000>;
+				remote-endpoint = <&csiphy1_ep>;
+			};
+		};
+	};
 };
