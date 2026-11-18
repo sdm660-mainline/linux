@@ -771,6 +771,16 @@ config VIDEO_S5C73M3
 	  This is a V4L2 sensor driver for Samsung S5C73M3
 	  8 Mpixel camera.
 
+config VIDEO_S5K2L7
+	tristate "Samsung S5K2L7 sensor support"
+	select V4L2_CCI_I2C
+	help
+	  This is a V4L2 sensor driver for the Samsung S5K2L7 12MP
+	  camera sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called s5k2l7.
+
 config VIDEO_S5K3M5
 	tristate "Samsung S5K3M5 sensor support"
 	select V4L2_CCI_I2C
