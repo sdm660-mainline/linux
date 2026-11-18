@@ -878,7 +878,10 @@ void vfe_isr_reset_ack(struct vfe_device *vfe)
  */
 void vfe_pm_domain_off(struct vfe_device *vfe)
 {
-	if (!vfe->genpd)
+	if (!vfe->genpd || !vfe->genpd_link)
+		return;
+
+	if (--vfe->genpd_link_count)
 		return;
 
 	device_link_del(vfe->genpd_link);
@@ -896,12 +899,19 @@ int vfe_pm_domain_on(struct vfe_device *vfe)
 	if (!vfe->genpd)
 		return 0;
 
+	if (vfe->genpd_link) {
+		vfe->genpd_link_count++;
+		return 0;
+	}
+
 	vfe->genpd_link = device_link_add(camss->dev, vfe->genpd,
 					  DL_FLAG_STATELESS |
 					  DL_FLAG_PM_RUNTIME |
 					  DL_FLAG_RPM_ACTIVE);
 	if (!vfe->genpd_link)
 		return -EINVAL;
+
+	vfe->genpd_link_count = 1;
 
 	return 0;
 }
@@ -1939,8 +1949,11 @@ int msm_vfe_subdev_init(struct camss *camss, struct vfe_device *vfe,
  */
 void msm_vfe_genpd_cleanup(struct vfe_device *vfe)
 {
-	if (vfe->genpd_link)
+	if (vfe->genpd_link) {
 		device_link_del(vfe->genpd_link);
+		vfe->genpd_link = NULL;
+		vfe->genpd_link_count = 0;
+	}
 
 	if (vfe->genpd)
 		dev_pm_domain_detach(vfe->genpd, true);

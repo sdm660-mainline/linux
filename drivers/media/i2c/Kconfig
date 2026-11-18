@@ -440,6 +440,16 @@ config VIDEO_OV08X40
 	  To compile this driver as a module, choose M here: the
 	  module will be called ov08x40.
 
+config VIDEO_OV13855
+	tristate "OmniVision OV13855 sensor support"
+	select V4L2_CCI_I2C
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OV13855 13MP camera sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov13855.
+
 config VIDEO_OV13858
 	tristate "OmniVision OV13858 sensor support"
 	help
@@ -771,6 +781,16 @@ config VIDEO_S5C73M3
 	  This is a V4L2 sensor driver for Samsung S5C73M3
 	  8 Mpixel camera.
 
+config VIDEO_S5K2L7
+	tristate "Samsung S5K2L7 sensor support"
+	select V4L2_CCI_I2C
+	help
+	  This is a V4L2 sensor driver for the Samsung S5K2L7 12MP
+	  camera sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called s5k2l7.
+
 config VIDEO_S5K3M5
 	tristate "Samsung S5K3M5 sensor support"
 	select V4L2_CCI_I2C
@@ -786,6 +806,16 @@ config VIDEO_S5K5BAF
 	help
 	  This is a V4L2 sensor driver for Samsung S5K5BAF 2M
 	  camera sensor with an embedded SoC image signal processor.
+
+config VIDEO_S5K5E8
+	tristate "Samsung S5K5E8 sensor support"
+	select V4L2_CCI_I2C
+	help
+	  This is a V4L2 sensor driver for the Samsung S5K5E8 5MP
+	  camera sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called s5k5e8.
 
 config VIDEO_S5K6A3
 	tristate "Samsung S5K6A3 sensor support"

@@ -4,19 +4,20 @@
 $id: http://devicetree.org/schemas/media/i2c/asahi-kasei,ak7375.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
-title: Asahi Kasei Microdevices AK7375 voice coil lens actuator
+title: Asahi Kasei Microdevices AK7345/AK7374/AK7375 voice coil lens actuator
 
 maintainers:
   - Tianshu Qiu <tian.shu.qiu@intel.com>
 
 description:
-  AK7375 is a voice coil motor (VCM) camera lens actuator that
-  is controlled over I2C.
+  AK7345, AK7374 and AK7375 are voice coil motor (VCM) camera lens
+  actuators that are controlled over I2C.
 
 properties:
   compatible:
     enum:
       - asahi-kasei,ak7345
+      - asahi-kasei,ak7374
       - asahi-kasei,ak7375
 
   reg:

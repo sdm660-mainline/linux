@@ -94,9 +94,11 @@ properties:
     maxItems: 4
 
   power-domains:
+    minItems: 2
     items:
       - description: VFE0 GDSC - Video Front End, Global Distributed Switch Controller.
       - description: VFE1 GDSC - Video Front End, Global Distributed Switch Controller.
+      - description: CAMSS top GDSC - keeps the CSIPHY and CSID registers powered.
 
   ports:
     $ref: /schemas/graph.yaml#/properties/ports
@@ -225,6 +227,10 @@ properties:
   vdda-supply:
     description:
       Definition of the regulator used as analog power supply.
+
+  vdd_sec-supply:
+    description:
+      Definition of the regulator used as the CSID secondary power supply.
 
 required:
   - clock-names
@@ -363,7 +369,8 @@ examples:
         <&mmss_smmu 0xc03>;
 
       power-domains = <&mmcc CAMSS_VFE0_GDSC>,
-        <&mmcc CAMSS_VFE1_GDSC>;
+        <&mmcc CAMSS_VFE1_GDSC>,
+        <&mmcc CAMSS_TOP_GDSC>;
 
       reg = <0x0ca00020 0x10>,
         <0x0ca30000 0x100>,

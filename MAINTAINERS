@@ -19951,6 +19951,14 @@ S:	Maintained
 F:	drivers/media/i2c/ov08x40.c
 F:	Documentation/devicetree/bindings/media/i2c/ovti,ov08x40.yaml
 
+OMNIVISION OV13855 SENSOR DRIVER
+M:	Kulesha Evgeniy <voovdop@gmail.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+T:	git git://linuxtv.org/media.git
+F:	Documentation/devicetree/bindings/media/i2c/ovti,ov13855.yaml
+F:	drivers/media/i2c/ov13855.c
+
 OMNIVISION OV13858 SENSOR DRIVER
 M:	Sakari Ailus <sakari.ailus@linux.intel.com>
 L:	linux-media@vger.kernel.org
@@ -24108,6 +24116,14 @@ S:	Supported
 F:	Documentation/devicetree/bindings/media/samsung,s5c73m3.yaml
 F:	drivers/media/i2c/s5c73m3/*
 
+SAMSUNG S5K2L7 CAMERA DRIVER
+M:	Kulesha Evgeniy <voovdop@gmail.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+T:	git git://linuxtv.org/media_tree.git
+F:	Documentation/devicetree/bindings/media/i2c/samsung,s5k2l7.yaml
+F:	drivers/media/i2c/s5k2l7.c
+
 SAMSUNG S5K3M5 CAMERA DRIVER
 M:	Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
 L:	linux-media@vger.kernel.org
@@ -24122,6 +24138,14 @@ M:	Andrzej Hajda <andrzej.hajda@intel.com>
 L:	linux-media@vger.kernel.org
 S:	Supported
 F:	drivers/media/i2c/s5k5baf.c
+
+SAMSUNG S5K5E8 CAMERA DRIVER
+M:	Kulesha Evgeniy <voovdop@gmail.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+T:	git git://linuxtv.org/media_tree.git
+F:	Documentation/devicetree/bindings/media/i2c/samsung,s5k5e8.yaml
+F:	drivers/media/i2c/s5k5e8.c
 
 SAMSUNG S5KJN1 CAMERA DRIVER
 M:	Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>

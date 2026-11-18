@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2018 Intel Corporation
+// Copyright (C) 2026 Kulesha Evgeniy <voovdop@gmail.com>
 
 #include <linux/acpi.h>
 #include <linux/delay.h>
@@ -61,6 +62,24 @@ static const struct ak73xx_chipdef ak7375_cdef = {
 	.focus_pos_max	= 4095,
 	.focus_steps	= 1,
 	.ctrl_steps	= 64,
+	.ctrl_delay_us	= 1000,
+	.power_delay_us	= 10000,
+};
+
+/*
+ * The AK7374 is a 10-bit voice coil motor driver. Its position is
+ * left-aligned in the 16-bit register, hence the shift of 6.
+ */
+static const struct ak73xx_chipdef ak7374_cdef = {
+	.reg_position	= 0x0,
+	.reg_cont	= 0x2,
+	.shift_pos	= 6,	/* 10 bits, left-aligned */
+	.mode_active	= 0x0,
+	.has_standby	= false,
+	.mode_standby	= 0x20,
+	.focus_pos_max	= 1023,
+	.focus_steps	= 1,
+	.ctrl_steps	= 32,
 	.ctrl_delay_us	= 1000,
 	.power_delay_us	= 10000,
 };
@@ -330,6 +349,7 @@ static int __maybe_unused ak7375_vcm_resume(struct device *dev)
 
 static const struct of_device_id ak7375_of_table[] = {
 	{ .compatible = "asahi-kasei,ak7345", .data = &ak7345_cdef, },
+	{ .compatible = "asahi-kasei,ak7374", .data = &ak7374_cdef, },
 	{ .compatible = "asahi-kasei,ak7375", .data = &ak7375_cdef, },
 	{ /* sentinel */ }
 };
@@ -351,6 +371,7 @@ static struct i2c_driver ak7375_i2c_driver = {
 };
 module_i2c_driver(ak7375_i2c_driver);
 
+MODULE_AUTHOR("Kulesha Evgeniy <voovdop@gmail.com>");
 MODULE_AUTHOR("Tianshu Qiu <tian.shu.qiu@intel.com>");
 MODULE_AUTHOR("Bingbu Cao <bingbu.cao@intel.com>");
 MODULE_DESCRIPTION("AK7375 VCM driver");
