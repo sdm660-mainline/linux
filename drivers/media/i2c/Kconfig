@@ -807,6 +807,16 @@ config VIDEO_S5K5BAF
 	  This is a V4L2 sensor driver for Samsung S5K5BAF 2M
 	  camera sensor with an embedded SoC image signal processor.
 
+config VIDEO_S5K5E8
+	tristate "Samsung S5K5E8 sensor support"
+	select V4L2_CCI_I2C
+	help
+	  This is a V4L2 sensor driver for the Samsung S5K5E8 5MP
+	  camera sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called s5k5e8.
+
 config VIDEO_S5K6A3
 	tristate "Samsung S5K6A3 sensor support"
 	help
