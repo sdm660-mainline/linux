@@ -440,6 +440,16 @@ config VIDEO_OV08X40
 	  To compile this driver as a module, choose M here: the
 	  module will be called ov08x40.
 
+config VIDEO_OV13855
+	tristate "OmniVision OV13855 sensor support"
+	select V4L2_CCI_I2C
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OV13855 13MP camera sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov13855.
+
 config VIDEO_OV13858
 	tristate "OmniVision OV13858 sensor support"
 	help
