@@ -19951,6 +19951,14 @@ S:	Maintained
 F:	drivers/media/i2c/ov08x40.c
 F:	Documentation/devicetree/bindings/media/i2c/ovti,ov08x40.yaml
 
+OMNIVISION OV13855 SENSOR DRIVER
+M:	Kulesha Evgeniy <voovdop@gmail.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+T:	git git://linuxtv.org/media.git
+F:	Documentation/devicetree/bindings/media/i2c/ovti,ov13855.yaml
+F:	drivers/media/i2c/ov13855.c
+
 OMNIVISION OV13858 SENSOR DRIVER
 M:	Sakari Ailus <sakari.ailus@linux.intel.com>
 L:	linux-media@vger.kernel.org
