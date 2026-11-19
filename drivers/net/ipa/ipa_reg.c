@@ -17,8 +17,11 @@ static bool ipa_reg_id_valid(struct ipa *ipa, enum ipa_reg_id reg_id)
 
 	switch (reg_id) {
 	case COMP_SW_RESET:
-	case V2_ENABLED_PIPES:
 		return version <= IPA_VERSION_2_6L;
+
+	/* The vendor register header lists this under 2.6/2.6L only */
+	case V2_ENABLED_PIPES:
+		return version == IPA_VERSION_2_6L;
 
 	case CLKON_CFG:
 	case QSB_MAX_WRITES:

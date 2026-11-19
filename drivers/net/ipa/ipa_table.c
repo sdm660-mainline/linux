@@ -26,6 +26,7 @@
 #include "ipa_version.h"
 
 static void ipa_ap_route_setup(struct ipa *ipa);
+static int ipa_v2_dl_setup(struct ipa *ipa);
 
 /**
  * DOC: IPA Filter and Route Tables
@@ -481,6 +482,15 @@ static void ipa_table_init_add(struct ipa_trans *trans, bool filter, bool ipv6)
 int ipa_table_setup(struct ipa *ipa)
 {
 	struct ipa_trans *trans;
+	int ret;
+
+	/* Make sure the modem's TX pipe has a rule that delivers downlink
+	 * traffic to the AP before the tables are programmed, rather than
+	 * waiting for a QMI INSTALL_FILTER_RULE request from the modem.
+	 */
+	ret = ipa_v2_dl_setup(ipa);
+	if (ret)
+		return ret;
 
 	/* We will need at most 8 TREs:
 	 * - IPv4:
@@ -763,6 +773,8 @@ static void *ipa_table_write(enum ipa_version version, void *virt, u64 value)
 }
 
 #define IPA_AP_RULE_SIZE		(sizeof(__le32) * 5)
+/* Route table entry the AP uses for modem -> AP (WAN) downlink traffic */
+#define IPA_V2_WAN_RT			8
 #define IPA_AP_FILTER_RULE_SIZE		20
 #define IPA_V2_ENDP_INIT_ROUTE_OFFSET	0x370
 
@@ -805,6 +817,11 @@ static void ipa_ap_route_setup(struct ipa *ipa)
 	for (i = 0; i < ipa->route_count; i++)
 		((__le32 *)ipa->route_table_virt)[i] =
 			cpu_to_le32((u32)ipa->ap_route_rule_addr);
+
+	/* The WAN downlink entry points at the AP WAN consumer rule */
+	if (ipa->pipe_5_route_rule_virt)
+		((__le32 *)ipa->route_table_virt)[IPA_V2_WAN_RT] =
+			cpu_to_le32((u32)ipa->pipe_5_route_rule_addr);
 
 	trans = ipa_cmd_trans_alloc(ipa, 2);
 	if (!trans) {
@@ -1061,10 +1078,79 @@ static int ipa_hdr_proc_ctx_setup(struct ipa *ipa, struct ipa_trans *trans)
 	return 0;
 }
 
+/* Install the default downlink rules.
+ *
+ * Downlink packets enter the IPA from the modem's TX pipe (endpoint 6) and
+ * must be routed to the AP's WAN consumer pipe (endpoint 5).  Do this at
+ * set-up time, not only when the modem sends a QMI INSTALL_FILTER_RULE
+ * request: until such a request arrives the modem's pipe matches no filter
+ * rule and every downlink packet is dropped, which shows up as zero RX on
+ * rmnet_ipa0.  The modem's request, when it comes, re-installs the same
+ * rules and adds its per-mux uplink rules.
+ */
+static int ipa_v2_dl_setup(struct ipa *ipa)
+{
+	struct ipa_endpoint *dl_endpoint;
+	struct ipa_endpoint *rx_endpoint;
+	u8 *rule;
+	u32 slot;
+
+	if (ipa->version > IPA_VERSION_2_6L)
+		return 0;
+
+	dl_endpoint = ipa->name_map[IPA_ENDPOINT_MODEM_LAN_TX];
+	rx_endpoint = ipa->name_map[IPA_ENDPOINT_AP_MODEM_RX];
+	if (!dl_endpoint || !rx_endpoint ||
+	    !ipa->filter_table_virt || !ipa->filter_table_virt_v6 ||
+	    !ipa->route_table_virt)
+		return 0;	/* Nothing to do (or not IPA v2.x) */
+
+	slot = ipa_filter_slot(ipa, dl_endpoint->endpoint_id);
+	if (slot >= 1 + ipa->filter_count)
+		return -EINVAL;
+
+	if (!ipa->pipe_5_route_rule_virt) {
+		rule = dma_alloc_coherent(ipa->dev, IPA_V2_ROUTE_RULE_SIZE,
+					  &ipa->pipe_5_route_rule_addr,
+					  GFP_KERNEL);
+		if (!rule)
+			return -ENOMEM;
+		memset(rule, 0, IPA_V2_ROUTE_RULE_SIZE);
+		ipa->pipe_5_route_rule_virt = rule;
+		rule = ipa_rt_rule_write_match_all(rule,
+						   rx_endpoint->endpoint_id,
+						   false);
+		put_unaligned_le32(0, rule);
+	}
+
+	if (!ipa->dl_flt_rule_virt) {
+		rule = dma_alloc_coherent(ipa->dev, IPA_V2_FLT_RULE_MAX_SIZE,
+					  &ipa->dl_flt_rule_addr, GFP_KERNEL);
+		if (!rule)
+			return -ENOMEM;
+		ipa->dl_flt_rule_size = IPA_V2_FLT_RULE_MAX_SIZE;
+		memset(rule, 0, ipa->dl_flt_rule_size);
+		ipa->dl_flt_rule_virt = rule;
+		rule = ipa_flt_rule_write_match_all(rule, IPA_V2_WAN_RT);
+		put_unaligned_le32(0, rule);
+	}
+
+	/* Both IP versions filter on the modem's TX pipe */
+	((__le32 *)ipa->filter_table_virt)[slot] =
+		cpu_to_le32((u32)ipa->dl_flt_rule_addr);
+	((__le32 *)ipa->filter_table_virt_v6)[slot] =
+		cpu_to_le32((u32)ipa->dl_flt_rule_addr);
+
+	/* Downlink packets matching the rule go to the AP WAN consumer */
+	((__le32 *)ipa->route_table_virt)[IPA_V2_WAN_RT] =
+		cpu_to_le32((u32)ipa->pipe_5_route_rule_addr);
+
+	return 0;
+}
+
 /* Install the filter rules sent by the modem for the AP's uplink pipe,
  * and a match-all rule on the modem's TX pipe so downlink traffic is
- * delivered to the AP.  Route table entry 1 is pointed at a pipe-5 rule;
- * the modem's other route entries are left untouched.
+ * delivered to the AP.
  */
 
 int ipa_table_install_filter_rules(struct ipa *ipa,
@@ -1117,7 +1203,7 @@ int ipa_table_install_filter_rules(struct ipa *ipa,
 		goto out_power_put;
 	}
 	ul_slot = ipa_filter_slot(ipa, ul_endpoint->endpoint_id);
-	wan_rt = 8;
+	wan_rt = IPA_V2_WAN_RT;
 
 	dl_slot = ipa_filter_slot(ipa, dl_endpoint->endpoint_id);
 	if (ul_slot >= 1 + ipa->filter_count ||

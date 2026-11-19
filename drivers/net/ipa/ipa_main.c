@@ -4,6 +4,7 @@
  * Copyright (C) 2018-2024 Linaro Ltd.
  */
 
+#include <linux/bitmap.h>
 #include <linux/bug.h>
 #include <linux/firmware.h>
 #include <linux/io.h>
@@ -508,6 +509,7 @@ static void ipa_hardware_dcd_deconfig(struct ipa *ipa)
 static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 {
 	const struct reg *reg;
+	u32 val;
 
 	/* IPA v2.x requires a software reset and the core clock enabled */
 	if (ipa->version <= IPA_VERSION_2_6L) {
@@ -515,8 +517,13 @@ static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 		iowrite32(1, ipa->reg_virt + reg_offset(reg));
 		iowrite32(0, ipa->reg_virt + reg_offset(reg));
 
+		/* The vendor stack enables both the core and the 2x DCMP
+		 * clock here, i.e. it writes 0x11 rather than 0x01.
+		 */
 		reg = ipa_reg(ipa, COMP_CFG);
-		iowrite32(1, ipa->reg_virt + reg_offset(reg));
+		val = reg_encode(reg, COMP_CFG_ENABLE, 1);
+		val |= reg_encode(reg, IPA_DCMP_FAST_CLK_EN, 1);
+		iowrite32(val, ipa->reg_virt + reg_offset(reg));
 
 		ipa_hardware_config_bcr(ipa, data);
 
@@ -546,6 +553,38 @@ static void ipa_hardware_deconfig(struct ipa *ipa)
 		ipa_hardware_dcd_deconfig(ipa);
 }
 
+/* On IPA v2.6L the V2_ENABLED_PIPES register reports the number of IPA
+ * pipes implemented in hardware; the vendor stack reads it to obtain its
+ * ipa_num_pipes value.  Validate the channel IDs from configuration data
+ * against it instead of trusting them blindly.
+ */
+static void ipa_v2_pipe_count_check(struct ipa *ipa)
+{
+	const struct reg *reg;
+	u32 endpoint_id;
+	u32 pipe_count;
+	u32 channel_id = 0;
+
+	if (ipa->version != IPA_VERSION_2_6L)
+		return;
+
+	reg = ipa_reg(ipa, V2_ENABLED_PIPES);
+	pipe_count = ioread32(ipa->reg_virt + reg_offset(reg));
+	if (!pipe_count)
+		return;
+
+	for_each_set_bit(endpoint_id, ipa->defined, ipa->endpoint_count) {
+		u32 id = ipa->endpoint[endpoint_id].channel_id;
+
+		if (id > channel_id)
+			channel_id = id;
+	}
+
+	if (channel_id >= pipe_count)
+		dev_warn(ipa->dev, "channel %u out of range (hardware has %u pipes)\n",
+			 channel_id, pipe_count);
+}
+
 /**
  * ipa_config() - Configure IPA hardware
  * @ipa:	IPA pointer
@@ -558,6 +597,7 @@ static int ipa_config(struct ipa *ipa, const struct ipa_data *data)
 	int ret;
 
 	ipa_hardware_config(ipa, data);
+	ipa_v2_pipe_count_check(ipa);
 
 	ret = ipa_mem_config(ipa);
 	if (ret)

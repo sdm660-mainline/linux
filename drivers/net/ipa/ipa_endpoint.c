@@ -1620,18 +1620,11 @@ ipa_endpoint_status_drop(struct ipa_endpoint *endpoint, const void *data)
 
 	/* Deaggregation exceptions we drop; all other types we consume */
 	exception = ipa_status_extract(ipa, data, STATUS_EXCEPTION);
-	rule = ipa_status_extract(ipa, data, STATUS_ROUTER_RULE_INDEX);
-	dev_info_ratelimited(ipa->dev,
-			     "IPA-STDBG ep%u exception %u src %u dst %u rule 0x%02x\n",
-			     endpoint->endpoint_id, exception,
-			     ipa_status_extract(ipa, data, STATUS_SRC_ENDPOINT),
-			     ipa_status_extract(ipa, data, STATUS_DST_ENDPOINT),
-			     rule);
-
 	if (exception)
 		return exception == IPA_STATUS_EXCEPTION_DEAGGR;
 
 	/* Drop the packet if it fails to match a routing rule; otherwise no */
+	rule = ipa_status_extract(ipa, data, STATUS_ROUTER_RULE_INDEX);
 	if (rule == (ipa->version <= IPA_VERSION_2_6L ? 0xff :
 		     IPA_STATUS_RULE_MISS))
 		return true;
@@ -1667,18 +1660,6 @@ static void ipa_endpoint_status_parse(struct ipa_endpoint *endpoint,
 
 		/* Skip over status packets that lack packet data */
 		length = ipa_status_extract(ipa, data, STATUS_LENGTH);
-		{
-			const __le32 *w = data;
-
-			dev_info_ratelimited(dev,
-				"IPA-STATRAW ep%u w0 0x%08x w1 0x%08x exc %u src %u dst %u len %u\n",
-				endpoint->endpoint_id, le32_to_cpu(w[0]),
-				le32_to_cpu(w[1]),
-				ipa_status_extract(ipa, data, STATUS_EXCEPTION),
-				ipa_status_extract(ipa, data, STATUS_SRC_ENDPOINT),
-				ipa_status_extract(ipa, data, STATUS_DST_ENDPOINT),
-				length);
-		}
 		if (!length || ipa_endpoint_status_skip(endpoint, data)) {
 			data += IPA_STATUS_SIZE;
 			resid -= IPA_STATUS_SIZE;
