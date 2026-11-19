@@ -838,6 +838,9 @@ enum ath10k_fw_features {
 	/* Firmware support IRAM recovery */
 	ATH10K_FW_FEATURE_IRAM_RECOVERY = 22,
 
+	/* Firmware crashes when asked for channel stats events during scan. */
+	ATH10K_FW_FEATURE_NO_CHAN_STAT_EVENT = 23,
+
 	/* keep last */
 	ATH10K_FW_FEATURE_COUNT,
 };
