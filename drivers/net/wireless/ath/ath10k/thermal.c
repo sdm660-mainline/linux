@@ -139,6 +139,11 @@ void ath10k_thermal_set_throttling(struct ath10k *ar)
 	if (ar->state != ATH10K_STATE_ON)
 		return;
 
+	/* running_fw is only valid once the device is up */
+	if (test_bit(ATH10K_FW_FEATURE_NO_QUIET_MODE,
+		     ar->running_fw->fw_file.fw_features))
+		return;
+
 	period = ar->thermal.quiet_period;
 	duration = (period * ar->thermal.throttle_state) / 100;
 	enabled = duration ? 1 : 0;
