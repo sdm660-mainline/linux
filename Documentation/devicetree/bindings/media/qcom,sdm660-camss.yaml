@@ -94,9 +94,11 @@ properties:
     maxItems: 4
 
   power-domains:
+    minItems: 2
     items:
       - description: VFE0 GDSC - Video Front End, Global Distributed Switch Controller.
       - description: VFE1 GDSC - Video Front End, Global Distributed Switch Controller.
+      - description: CAMSS TOP GDSC, parent of the VFE GDSCs, needed by CSIPHY/CSID/ISPIF.
 
   ports:
     $ref: /schemas/graph.yaml#/properties/ports
