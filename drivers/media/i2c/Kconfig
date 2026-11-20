@@ -276,6 +276,16 @@ config VIDEO_IMX376
 	  To compile this driver as a module, choose M here: the
 	  module will be called imx376.
 
+config VIDEO_IMX486
+	tristate "Sony IMX486 sensor support"
+	select V4L2_CCI_I2C
+	help
+	  This is a Video4Linux2 sensor driver for the Sony
+	  IMX486 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called imx486.
+
 config VIDEO_IMX412
 	tristate "Sony IMX412 sensor support"
 	depends on OF

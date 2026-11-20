@@ -25272,6 +25272,7 @@ S:	Maintained
 T:	git git://linuxtv.org/media.git
 F:	Documentation/devicetree/bindings/media/i2c/sony,imx376.yaml
 F:	drivers/media/i2c/imx376.c
+F:	drivers/media/i2c/imx486.c
 
 SONY IMX412 SENSOR DRIVER
 L:	linux-media@vger.kernel.org
