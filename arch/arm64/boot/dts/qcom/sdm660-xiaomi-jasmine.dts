@@ -103,6 +103,58 @@
 		pinctrl-names = "default";
 	};
 
+	cam_imx376_vaf: cam-imx376-vaf-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_imx376_vaf";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 45 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_bob>;
+
+		pinctrl-0 = <&cam_imx376_vaf_en>;
+		pinctrl-names = "default";
+	};
+
+	cam_imx486_avdd: cam-imx486-avdd-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_imx486_avdd";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 51 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_bob>;
+
+		pinctrl-0 = <&cam_imx486_avdd_en>;
+		pinctrl-names = "default";
+	};
+
+	cam_imx486_dvdd: cam-imx486-dvdd-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_imx486_dvdd";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		gpio = <&pm660l_gpios 4 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_s5a_1p35>;
+
+		pinctrl-0 = <&cam_imx486_dvdd_en>;
+		pinctrl-names = "default";
+	};
+
+	cam_imx486_vaf: cam-imx486-vaf-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_imx486_vaf";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 50 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vreg_bob>;
+
+		pinctrl-0 = <&cam_imx486_vaf_en>;
+		pinctrl-names = "default";
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 
@@ -226,6 +278,24 @@
 	status = "okay";
 
 	ports {
+		port@0 {
+			reg = <0>;
+
+			camss_csiphy0_ep: endpoint {
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&cam_rear_ep>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			camss_csiphy1_ep: endpoint {
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&cam_rear2_ep>;
+			};
+		};
+
 		port@2 {
 			reg = <2>;
 
@@ -241,7 +311,102 @@
 	status = "okay";
 };
 
+&cci_i2c0 {
+	cam_rear_vcm: camera-lens@c {
+		compatible = "dongwoon,dw9763", "dongwoon,dw9768";
+		reg = <0x0c>;
+
+		vin-supply = <&vreg_l11a_1p8>;
+		vdd-supply = <&cam_imx376_vaf>;
+
+		dongwoon,aac-mode = <3>;
+		dongwoon,aac-timing = <0x39>;
+	};
+
+	camera@1a {
+		compatible = "sony,imx376";
+		reg = <0x1a>;
+
+		lens-focus = <&cam_rear_vcm>;
+
+		clocks = <&mmcc CAMSS_MCLK0_CLK>;
+		assigned-clocks = <&mmcc MCLK0_CLK_SRC>;
+		assigned-clock-rates = <24000000>;
+		clock-frequency = <24000000>;
+
+		reset-gpios = <&tlmm 48 GPIO_ACTIVE_LOW>;
+
+		vana-supply = <&cam_imx376_avdd>;
+		vcore-supply = <&cam_imx376_dvdd>;
+		vio-supply = <&vreg_l11a_1p8>;
+
+		pinctrl-0 = <&cam_rear_default>;
+		pinctrl-names = "default";
+
+		orientation = <1>;
+		rotation = <270>;
+
+		port {
+			cam_rear_ep: endpoint {
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <500000000>;
+				remote-endpoint = <&camss_csiphy0_ep>;
+			};
+		};
+	};
+
+	eeprom@58 {
+		compatible = "atmel,24c64";
+		reg = <0x58>;
+		vcc-supply = <&cam_imx376_vaf>;
+		read-only;
+	};
+};
+
 &cci_i2c1 {
+	cam_rear2_vcm: camera-lens@e {
+		compatible = "dongwoon,dw9763", "dongwoon,dw9768";
+		reg = <0x0e>;
+
+		vin-supply = <&vreg_l11a_1p8>;
+		vdd-supply = <&cam_imx486_vaf>;
+
+		dongwoon,aac-mode = <3>;
+		dongwoon,aac-timing = <0x39>;
+	};
+
+	camera@10 {
+		compatible = "sony,imx486";
+		reg = <0x10>;
+
+		lens-focus = <&cam_rear2_vcm>;
+
+		clocks = <&mmcc CAMSS_MCLK3_CLK>;
+		assigned-clocks = <&mmcc MCLK3_CLK_SRC>;
+		assigned-clock-rates = <24000000>;
+		clock-frequency = <24000000>;
+
+		reset-gpios = <&tlmm 52 GPIO_ACTIVE_LOW>;
+
+		vana-supply = <&cam_imx486_avdd>;
+		vcore-supply = <&cam_imx486_dvdd>;
+		vio-supply = <&vreg_l11a_1p8>;
+
+		pinctrl-0 = <&cam_rear2_default>;
+		pinctrl-names = "default";
+
+		orientation = <1>;
+		rotation = <270>;
+
+		port {
+			cam_rear2_ep: endpoint {
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <492000000 252000000>;
+				remote-endpoint = <&camss_csiphy1_ep>;
+			};
+		};
+	};
+
 	camera@1a {
 		compatible = "sony,imx376";
 		reg = <0x1a>;
@@ -270,6 +435,20 @@
 				remote-endpoint = <&camss_csiphy2_ep>;
 			};
 		};
+	};
+
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+		vcc-supply = <&cam_imx486_vaf>;
+		read-only;
+	};
+
+	eeprom@51 {
+		compatible = "atmel,24c64";
+		reg = <0x51>;
+		vcc-supply = <&vreg_l11a_1p8>;
+		read-only;
 	};
 };
 
@@ -368,6 +547,13 @@
 &pm660l_gpios {
 	cam_imx376_dvdd_en: cam-imx376-dvdd-en-state {
 		pins = "gpio3";
+		function = PMIC_GPIO_FUNC_NORMAL;
+		output-low;
+		power-source = <0>;
+	};
+
+	cam_imx486_dvdd_en: cam-imx486-dvdd-en-state {
+		pins = "gpio4";
 		function = PMIC_GPIO_FUNC_NORMAL;
 		output-low;
 		power-source = <0>;
@@ -848,6 +1034,59 @@
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
+	};
+
+	cam_imx376_vaf_en: cam-imx376-vaf-en-state {
+		pins = "gpio45";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_imx486_avdd_en: cam-imx486-avdd-en-state {
+		pins = "gpio51";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_imx486_vaf_en: cam-imx486-vaf-en-state {
+		pins = "gpio50";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	cam_rear_default: cam-rear-default-state {
+		mclk-pins {
+			pins = "gpio32";
+			function = "cam_mclk";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		reset-pins {
+			pins = "gpio48";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+	};
+
+	cam_rear2_default: cam-rear2-default-state {
+		mclk-pins {
+			pins = "gpio35";
+			function = "cam_mclk";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		reset-pins {
+			pins = "gpio52";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
 	};
 
 	ir_led_default: ir-led-default-state {
