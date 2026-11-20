@@ -606,7 +606,8 @@ int msm_csiphy_subdev_init(struct camss *camss,
 	if (camss->res->version == CAMSS_8x16 ||
 	    camss->res->version == CAMSS_8x39 ||
 	    camss->res->version == CAMSS_8x53 ||
-	    camss->res->version == CAMSS_8x96) {
+	    camss->res->version == CAMSS_8x96 ||
+	    camss->res->version == CAMSS_660) {
 		csiphy->base_clk_mux =
 			devm_platform_ioremap_resource_byname(pdev, res->reg[1]);
 		if (IS_ERR(csiphy->base_clk_mux))
