@@ -329,13 +329,13 @@ static int ispif_reset(struct ispif_device *ispif, u8 vfe_id)
 
 	ret = camss_pm_domain_on(camss, PM_DOMAIN_VFE1);
 	if (ret < 0)
-		return ret;
+		goto err_vfe0_off;
 
 	ret = camss_enable_clocks(ispif->nclocks_for_reset,
 				  ispif->clock_for_reset,
 				  camss->dev);
 	if (ret < 0)
-		return ret;
+		goto err_vfe1_off;
 
 	ret = ispif_vfe_reset(ispif, vfe_id);
 	if (ret)
@@ -343,8 +343,10 @@ static int ispif_reset(struct ispif_device *ispif, u8 vfe_id)
 
 	camss_disable_clocks(ispif->nclocks_for_reset, ispif->clock_for_reset);
 
-	camss_pm_domain_off(camss, PM_DOMAIN_VFE0);
+err_vfe1_off:
 	camss_pm_domain_off(camss, PM_DOMAIN_VFE1);
+err_vfe0_off:
+	camss_pm_domain_off(camss, PM_DOMAIN_VFE0);
 
 	return ret;
 }
