@@ -25265,6 +25265,13 @@ S:	Maintained
 T:	git git://linuxtv.org/media.git
 F:	drivers/media/i2c/imx355.c
 
+SONY IMX376 AND IMX486 SENSOR DRIVERS
+M:	Gianluca Boiano <morf3089@gmail.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+T:	git git://linuxtv.org/media.git
+F:	Documentation/devicetree/bindings/media/i2c/sony,imx376.yaml
+
 SONY IMX412 SENSOR DRIVER
 L:	linux-media@vger.kernel.org
 S:	Orphan
