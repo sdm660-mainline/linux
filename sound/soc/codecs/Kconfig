@@ -2172,7 +2172,8 @@ config SND_SOC_TAS2552
 config SND_SOC_TAS2557
 	tristate "Texas Instruments TAS2557 Mono Smart Amplifier"
 	depends on I2C
-	select REGMAP_I2C
+	select SND_SOC_TAS2781_COMLIB
+	select SND_SOC_TAS2781_COMLIB_I2C
 	help
 	  Enable support for the Texas Instruments TAS2557 mono smart
 	  amplifier with integrated DSP. The on-chip DSP requires firmware
