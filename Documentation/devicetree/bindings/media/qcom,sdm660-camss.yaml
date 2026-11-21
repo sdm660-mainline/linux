@@ -226,6 +226,10 @@ properties:
     description:
       Definition of the regulator used as analog power supply.
 
+  vdd_sec-supply:
+    description:
+      Secondary CSID supply (PM660L LDO1 on reference designs).
+
 required:
   - clock-names
   - clocks
