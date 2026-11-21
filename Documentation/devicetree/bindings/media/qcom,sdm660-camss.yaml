@@ -94,9 +94,11 @@ properties:
     maxItems: 4
 
   power-domains:
+    minItems: 2
     items:
       - description: VFE0 GDSC - Video Front End, Global Distributed Switch Controller.
       - description: VFE1 GDSC - Video Front End, Global Distributed Switch Controller.
+      - description: CAMSS TOP GDSC, parent of the VFE GDSCs, needed by CSIPHY/CSID/ISPIF.
 
   ports:
     $ref: /schemas/graph.yaml#/properties/ports
@@ -225,6 +227,10 @@ properties:
   vdda-supply:
     description:
       Definition of the regulator used as analog power supply.
+
+  vdd_sec-supply:
+    description:
+      Secondary CSID supply (PM660L LDO1 on reference designs).
 
 required:
   - clock-names

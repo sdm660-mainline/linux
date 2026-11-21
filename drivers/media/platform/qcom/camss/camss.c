@@ -830,6 +830,7 @@ static const struct camss_subdev_resources csiphy_res_660[] = {
 				{ 0 },
 				{ 0 },
 				{ 100000000, 200000000, 269333333 },
+				{ 100000000, 200000000, 269333333 },
 				{ 0 } },
 		.reg = { "csiphy0", "csiphy0_clk_mux" },
 		.interrupt = { "csiphy0" },
@@ -849,6 +850,7 @@ static const struct camss_subdev_resources csiphy_res_660[] = {
 				{ 0 },
 				{ 0 },
 				{ 100000000, 200000000, 269333333 },
+				{ 100000000, 200000000, 269333333 },
 				{ 0 } },
 		.reg = { "csiphy1", "csiphy1_clk_mux" },
 		.interrupt = { "csiphy1" },
@@ -867,6 +869,7 @@ static const struct camss_subdev_resources csiphy_res_660[] = {
 		.clock_rate = { { 0 },
 				{ 0 },
 				{ 0 },
+				{ 100000000, 200000000, 269333333 },
 				{ 100000000, 200000000, 269333333 },
 				{ 0 } },
 		.reg = { "csiphy2", "csiphy2_clk_mux" },
@@ -4668,26 +4671,38 @@ int camss_get_pixel_clock(struct media_entity *entity, u64 *pixel_clock)
 	return 0;
 }
 
+/*
+ * Power a VFE domain on behalf of another block (ISPIF reset). This must not
+ * go through vfe->genpd_link: device_link_add() returns the VFE's own link
+ * while the VFE is powered, and deleting it here would leave vfe_put() with a
+ * NULL link. Take a runtime PM reference on the genpd device instead.
+ */
 int camss_pm_domain_on(struct camss *camss, int id)
 {
-	int ret = 0;
+	struct vfe_device *vfe;
+	int ret;
 
-	if (id < camss->res->vfe_num) {
-		struct vfe_device *vfe = &camss->vfe[id];
+	if (id >= camss->res->vfe_num)
+		return 0;
 
-		ret = vfe->res->hw_ops->pm_domain_on(vfe);
-	}
+	vfe = &camss->vfe[id];
+	if (!vfe->genpd)
+		return 0;
 
-	return ret;
+	ret = pm_runtime_resume_and_get(vfe->genpd);
+	return ret < 0 ? ret : 0;
 }
 
 void camss_pm_domain_off(struct camss *camss, int id)
 {
-	if (id < camss->res->vfe_num) {
-		struct vfe_device *vfe = &camss->vfe[id];
+	struct vfe_device *vfe;
 
-		vfe->res->hw_ops->pm_domain_off(vfe);
-	}
+	if (id >= camss->res->vfe_num)
+		return;
+
+	vfe = &camss->vfe[id];
+	if (vfe->genpd)
+		pm_runtime_put_sync(vfe->genpd);
 }
 
 static int vfe_parent_dev_ops_get(struct camss *camss, int id)
@@ -5388,7 +5403,8 @@ static int camss_probe(struct platform_device *pdev)
 	if (camss->res->version == CAMSS_8x16 ||
 	    camss->res->version == CAMSS_8x39 ||
 	    camss->res->version == CAMSS_8x53 ||
-	    camss->res->version == CAMSS_8x96) {
+	    camss->res->version == CAMSS_8x96 ||
+	    camss->res->version == CAMSS_660) {
 		camss->ispif = devm_kcalloc(dev, 1, sizeof(*camss->ispif), GFP_KERNEL);
 		if (!camss->ispif)
 			return -ENOMEM;

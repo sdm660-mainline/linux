@@ -130,6 +130,53 @@ static u8 csiphy_get_bpp(const struct csiphy_format_info *formats,
 	return formats[0].bpp;
 }
 
+static void csiphy_put_shared_clk(struct csiphy_device *csiphy)
+{
+	if (!csiphy->shared_clk_protected)
+		return;
+
+	clk_rate_exclusive_put(csiphy->shared_clk);
+	csiphy->shared_clk_protected = false;
+}
+
+/*
+ * On SDM630/660 the csiN_phy clocks of all CSIPHYs feed from one RCG.
+ * Hold its rate while this PHY is powered so another PHY cannot change it
+ * under a running stream. If another PHY already holds a different rate,
+ * use it when it is fast enough for this link.
+ */
+static int csiphy_set_shared_clk_rate(struct csiphy_device *csiphy,
+				      unsigned long rate, u64 min_rate)
+{
+	struct device *dev = csiphy->camss->dev;
+	unsigned long cur;
+	int ret;
+
+	/*
+	 * A rate held by another PHY makes the parent round to its current
+	 * rate, or fails with -EBUSY. Either way check what we ended up with.
+	 */
+	ret = clk_set_rate_exclusive(csiphy->shared_clk, rate);
+	if (ret == -EBUSY)
+		ret = clk_rate_exclusive_get(csiphy->shared_clk);
+	if (ret < 0) {
+		dev_err(dev, "shared CSIPHY clock set rate failed: %d\n", ret);
+		return ret;
+	}
+
+	csiphy->shared_clk_protected = true;
+
+	cur = clk_get_rate(csiphy->shared_clk);
+	if (cur < min_rate) {
+		dev_err(dev, "shared CSIPHY clock held at %lu Hz, need %llu Hz\n",
+			cur, min_rate);
+		csiphy_put_shared_clk(csiphy);
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
 /*
  * csiphy_set_clock_rates - Calculate and set clock rates on CSIPHY module
  * @csiphy: CSIPHY device
@@ -165,7 +212,8 @@ static int csiphy_set_clock_rates(struct csiphy_device *csiphy)
 			if (j == clock->nfreqs) {
 				dev_err(dev,
 					"Pixel clock is too high for CSIPHY\n");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto err_put_shared;
 			}
 
 			/* if sensor pixel clock is not available */
@@ -177,7 +225,17 @@ static int csiphy_set_clock_rates(struct csiphy_device *csiphy)
 			if (round_rate < 0) {
 				dev_err(dev, "clk round rate failed: %ld\n",
 					round_rate);
-				return -EINVAL;
+				ret = -EINVAL;
+				goto err_put_shared;
+			}
+
+			if (clock->clk == csiphy->shared_clk) {
+				ret = csiphy_set_shared_clk_rate(csiphy,
+								 round_rate,
+								 min_rate);
+				if (ret < 0)
+					goto err_put_shared;
+				continue;
 			}
 
 			csiphy->timer_clk_rate = round_rate;
@@ -185,12 +243,16 @@ static int csiphy_set_clock_rates(struct csiphy_device *csiphy)
 			ret = clk_set_rate(clock->clk, csiphy->timer_clk_rate);
 			if (ret < 0) {
 				dev_err(dev, "clk set rate failed: %d\n", ret);
-				return ret;
+				goto err_put_shared;
 			}
 		}
 	}
 
 	return 0;
+
+err_put_shared:
+	csiphy_put_shared_clk(csiphy);
+	return ret;
 }
 
 /*
@@ -229,6 +291,7 @@ static int csiphy_set_power(struct v4l2_subdev *sd, int on)
 
 		ret = camss_enable_clocks(csiphy->nclocks, csiphy->clock, dev);
 		if (ret < 0) {
+			csiphy_put_shared_clk(csiphy);
 			regulator_bulk_disable(csiphy->num_supplies,
 					       csiphy->supplies);
 			pm_runtime_put_sync(dev);
@@ -244,6 +307,8 @@ static int csiphy_set_power(struct v4l2_subdev *sd, int on)
 		disable_irq(csiphy->irq);
 
 		camss_disable_clocks(csiphy->nclocks, csiphy->clock);
+
+		csiphy_put_shared_clk(csiphy);
 
 		regulator_bulk_disable(csiphy->num_supplies, csiphy->supplies);
 
@@ -606,7 +671,8 @@ int msm_csiphy_subdev_init(struct camss *camss,
 	if (camss->res->version == CAMSS_8x16 ||
 	    camss->res->version == CAMSS_8x39 ||
 	    camss->res->version == CAMSS_8x53 ||
-	    camss->res->version == CAMSS_8x96) {
+	    camss->res->version == CAMSS_8x96 ||
+	    camss->res->version == CAMSS_660) {
 		csiphy->base_clk_mux =
 			devm_platform_ioremap_resource_byname(pdev, res->reg[1]);
 		if (IS_ERR(csiphy->base_clk_mux))
@@ -690,8 +756,10 @@ int msm_csiphy_subdev_init(struct camss *camss,
 			csiphy->rate_set[i] = csiphy_match_clock_name(clock->name,
 								      "csi%d_phy",
 								       csiphy->id);
-			if (csiphy->rate_set[i])
+			if (csiphy->rate_set[i]) {
+				csiphy->shared_clk = clock->clk;
 				continue;
+			}
 		}
 
 		csiphy->rate_set[i] = csiphy_match_clock_name(clock->name, "csiphy%d", csiphy->id);

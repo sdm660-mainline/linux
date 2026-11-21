@@ -108,6 +108,9 @@ struct csiphy_device {
 	bool *rate_set;
 	int nclocks;
 	u32 timer_clk_rate;
+	/* PHY clock shared by all CSIPHYs, rate held exclusively while on */
+	struct clk *shared_clk;
+	bool shared_clk_protected;
 	struct regulator_bulk_data *supplies;
 	int num_supplies;
 	struct csiphy_config cfg;

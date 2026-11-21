@@ -1,0 +1,148 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/media/i2c/sony,imx376.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sony IMX376 and IMX486 Image Sensors
+
+maintainers:
+  - Gianluca Boiano <morf3089@gmail.com>
+
+description:
+  IMX376 (20 MP, 5184x3880) and IMX486 (12 MP, 4032x3016) are Sony CMOS
+  Bayer image sensors controlled over I2C (CCI) and sending image data over
+  a 4-lane MIPI CSI-2 interface.
+
+allOf:
+  - $ref: /schemas/media/video-interface-devices.yaml#
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: sony,imx376
+    then:
+      properties:
+        port:
+          properties:
+            endpoint:
+              properties:
+                link-frequencies:
+                  items:
+                    - const: 500000000
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: sony,imx486
+    then:
+      properties:
+        port:
+          properties:
+            endpoint:
+              properties:
+                link-frequencies:
+                  items:
+                    - const: 492000000
+                    - const: 252000000
+
+properties:
+  compatible:
+    enum:
+      - sony,imx376
+      - sony,imx486
+
+  reg:
+    maxItems: 1
+
+  clocks:
+    description:
+      Input clock (INCK). The driver only supports a 24 MHz input clock and
+      uses the rate the clock is running at, so the clock must be configured
+      to 24 MHz, e.g. with assigned-clock-rates.
+    maxItems: 1
+
+  clock-frequency:
+    description:
+      Frequency of the input clock in Hz. Optional, the driver reads the rate
+      from the clock itself; if present it must match the 24 MHz that the
+      sensor PLL settings are calculated for.
+    const: 24000000
+
+  vana-supply:
+    description: Analog power supply (2.8 V).
+
+  vcore-supply:
+    description: Digital core power supply (1.2 V or 1.35 V).
+
+  vio-supply:
+    description: Interface power supply (1.8 V).
+
+  reset-gpios:
+    description: GPIO connected to the XCLR pin.
+    maxItems: 1
+
+  port:
+    $ref: /schemas/graph.yaml#/$defs/port-base
+    additionalProperties: false
+
+    properties:
+      endpoint:
+        $ref: /schemas/media/video-interfaces.yaml#
+        unevaluatedProperties: false
+
+        properties:
+          data-lanes:
+            items:
+              - const: 1
+              - const: 2
+              - const: 3
+              - const: 4
+
+          link-frequencies: true
+
+        required:
+          - data-lanes
+          - link-frequencies
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - port
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        camera@10 {
+            compatible = "sony,imx486";
+            reg = <0x10>;
+
+            clocks = <&cam_mclk>;
+            clock-frequency = <24000000>;
+            reset-gpios = <&tlmm 52 GPIO_ACTIVE_LOW>;
+
+            vana-supply = <&cam_avdd>;
+            vcore-supply = <&cam_dvdd>;
+            vio-supply = <&cam_vio>;
+
+            orientation = <1>;
+            rotation = <90>;
+
+            port {
+                endpoint {
+                    data-lanes = <1 2 3 4>;
+                    link-frequencies = /bits/ 64 <492000000 252000000>;
+                    remote-endpoint = <&csiphy_ep>;
+                };
+            };
+        };
+    };
+...
