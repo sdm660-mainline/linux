@@ -2110,7 +2110,8 @@
 				 <&mmss_smmu 0xc02>,
 				 <&mmss_smmu 0xc03>;
 			power-domains = <&mmcc CAMSS_VFE0_GDSC>,
-					<&mmcc CAMSS_VFE1_GDSC>;
+					<&mmcc CAMSS_VFE1_GDSC>,
+					<&mmcc CAMSS_TOP_GDSC>;
 			status = "disabled";
 
 			ports {
