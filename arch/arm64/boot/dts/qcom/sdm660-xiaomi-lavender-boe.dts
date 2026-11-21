@@ -12,6 +12,16 @@
 	compatible = "xiaomi,lavender-boe", "qcom,sdm660";
 };
 
+&blsp_i2c1 {
+	status = "okay";
+
+};
+
 &panel {
 	compatible = "boe,td4320";
+	iovcc-supply = <&vreg_l11a_1p8>;
+};
+
+&synaptics_ts {
+	status = "okay";
 };
