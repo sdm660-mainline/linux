@@ -141,6 +141,12 @@ struct tas2557_priv {
 	unsigned int asi_offset;
 	int tdm_slot_width;
 
+	/* Cached ASI format/word length, re-applied after every reset */
+	unsigned int wordlength;	/* ASI_FORMAT[4:3] */
+	unsigned int dai_fmt;		/* ASI_FORMAT[7:5] */
+	unsigned int asi_delay;		/* extra BCLK delay for DSP_A */
+	bool tdm_configured;
+
 	/* Health tracking */
 	unsigned int restart_count;
 
@@ -151,6 +157,8 @@ struct tas2557_priv {
 /* Forward declarations */
 static void tas2557_hw_reset(struct tas2557_priv *tas2557);
 static int tas2557_failsafe_recovery(struct tas2557_priv *tas2557);
+static int tas2557_apply_asi_format(struct tas2557_priv *tas2557);
+static int tas2557_apply_asi_offset(struct tas2557_priv *tas2557);
 
 /*
  * Default device initialization sequence - identical to the TI Android
@@ -192,11 +200,12 @@ static const unsigned int tas2557_startup_data[] = {
 	TAS2557_GPI_PIN_REG,              0x15,	/* enable DIN, MCLK, CCI */
 	TAS2557_GPIO1_PIN_REG,            0x01,	/* enable BCLK (ASI1) */
 	TAS2557_GPIO2_PIN_REG,            0x01,	/* enable WCLK (ASI1) */
+	TAS2557_ASI1_DAC_FORMAT_REG,      0x00,	/* ASI1: 16-bit I2S */
 	/* ASI2 GPIO wiring; arm the BCLK source (GPIO5) before its dividers */
 	TAS2557_GPIO6_PIN_REG,            0x01,	/* GPIO6 = ASI2 WCLK input */
 	TAS2557_GPIO8_PIN_REG,            0x02,	/* GPIO8 = ASI2 DIN */
 	TAS2557_GPIO5_PIN_REG,            0x01,	/* GPIO5 = ASI2 BCLK input */
-	TAS2557_ASI2_DAC_FORMAT_REG,      0x18,	/* ASI2: 32-bit I2S */
+	TAS2557_ASI2_DAC_FORMAT_REG,      0x00,	/* ASI2: 16-bit I2S */
 	TAS2557_ASI2_BDIV_CLK_SEL_REG,   0x01,
 	TAS2557_ASI2_BDIV_CLK_RATIO_REG, 0x01,
 	TAS2557_ASI2_BDIV_CLK_RATIO_REG, 0x81,	/* power up BDIV */
@@ -1538,6 +1547,13 @@ static int tas2557_failsafe_recovery(struct tas2557_priv *tas2557)
 		if (ret < 0)
 			return ret;
 
+		ret = tas2557_apply_asi_format(tas2557);
+		if (ret < 0)
+			return ret;
+		ret = tas2557_apply_asi_offset(tas2557);
+		if (ret < 0)
+			return ret;
+
 		ret = tas2557_load_config_post_power(tas2557);
 		if (ret < 0)
 			return ret;
@@ -1609,6 +1625,42 @@ static void tas2557_check_pll_lock(struct tas2557_priv *tas2557)
 }
 
 /*
+ * Apply the cached ASI format and word length to both ASI interfaces.
+ * whyred wires playback to ASI2, but the startup sequence programs both
+ * ports and keeping them consistent avoids surprises if the board wiring
+ * or DTS route changes.
+ */
+static int tas2557_apply_asi_format(struct tas2557_priv *tas2557)
+{
+	unsigned int val = tas2557->dai_fmt | tas2557->wordlength;
+	int ret;
+
+	ret = tas2557_dev_update_bits(tas2557, TAS2557_ASI1_DAC_FORMAT_REG,
+				      TAS2557_FORMAT_MASK |
+					      TAS2557_WORDLENGTH_MASK, val);
+	if (ret >= 0)
+		ret = tas2557_dev_update_bits(tas2557,
+					      TAS2557_ASI2_DAC_FORMAT_REG,
+					      TAS2557_FORMAT_MASK |
+						      TAS2557_WORDLENGTH_MASK,
+					      val);
+	return ret;
+}
+
+/* Apply the cached data-slot offset (plus DSP_A's one-BCLK delay). */
+static int tas2557_apply_asi_offset(struct tas2557_priv *tas2557)
+{
+	unsigned int offset = tas2557->asi_offset + tas2557->asi_delay;
+	int ret;
+
+	ret = tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET1_REG, offset);
+	if (ret >= 0)
+		ret = tas2557_dev_write(tas2557,
+					TAS2557_ASI2_OFFSET1_REG, offset);
+	return ret;
+}
+
+/*
  * tas2557_enable - power the amplifier up or down
  *
  * Caller must hold tas2557->lock.  Does not touch the fault IRQ or the
@@ -1669,16 +1721,24 @@ static int tas2557_enable(struct tas2557_priv *tas2557, bool enable)
 					tas2557->dac_gain << TAS2557_DAC_GAIN_SHIFT);
 
 		/*
-		 * Re-apply the cached ASI data-slot offset (BCLK cycles).
-		 * The SW reset in tas2557_set_program() cleared the ASI
-		 * offset registers, so program them now the clocks are up.
-		 * Both ASIs are written; the board wiring selects which one
-		 * actually carries audio.
+		 * Re-apply the cached ASI format/word length and data-slot
+		 * offset.  tas2557_set_program() reset the device and the
+		 * startup sequence wrote safe defaults, so the runtime
+		 * values must be restored before audio starts.
 		 */
-		tas2557_dev_write(tas2557, TAS2557_ASI2_OFFSET1_REG,
-				  tas2557->asi_offset);
-		tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET1_REG,
-				  tas2557->asi_offset);
+		ret = tas2557_apply_asi_format(tas2557);
+		if (ret < 0) {
+			dev_err(tas2557->dev, "ASI format apply failed: %d\n",
+				ret);
+			return ret;
+		}
+
+		ret = tas2557_apply_asi_offset(tas2557);
+		if (ret < 0) {
+			dev_err(tas2557->dev, "ASI offset apply failed: %d\n",
+				ret);
+			return ret;
+		}
 
 		/* DSP post-power coefficients need active clocks to latch */
 		ret = tas2557_load_config_post_power(tas2557);
@@ -1742,41 +1802,61 @@ static int tas2557_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_component *component = dai->component;
 	struct tas2557_priv *tas2557 = snd_soc_component_get_drvdata(component);
 	unsigned int rate = params_rate(params);
-	unsigned int width, offset;
-	int ret;
+	unsigned int wordlength;
+	int ret = 0;
 
 	mutex_lock(&tas2557->lock);
 
 	dev_dbg(tas2557->dev, "hw_params: rate=%u width=%d\n",
-		rate, params_physical_width(params));
+		rate, params_width(params));
+
+	switch (params_width(params)) {
+	case 16:
+		wordlength = TAS2557_WORDLENGTH_16BIT;
+		break;
+	case 20:
+		wordlength = TAS2557_WORDLENGTH_20BIT;
+		break;
+	case 24:
+		wordlength = TAS2557_WORDLENGTH_24BIT;
+		break;
+	case 32:
+		wordlength = TAS2557_WORDLENGTH_32BIT;
+		break;
+	default:
+		dev_err(tas2557->dev, "unsupported sample width %d\n",
+			params_width(params));
+		mutex_unlock(&tas2557->lock);
+		return -EINVAL;
+	}
 
 	/* Store the rate; tas2557_enable() uses it to pick the config */
 	tas2557->sample_rate = rate;
+	tas2557->wordlength = wordlength;
 
 	/*
-	 * The ASI word length is fixed by tas2557_startup_data to match
-	 * what the DSP firmware expects; it does not depend on the stream
-	 * format, so no WORDLENGTH bits are written here.  Only the
-	 * channel data-slot offset (in BCLK cycles) depends on the
-	 * stream: channel 0 sits at offset 1 (the validated hardware
-	 * configuration); later channels follow, width*2 apart.
+	 * Plain I2S/DSP playback has no explicit TDM slot: the data starts
+	 * at the format-defined position, so OFFSET1 stays zero.  Only
+	 * set_tdm_slot() with a real rx_mask moves the slot.
 	 */
-	width = tas2557->tdm_slot_width > 0 ? tas2557->tdm_slot_width :
-					      params_physical_width(params);
-	offset = (tas2557->channel == 0) ? 1 : 1 + width * 2;
-	tas2557->asi_offset = offset;
+	if (!tas2557->tdm_configured)
+		tas2557->asi_offset = 0;
 
-	/* Playback runs over ASI2; ASI1 is programmed too (per TI driver) */
-	ret = tas2557_dev_write(tas2557, TAS2557_ASI2_OFFSET1_REG, offset);
-	if (ret < 0)
-		dev_warn(tas2557->dev, "ASI2 offset write failed: %d\n", ret);
+	/*
+	 * If the amplifier is already powered (a rate/format change on an
+	 * open stream), apply the new word length now.  Otherwise
+	 * tas2557_enable() applies the cached values after the reset and
+	 * startup sequence.
+	 */
+	if (tas2557->powered) {
+		ret = tas2557_apply_asi_format(tas2557);
+		if (ret >= 0)
+			ret = tas2557_apply_asi_offset(tas2557);
+	}
 
-	ret = tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET1_REG, offset);
-	if (ret < 0)
-		dev_warn(tas2557->dev, "ASI1 offset write failed: %d\n", ret);
-
-	dev_dbg(tas2557->dev, "ASI: %s channel, offset=%u BCLK cycles\n",
-		tas2557->channel ? "right" : "left", offset);
+	dev_dbg(tas2557->dev, "ASI: %s channel, %u-bit, offset=%u BCLK cycles\n",
+		tas2557->channel ? "right" : "left", params_width(params),
+		tas2557->asi_offset + tas2557->asi_delay);
 
 	/*
 	 * PLL (MAIN_CLKIN, PLL_CLKIN, PLL J/P/D/N) is not configured here.
@@ -1786,14 +1866,14 @@ static int tas2557_hw_params(struct snd_pcm_substream *substream,
 
 	mutex_unlock(&tas2557->lock);
 
-	return 0;
+	return ret;
 }
 
 static int tas2557_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 	struct snd_soc_component *component = dai->component;
 	struct tas2557_priv *tas2557 = snd_soc_component_get_drvdata(component);
-	unsigned int asi_fmt = 0;
+	unsigned int asi_fmt = 0, asi_delay = 0;
 	int ret;
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
@@ -1801,6 +1881,9 @@ static int tas2557_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		asi_fmt = TAS2557_FORMAT_I2S;
 		break;
 	case SND_SOC_DAIFMT_DSP_A:
+		/* DSP_B is at OFFSET1 = 0; DSP_A starts one BCLK later */
+		asi_delay = 1;
+		fallthrough;
 	case SND_SOC_DAIFMT_DSP_B:
 		asi_fmt = TAS2557_FORMAT_DSP;
 		break;
@@ -1816,12 +1899,14 @@ static int tas2557_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	}
 
 	mutex_lock(&tas2557->lock);
-	ret = tas2557_dev_update_bits(tas2557, TAS2557_ASI1_DAC_FORMAT_REG,
-				      TAS2557_FORMAT_MASK, asi_fmt);
+
+	tas2557->dai_fmt = asi_fmt;
+	tas2557->asi_delay = asi_delay;
+
+	ret = tas2557_apply_asi_format(tas2557);
 	if (ret >= 0)
-		ret = tas2557_dev_update_bits(tas2557,
-					      TAS2557_ASI2_DAC_FORMAT_REG,
-					      TAS2557_FORMAT_MASK, asi_fmt);
+		ret = tas2557_apply_asi_offset(tas2557);
+
 	mutex_unlock(&tas2557->lock);
 
 	return ret;
@@ -1862,17 +1947,25 @@ static int tas2557_set_tdm_slot(struct snd_soc_dai *dai,
 	mutex_lock(&tas2557->lock);
 
 	tas2557->tdm_slot_width = slot_width;
+	tas2557->tdm_configured = !!rx_mask;
 
 	if (rx_slot >= 0) {
+		unsigned int offset = rx_slot * slot_width;
+
+		if (offset + tas2557->asi_delay > U8_MAX) {
+			dev_err(tas2557->dev,
+				"TDM slot offset %u out of range\n", offset);
+			mutex_unlock(&tas2557->lock);
+			return -EINVAL;
+		}
 		/* RX (playback) data-slot offset in BCLK cycles */
-		tas2557->asi_offset = rx_slot * slot_width;
-		ret = tas2557_dev_write(tas2557, TAS2557_ASI1_OFFSET1_REG,
-					tas2557->asi_offset);
-		if (ret >= 0)
-			ret = tas2557_dev_write(tas2557,
-						TAS2557_ASI2_OFFSET1_REG,
-						tas2557->asi_offset);
+		tas2557->asi_offset = offset;
+	} else {
+		/* No RX slot: return to the format-defined position */
+		tas2557->asi_offset = 0;
 	}
+
+	ret = tas2557_apply_asi_offset(tas2557);
 
 	if (ret >= 0 && tx_slot >= 0) {
 		unsigned int tx_offset = tx_slot * slot_width;
@@ -1963,7 +2056,8 @@ static struct snd_soc_dai_driver tas2557_dai = {
  * ALSA mixer controls
  * =========================================================================
  */
-static DECLARE_TLV_DB_SCALE(tas2557_dac_tlv, -2800, 200, 0);
+/* DAC_GAIN is 0..15 dB in 1 dB steps (datasheet Table 27). */
+static DECLARE_TLV_DB_SCALE(tas2557_dac_tlv, 0, 100, 0);
 
 static int tas2557_volume_get(struct snd_kcontrol *kc,
 			      struct snd_ctl_elem_value *ucontrol)
@@ -2330,6 +2424,7 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 	struct device *dev = &client->dev;
 	struct tas2557_priv *tas2557;
 	const char *fw_name;
+	unsigned int i2s_bits;
 	int ret;
 
 	tas2557 = devm_kzalloc(dev, sizeof(*tas2557), GFP_KERNEL);
@@ -2345,7 +2440,9 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 	tas2557->fw_requested = false;
 
 	/* Default gain (0 dB) */
-	tas2557->dac_gain = TAS2557_DAC_GAIN_MAX;
+	tas2557->dac_gain = 0;
+	tas2557->dai_fmt = TAS2557_FORMAT_I2S;
+	tas2557->asi_delay = 0;
 
 	/* The device comes out of reset muted */
 	tas2557->muted = true;
@@ -2356,6 +2453,36 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 	else if (tas2557->channel > 1)
 		return dev_err_probe(dev, -EINVAL,
 				     "ti,channel must be 0 or 1\n");
+
+	/*
+	 * whyred's stock kernel uses ti,i2s-bits = <16>; the Q6AFE primary
+	 * MI2S path sends the same width as the PCM stream.  Accept both the
+	 * legacy ti,i2s-bits and the non-ambiguous ti,asi-word-length name
+	 * (the -bits suffix is a standard unit suffix and must not be used
+	 * for a scalar DT property).  Keep 16 bits as the safe default.
+	 */
+	if (!of_property_read_u32(dev->of_node, "ti,asi-word-length", &i2s_bits) ||
+	    !of_property_read_u32(dev->of_node, "ti,i2s-bits", &i2s_bits)) {
+		switch (i2s_bits) {
+		case 16:
+			tas2557->wordlength = TAS2557_WORDLENGTH_16BIT;
+			break;
+		case 20:
+			tas2557->wordlength = TAS2557_WORDLENGTH_20BIT;
+			break;
+		case 24:
+			tas2557->wordlength = TAS2557_WORDLENGTH_24BIT;
+			break;
+		case 32:
+			tas2557->wordlength = TAS2557_WORDLENGTH_32BIT;
+			break;
+		default:
+			return dev_err_probe(dev, -EINVAL,
+					     "ti,asi-word-length/ti,i2s-bits must be 16, 20, 24 or 32\n");
+		}
+	} else {
+		tas2557->wordlength = TAS2557_WORDLENGTH_16BIT;
+	}
 
 	if (of_property_read_u32(dev->of_node, "ti,imon-slot-no",
 				 &tas2557->imon_slot))
@@ -2376,11 +2503,11 @@ static int tas2557_i2c_probe(struct i2c_client *client)
 		strscpy(tas2557->fw_name, fw_name, sizeof(tas2557->fw_name));
 
 	/*
-	 * Seed the cached ASI data-slot offset before any hw_params() or
-	 * set_tdm_slot() call arrives; 32 is the fixed ASI word length
-	 * used by tas2557_startup_data.
+	 * Seed the cached ASI data-slot offset.  For I2S the codec's
+	 * format logic already places the MSB correctly, so OFFSET1 is
+	 * zero unless set_tdm_slot() asks for a real TDM slot.
 	 */
-	tas2557->asi_offset = (tas2557->channel == 0) ? 1 : 1 + 32 * 2;
+	tas2557->asi_offset = 0;
 
 	ret = devm_regulator_bulk_get_enable(dev, ARRAY_SIZE(tas2557_supplies),
 					     tas2557_supplies);
