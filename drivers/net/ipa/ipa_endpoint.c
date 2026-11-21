@@ -1590,14 +1590,21 @@ ipa_endpoint_status_tag_valid(struct ipa_endpoint *endpoint, const void *data)
 		 * treating it as an error.
 		 */
 		if (tag_high16 == (IPA_COOKIE >> 16) &&
-		    (tag_low32 >> 16) == (IPA_COOKIE & 0xffff))
+		    (tag_low32 >> 16) == (IPA_COOKIE & 0xffff)) {
 			dev_dbg(ipa->dev,
 				"IPA tag process status from endpoint %u\n",
 				endpoint_id);
-		else
-			dev_err_ratelimited(ipa->dev,
-					    "unexpected tagged packet from endpoint %u\n",
-					    endpoint_id);
+			return true;	/* pipeline sync marker, drop it */
+		}
+
+		/* IPA v2.6L firmware tags ordinary WAN downlink data with a
+		 * non-cookie tag.  Dropping those packets leaves the modem
+		 * netdev with RX == 0 even though the downlink arrives.
+		 */
+		dev_dbg_ratelimited(ipa->dev,
+				    "tagged data from endpoint %u, delivering\n",
+				    endpoint_id);
+		return false;
 	} else {
 		dev_err(ipa->dev, "unexpected tagged packet from endpoint %u\n",
 			endpoint_id);
