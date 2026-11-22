@@ -223,6 +223,11 @@
 	};
 };
 
+&cpu_clock_osm {
+	/* TZ does not initialise OSM on this device */
+	qcom,osm-no-tz;
+};
+
 &mdss {
 	status = "okay";
 };
