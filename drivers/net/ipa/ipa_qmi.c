@@ -4,6 +4,7 @@
  * Copyright (C) 2018-2024 Linaro Ltd.
  */
 
+#include <linux/module.h>
 #include <linux/qrtr.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -15,6 +16,17 @@
 #include "ipa_modem.h"
 #include "ipa_qmi_msg.h"
 #include "ipa_table.h"
+
+/* On IPA v2.6L the modem installs its own WAN downlink filters; an AP-side
+ * INSTALL_FILTER_RULE request for the WAN DL path conflicts with the modem
+ * and leaves DL at 0 pps (see vendor port POSTMARKETOS_X00TD_CELLULAR.md:
+ * "qcom,modem-cfg-emb-pipe-flt ... DL stays at 0 pps").  Default OFF; set
+ * wan_dl_filter=1 to restore the old wip2 behaviour for A/B testing.
+ */
+static bool wan_dl_filter;
+module_param(wan_dl_filter, bool, 0644);
+MODULE_PARM_DESC(wan_dl_filter,
+		 "install AP-side WAN DL filters on modem (default N; v2.6L modem owns them)");
 
 /**
  * DOC: AP/Modem QMI Handshake
@@ -440,7 +452,8 @@ out_free:
  */
 void ipa_qmi_wan_filters_install(struct ipa *ipa)
 {
-	ipa_qmi_install_wan_filters(ipa);
+	if (wan_dl_filter)
+		ipa_qmi_install_wan_filters(ipa);
 }
 
 static void ipa_server_install_filter_rule(struct qmi_handle *qmi,
@@ -502,11 +515,12 @@ static void ipa_server_install_filter_rule(struct qmi_handle *qmi,
 		ipa_server_filter_notif(ipa, pipe, req);
 	}
 
-	/* The modem also needs the AP's WAN downlink filters before it can
-	 * forward downlink traffic into the AP's IPA.  Stock ipacm sends
-	 * this request after setting up its local rules; do the same here.
+	/* On IPA v2.6L the modem owns the WAN DL filters; installing them from
+	 * the AP here conflicts with the modem and leaves DL at 0 pps.  Opt in
+	 * with wan_dl_filter=1 only for A/B testing.
 	 */
-	ipa_qmi_install_wan_filters(ipa);
+	if (wan_dl_filter)
+		ipa_qmi_install_wan_filters(ipa);
 }
 
 static void ipa_server_filter_installed(struct qmi_handle *qmi,
