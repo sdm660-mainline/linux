@@ -217,16 +217,18 @@ static int ipa_data_format_dpm(struct ipa_data_format *df)
 	req.info.count = 1;
 	req.info.ep_type = IPA_DPM_EP_TYPE_HSUSB;
 	req.info.iface_id = IPA_DPM_IFACE_ID;
-	/* DPM names the endpoints from the modem's point of view: the modem
-	 * transmits on the AP's RX endpoint and receives on the AP's TX
-	 * endpoint.  ModemManager's dpm_open_port() swaps tx/rx the same way
-	 * ("The modem TX endpoint connects with the IPA's RX port and the
-	 * modem RX endpoint connects with the IPA's TX port").
+	/* DPM OPEN_PORT names the endpoints as Linux exports them from the
+	 * AP's point of view: tx is AP->modem (pipe 4 here), rx is
+	 * modem->AP (pipe 5).  A vendor QMI capture on SDM636/IPA v2.6L
+	 * (miraro/postmarketos-x00td-cellular, stage_dpm_open.c) sends
+	 * tx=4/rx=5, and ModemManager's IPA setup does the same.  The old
+	 * swapped mapping (tx=5/rx=4) left the modem driving downlink on
+	 * the wrong pipe: TX counters grew while RX stayed at zero.
 	 */
 	req.info.tx_endpoint =
-		ipa->name_map[IPA_ENDPOINT_AP_MODEM_RX]->endpoint_id;
-	req.info.rx_endpoint =
 		ipa->name_map[IPA_ENDPOINT_AP_MODEM_TX]->endpoint_id;
+	req.info.rx_endpoint =
+		ipa->name_map[IPA_ENDPOINT_AP_MODEM_RX]->endpoint_id;
 
 	ret = ipa_data_format_send(df, df->dpm_node, df->dpm_port,
 				   IPA_DPM_OPEN_PORT,
