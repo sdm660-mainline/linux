@@ -286,6 +286,13 @@
 	vdda-phy-dpdm-supply = <&vreg_l7b_3p125>;
 };
 
+&remoteproc_mss {
+	firmware-name = "qcom/sdm630/Sony/nile/mba.mbn",
+			"qcom/sdm630/Sony/nile/modem.mdt";
+
+	status = "okay";
+};
+
 &rpm_requests {
 	regulators-0 {
 		compatible = "qcom,rpm-pm660l-regulators";
