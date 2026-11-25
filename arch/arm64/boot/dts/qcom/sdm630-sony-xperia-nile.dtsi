@@ -169,7 +169,7 @@
 		reg = <0x70>;
 		#address-cells = <1>;
 		#size-cells = <0>;
-		interrupts-extended = <&tlmm 45 0x2008>;
+		interrupts-extended = <&tlmm 45 IRQ_TYPE_LEVEL_LOW>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&ts_int_active &ts_lcd_id_active>;
