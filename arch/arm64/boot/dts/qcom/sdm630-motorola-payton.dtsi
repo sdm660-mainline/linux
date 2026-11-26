@@ -140,6 +140,10 @@
 	firmware-name = "qcom/sdm630/motorola/payton/a508_zap.mbn";
 };
 
+&adsp_pil {
+	firmware-name = "qcom/sdm630/motorola/payton/adsp.mbn";
+};
+
 &blsp1_uart2 {
 	status = "okay";
 };
