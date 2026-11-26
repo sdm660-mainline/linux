@@ -12,15 +12,15 @@ maintainers:
 
 description: |
   The TAS2557 is a mono, digital-input Class-D amplifier with an
-  integrated DSP for speaker protection. Audio is carried over I2S/TDM
-  (ASI). The on-chip DSP boots from a firmware image that is generated
-  for a specific speaker design using the TI PurePath Console tuning
-  tools.
+  integrated DSP for speaker protection, controlled over I2C, with
+  audio over I2S/TDM (ASI). The DSP runs a firmware image generated for
+  the speaker with the TI PurePath Console tuning tools.
 
-  Stereo playback is built from two devices, each reproducing one audio
-  slot selected through the ti,channel property and applying the
-  matching per-device tuning contained in a stereo-tuned firmware
-  image.
+  One node describes one device or a pair sharing one ASI bus, using
+  the reg-array convention of ti,tas2781.yaml. The device at reg index 0
+  is DEV_A and the one at index 1 is DEV_B; they select the two halves
+  of a stereo-tuned firmware image. The firmware format defines no
+  other device types, so a node has at most two devices.
 
   Datasheet: https://www.ti.com/lit/gpn/tas2557
 
@@ -32,18 +32,32 @@ properties:
     const: ti,tas2557
 
   reg:
-    maxItems: 1
+    minItems: 1
+    maxItems: 2
+    description:
+      I2C address of each physical device sharing this node. One
+      entry configures a single mono TAS2557. Two entries configure a
+      device pair; the device at index 0 is DEV_A and the device at
+      index 1 is DEV_B.
 
   '#sound-dai-cells':
     const: 0
 
   reset-gpios:
-    maxItems: 1
-    description: GPIO connected to the active-low RESET pin.
+    minItems: 1
+    maxItems: 2
+    description:
+      GPIO connected to the active-low RESET pin of each physical
+      device sharing this node, one entry per reg entry. A single
+      entry is shared by every device in the group.
 
   interrupts:
-    maxItems: 1
-    description: Fault interrupt output (INT).
+    minItems: 1
+    maxItems: 2
+    description:
+      Fault interrupt output (INT) of each physical device sharing
+      this node, one entry per reg entry. A single entry is shared
+      by every device in the group.
 
   vbat-supply:
     description: Battery/boost input supply (VBAT), 2.9 V to 5.5 V.
@@ -57,40 +71,39 @@ properties:
   dvdd-supply:
     description: Digital core supply, 1.65 V to 1.95 V.
 
-  ti,imon-slot-no:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: TDM TX time slot for current-sense data.
-    default: 0
-    minimum: 0
-    maximum: 7
-
-  ti,vmon-slot-no:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: TDM TX time slot for voltage-sense data.
-    default: 2
-    minimum: 0
-    maximum: 7
-
-  ti,channel:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: |
-      Audio slot of the stereo stream reproduced by this device (0 =
-      left, 1 = right). With stereo firmware this also selects which
-      per-device tuning set is applied.
-    enum: [0, 1]
-    default: 0
-
   firmware-name:
-    $ref: /schemas/types.yaml#/definitions/string
-    description: |
+    maxItems: 1
+    description:
       Name of the DSP firmware image to load. Defaults to a name
-      derived from the silicon revision. Stereo systems typically use
-      a stereo-tuned image shared by both devices.
+      derived from the silicon revision, which is the mono image, so a
+      device pair must set this property. A device pair shares one
+      image; each device's half of it is selected by its reg index,
+      not by this property.
+
+  ti,asi-port:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [1, 2]
+    default: 2
+    description:
+      Which audio serial interface (ASI1 or ASI2) of the chip is
+      wired to the host. Only the selected interface is configured.
 
 required:
   - compatible
   - reg
   - '#sound-dai-cells'
+  - vbat-supply
+  - iovdd-supply
+  - avdd-supply
+  - dvdd-supply
+
+if:
+  properties:
+    reg:
+      minItems: 2
+then:
+  required:
+    - firmware-name
 
 unevaluatedProperties: false
 
@@ -115,9 +128,31 @@ examples:
             iovdd-supply = <&vreg_l6b_1p8>;
             avdd-supply = <&vreg_l6b_1p8>;
             dvdd-supply = <&vreg_l6b_1p8>;
-
-            ti,imon-slot-no = <0>;
-            ti,vmon-slot-no = <2>;
-            ti,channel = <0>;
         };
     };
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        audio-codec@4c {
+            compatible = "ti,tas2557";
+            reg = <0x4c>, <0x4e>;
+            #sound-dai-cells = <0>;
+            reset-gpios = <&tlmm 77 GPIO_ACTIVE_LOW>,
+                          <&tlmm 78 GPIO_ACTIVE_LOW>;
+            interrupt-parent = <&tlmm>;
+            interrupts = <73 IRQ_TYPE_LEVEL_HIGH>, <74 IRQ_TYPE_LEVEL_HIGH>;
+
+            vbat-supply = <&vph_pwr>;
+            iovdd-supply = <&vreg_l6b_1p8>;
+            avdd-supply = <&vreg_l6b_1p8>;
+            dvdd-supply = <&vreg_l6b_1p8>;
+
+            firmware-name = "tas2557-stereo.bin";
+        };
+    };
+...

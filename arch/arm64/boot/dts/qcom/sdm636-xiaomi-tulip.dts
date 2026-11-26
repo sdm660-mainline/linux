@@ -188,8 +188,6 @@
 		iovdd-supply = <&vreg_l6b_1p8>;
 		avdd-supply = <&vreg_l6b_1p8>;
 		dvdd-supply = <&vreg_l6b_1p8>;
-
-		ti,channel = <0>;
 	};
 };
 
@@ -700,8 +698,7 @@
 			"PDM_RX3", "Digital PDM_RX3",
 			"Digital LPASS_PDM_TX", "PDM_TX",
 			"AMIC1", "MIC BIAS External1",
-			"AMIC2", "MIC BIAS External2",
-			"ASI2", "Primary MI2S Playback";
+			"AMIC2", "MIC BIAS External2";
 
 	mm1-dai-link {
 		link-name = "MultiMedia1";
