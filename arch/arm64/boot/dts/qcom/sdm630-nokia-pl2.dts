@@ -102,9 +102,17 @@
 			no-map;
 		};
 
+		/*
+		 * The FIH modem firmware accesses this region, so share it with
+		 * the modem like the stock kernel does.
+		 */
 		fih_nv@AC000000 {
+			compatible = "qcom,rmtfs-mem";
 			reg = <0x00 0xac000000 0x00 0x800000>;
 			no-map;
+
+			qcom,client-id = <2>;
+			qcom,vmid = <QCOM_SCM_VMID_MSS_MSA>;
 		};
 
 		venus_fw_region {
