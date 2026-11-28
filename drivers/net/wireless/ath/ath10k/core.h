@@ -838,6 +838,19 @@ enum ath10k_fw_features {
 	/* Firmware support IRAM recovery */
 	ATH10K_FW_FEATURE_IRAM_RECOVERY = 22,
 
+	/* Firmware crashes when asked for channel stats events during scan. */
+	ATH10K_FW_FEATURE_NO_CHAN_STAT_EVENT = 23,
+
+	/* Firmware advertises WMI_SERVICE_THERM_THROT but crashes when it
+	 * receives the pdev quiet mode command.
+	 */
+	ATH10K_FW_FEATURE_NO_QUIET_MODE = 24,
+
+	/* Firmware does not tune the radio during active scan on 5 GHz
+	 * channels, all 5 GHz channels must be scanned passively.
+	 */
+	ATH10K_FW_FEATURE_PASSIVE_SCAN_5GHZ = 25,
+
 	/* keep last */
 	ATH10K_FW_FEATURE_COUNT,
 };
